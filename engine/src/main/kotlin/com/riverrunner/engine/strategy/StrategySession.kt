@@ -31,13 +31,29 @@ class StrategySession(private val seed: Long, private val mode: GameMode, val co
         val view = ObservationFactory.forActor(engine, mode)
         if (view.actionIndex in pending) return
         val advice = advise(engine, BotStyle.GTO, tournament)
+        val snapshot = opponents.snapshots()
+        val river = if (view.street == Street.RIVER && view.mode == GameMode.CASH && view.opponents.size == 1) {
+            val seat = view.opponents.single().seat
+            RiverEv.analyze(view, RangeModel.infer(view, seat, snapshot[seat]), snapshot[seat],
+                (advice.baseline.options + advice.policy.options).map { it.first })
+        } else null
+        val notes = buildList {
+            if (advice.note.isNotBlank()) add(advice.note)
+            if (river != null) {
+                addAll(river.assumptions)
+                if (river.supported) {
+                    add("Top model range classes: " + river.rangeClasses.entries.take(12).joinToString(", ") { "${it.key}: ${"%.1f".format(java.util.Locale.US, it.value * 100)}%" })
+                    add("River EV is coaching-only in this version; it does not override the bounded live policy.")
+                }
+            }
+        }
         pending[view.actionIndex] = DecisionTrace(view.actionIndex, view.actorSeat, view.street,
             DecisionFingerprint.of(view), PolicySnapshot.from(advice.baseline), PolicySnapshot.from(advice.policy),
-            advice.status, advice.evidence.toList(), opponents.snapshots().values.sortedBy { it.seat },
-            notes = listOf(advice.note).filter { it.isNotBlank() })
+            advice.status, advice.evidence.toList(), snapshot.values.sortedBy { it.seat },
+            actionValues = river?.values ?: emptyList(), notes = notes)
     }
     fun finishAnalysis(handId: Long): HandAnalysis? = if (pending.isEmpty()) null else HandAnalysis(
-        handId, ExploitPolicy.VERSION, StrategyRandom.VERSION, seed, config.aiMode, pending.values.toList())
+        handId, "exploit-0.2.0", StrategyRandom.VERSION, seed, config.aiMode, pending.values.toList())
 
     fun choose(engine: HandEngine, style: BotStyle, legacyRandom: Random, tournament: TournamentContext? = null): Move {
         if (config.aiMode == AiMode.LEGACY && config.opponents[engine.toAct] != OpponentPreset.LOOSE_PASSIVE) {
