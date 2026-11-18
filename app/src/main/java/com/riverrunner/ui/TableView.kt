@@ -78,13 +78,20 @@ import kotlin.math.sin
 
 /** All positions on the table in dp, for a table area of [w] x [h] with [n] seats (hero at the bottom). */
 class TableGeometry(val w: Float, val h: Float, val n: Int) {
-    /** 7-8 players or a narrow table: smaller seats and board */
+    /** 7-9 players or a narrow table: smaller seats and board */
     val crowded = n >= 7 || w < 520f
     val cx = w / 2f
     val cy = h * 0.43f
-    val podW = if (crowded) 100f else 112f
+    // Nine seats on short landscape viewports need compact pods so neighbouring
+    // players remain separately tappable and the centre board stays legible.
+    val podW = when {
+        n == 9 && w < 445f -> 80f
+        n == 9 && w < 500f -> 92f
+        crowded -> 100f
+        else -> 112f
+    }
     val podH = 46f
-    val miniCardW = if (crowded) 22f else 24f
+    val miniCardW = if (n == 9 && w < 445f) 20f else if (crowded) 22f else 24f
     val boardCardW = if (crowded) 32f else if (w < 520f || h < 320f) 34f else 38f
     val boardCardH = boardCardW * 1.4f
     val boardGap = 4f

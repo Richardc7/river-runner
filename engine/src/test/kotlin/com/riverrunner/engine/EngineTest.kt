@@ -322,7 +322,7 @@ class SessionTest {
     }
 
     @Test fun tournamentFinishes() {
-        for (size in listOf(2, 5, 6, 7, 8)) {
+        for (size in listOf(2, 5, 6, 7, 8, 9)) {
             val s = playOut(SessionConfig(GameMode.TOURNAMENT, size, 30, TableType.MIXED, handsPerLevel = 6, seed = size.toLong()), 3000)
             assertTrue(s.isOver, "tournament $size did not finish")
             val sum = s.finish()
@@ -332,9 +332,12 @@ class SessionTest {
     }
 
     @Test fun cashSessionRuns() {
-        val s = playOut(SessionConfig(GameMode.CASH, 8, 100, TableType.GTO, seed = 11), 150)
-        val sum = s.finish(early = true)
-        assertEquals(8, sum.standings.size)
+        for (size in listOf(8, 9)) {
+            val s = playOut(SessionConfig(GameMode.CASH, size, 100, TableType.GTO, seed = size.toLong() + 3),
+                if (size == 9) 90 else 150)
+            val sum = s.finish(early = true)
+            assertEquals(size, sum.standings.size)
+        }
     }
 }
 
