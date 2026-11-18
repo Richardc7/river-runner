@@ -232,7 +232,8 @@ private fun SidePanel(
                 androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
                     val info = ui.practiceInfo
                     val live = if (heroTurn) ui.liveStrategy else null
-                    val infoMaxHeight = maxHeight * .55f
+                    val showStrategyDetails = live != null && liveExpanded
+                    val infoMaxHeight = if (showStrategyDetails) maxHeight else maxHeight * .55f
                     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         if (live != null || (ui.practice && info != null)) {
                             Column(Modifier.fillMaxWidth().heightIn(max = infoMaxHeight)
@@ -246,7 +247,7 @@ private fun SidePanel(
                                 if (ui.practice && info != null) PracticeHud(info, fmt)
                             }
                         }
-                        ActionLog(ui.log, Modifier.weight(1f))
+                        if (!showStrategyDetails) ActionLog(ui.log, Modifier.weight(1f))
                     }
                 }
             }

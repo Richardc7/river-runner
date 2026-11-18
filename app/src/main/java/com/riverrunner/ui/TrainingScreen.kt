@@ -155,8 +155,7 @@ private fun RiverTrainingEmpty(vm: AppViewModel) {
             "Recording is on. River drills need an unraked cash game. Set rake to 0 in the rules and save.",
         ) to t("前往规则设置", "Open rules")
         else -> t(
-            "决策记录已开启。建议开一桌无抽水的单挑筹码局，打到河牌并完成一手。" +
-                "面对下注或在有利位置作出河牌决策更容易生成可评分的题目。牌局保存后回到这里练习。",
+            "已开启决策记录。开一桌无抽水的单挑筹码局，打完一手河牌再回来。面对下注或在有利位置行动，更容易生成题目。",
             "Recording is on. Play an unraked heads-up cash hand through the river. Acting in position " +
                 "or facing a bet is more likely to yield a scored question. Return here after the hand is saved.",
         ) to t("配置单挑筹码局", "Set up heads-up cash")
