@@ -47,22 +47,21 @@ object StudyPresentation {
     fun choices(drill: TrainingDrill): List<ActionValue> {
         val ordered = drill.options.sortedWith(compareBy<ActionValue> { it.move.type.ordinal }.thenBy { it.move.raiseTo })
         if (ordered.size <= 6) return ordered
-        val picked = linkedSetOf<Move>()
-        for (t in listOf(MoveType.FOLD, MoveType.CHECK, MoveType.CALL)) {
-            ordered.firstOrNull { it.move.type == t }?.let { picked.add(it.move) }
+        val picked = linkedSetOf(drill.best.move)
+        fun include(option: ActionValue?) {
+            if (picked.size < 6 && option != null) picked.add(option.move)
         }
-        picked.add(drill.best.move)
+        for (type in listOf(MoveType.FOLD, MoveType.CHECK, MoveType.CALL)) {
+            include(ordered.firstOrNull { it.move.type == type })
+        }
         val raises = ordered.filter { it.move.type == MoveType.RAISE }
         if (raises.isNotEmpty()) {
-            picked.add(raises.first().move)
-            picked.add(raises.last().move)
-            picked.add(raises[raises.size / 2].move)
+            include(raises.first())
+            include(raises.last())
+            include(raises[raises.size / 2])
         }
-        for (v in ordered.sortedByDescending { it.chips }) {
-            if (picked.size >= 6) break
-            picked.add(v.move)
-        }
-        return ordered.filter { it.move in picked }.take(6)
+        for (option in ordered.sortedByDescending { it.chips }) include(option)
+        return ordered.filter { it.move in picked }
     }
 
     fun topic(topic: String, zh: Boolean): String {

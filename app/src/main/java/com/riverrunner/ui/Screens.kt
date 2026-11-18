@@ -106,7 +106,8 @@ fun HomeScreen(vm: AppViewModel) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     Box(Modifier.height(72.dp).width(110.dp)) {
                         Box(Modifier.align(Alignment.Center).offset(x = (-19).dp).graphicsLayer { rotationZ = -9f }) {
                             PlayingCard(Cards.parse("As"), 49.dp)
@@ -115,7 +116,7 @@ fun HomeScreen(vm: AppViewModel) {
                             PlayingCard(Cards.parse("Kh"), 49.dp)
                         }
                     }
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(if (st.isZh) "牌桌 · 训练中心" else "Play · Training",
                             color = Palette.Text, fontSize = 19.sp, fontWeight = FontWeight.Bold)
                         Text(if (st.isZh) "开始牌局，或针对弱项专项练习"
@@ -308,6 +309,7 @@ private fun OptionRow(label: String, content: @Composable () -> Unit) {
             modifier = Modifier.width(92.dp).padding(top = 10.dp),
         )
         FlowRow(
+            modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) { content() }
@@ -563,7 +565,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     .background(Palette.Panel).padding(14.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                SectionTitle("Exploit Edition V0.5")
+                SectionTitle("Exploit Edition V0.5.1")
                 Text(if (st.isZh) "AI、对手、抽水与筹码设置已集成；保存后从新牌桌开始生效。" else
                     "AI, opponents, rake and stacks are configurable. Saved settings apply to the next table.",
                     color = Palette.TextDim, fontSize = 12.sp)
