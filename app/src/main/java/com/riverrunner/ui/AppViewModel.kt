@@ -33,6 +33,8 @@ sealed class Screen {
     data class Replay(val record: HandRecord) : Screen()
     data object Stats : Screen()
     data object Settings : Screen()
+    data object EditionSettings : Screen()
+    data object Training : Screen()
     data object Guide : Screen()
     data object Saves : Screen()
     data object Achievements : Screen()
@@ -87,6 +89,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val editionPrefs = EditionPrefs(app)
     var editionConfig by mutableStateOf(editionPrefs.load()); private set
     fun saveEdition(config: EditionConfig) { editionPrefs.save(config); editionConfig = config }
+    private var editionReturnScreen: Screen = Screen.Home
+    private var trainingReturnScreen: Screen = Screen.Home
+
+    fun openEditionSettings() {
+        if (screen == Screen.EditionSettings) return
+        editionReturnScreen = screen
+        screen = Screen.EditionSettings
+    }
+    fun closeEditionSettings() { screen = editionReturnScreen }
+
+    fun openTraining() {
+        if (screen == Screen.Training) return
+        trainingReturnScreen = screen
+        screen = Screen.Training
+    }
+    fun closeTraining() { screen = trainingReturnScreen }
     var topUpAvailable by mutableStateOf(false); private set
     fun topUpHero() {
         val s = session ?: return

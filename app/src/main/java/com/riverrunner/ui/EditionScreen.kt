@@ -1,5 +1,6 @@
 package com.riverrunner.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,9 +15,18 @@ import com.riverrunner.engine.strategy.*
 fun EditionScreen(initial: EditionConfig, chinese: Boolean, onSave: (EditionConfig) -> Unit, onBack: () -> Unit) {
     var config by remember(initial) { mutableStateOf(initial) }
     fun text(zh: String, en: String) = if (chinese) zh else en
+    BackHandler(onBack = onBack)
     Column(Modifier.fillMaxSize().background(Palette.Bg).verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Exploit Edition", style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Exploit Edition V0.4", style = MaterialTheme.typography.headlineSmall,
+                color = Palette.Text, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = onBack) { Text(text("返回", "Back")) }
+            Button(onClick = { onSave(config); onBack() }) { Text(text("保存配置", "Save settings")) }
+        }
+        Text(text("当前配置：", "Current: ") + editionSummary(config, chinese), color = Palette.Gold)
+        Text(text("一、AI 模式与对手类型", "1. AI mode and opponent presets"),
+            style = MaterialTheme.typography.titleMedium, color = Palette.Text)
         Text(text("\u8bbe\u7f6e\u4ec5\u5bf9\u65b0\u724c\u684c\u751f\u6548\uff1b\u753b\u50cf\u5728\u6bcf\u5c40\u91cd\u65b0\u5b66\u4e60\u3002", "Settings apply to new tables. Opponent evidence resets each session."), color = Palette.TextDim)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AiMode.entries.forEach { mode ->
@@ -66,4 +76,20 @@ fun presetLabel(preset: OpponentPreset?, chinese: Boolean): String = when (prese
     OpponentPreset.NIT -> if (chinese) "\u8d85\u7d27" else "Nit"
     OpponentPreset.MANIAC -> if (chinese) "\u8fc7\u5ea6\u6fc0\u8fdb" else "Maniac"
     OpponentPreset.LOOSE_PASSIVE -> if (chinese) "\u677e\u88ab\u52a8" else "Loose passive"
+}
+
+
+/** Visible summary of exactly the settings applied by AppViewModel.startGame. */
+fun editionSummary(config: EditionConfig, chinese: Boolean): String {
+    val mode = if (config.aiMode == AiMode.ADAPTIVE) {
+        if (chinese) "动态剥削" else "Adaptive exploit"
+    } else {
+        if (chinese) "原版基准" else "Legacy baseline"
+    }
+    val opponents = if (chinese) "自定义对手 ${config.opponents.size} 位" else "${config.opponents.size} preset opponents"
+    val rake = if (config.cashRules.rakeBasisPoints == 0) {
+        if (chinese) "无抽水" else "No rake"
+    } else "${config.cashRules.rakeBasisPoints / 100.0}% rake"
+    val straddle = if (config.cashRules.utgStraddle) " · UTG Straddle" else ""
+    return "$"+"mode · $"+"opponents · $"+"rake$"+"straddle"
 }
