@@ -83,6 +83,43 @@ class StudyUxRedesignTest {
         compose.onNodeWithText("复盘 · 第 1 手").assertDoesNotExist()
     }
 
+    @Test fun replayKeepsTheSameFrameAcrossAnalysisTabs() {
+        val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
+        val session = GameSession(SessionConfig(GameMode.CASH, 2, 100, TableType.GTO, seed = 7))
+        val hand = session.startHand()
+        session.applyMove(Move.FOLD)
+        val record = session.completeHand(hand)
+        compose.setContent { RiverTheme(ZH) { EditionReplayScreen(vm, record) } }
+        compose.onNodeWithText("下一步").performClick()
+        compose.onNodeWithText("翻牌前 · 2 / 2").assertExists()
+        compose.onNodeWithText("双轨分析").performClick()
+        compose.onNodeWithText("逐街回放").performClick()
+        compose.onNodeWithText("翻牌前 · 2 / 2").assertExists()
+        compose.onNodeWithText("开头").performClick()
+        compose.onNodeWithText("翻牌前 · 1 / 2").assertExists()
+    }
+
+    @Test fun statisticsExplainMissingRatesAndFilterTheSample() {
+        val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
+        val session = GameSession(SessionConfig(GameMode.CASH, 2, 100, TableType.GTO, seed = 7))
+        val hand = session.startHand()
+        session.applyMove(Move.FOLD)
+        vm.history.add(session.completeHand(hand))
+        compose.setContent { RiverTheme(ZH) { StatsScreen(vm) } }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("样本不足时以 — 显示。").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("0%").assertDoesNotExist()
+        compose.onNodeWithText("入池率 VPIP").performClick()
+        compose.onNodeWithText("当前有 1 个有效样本，达到 50 个后显示该指标。", substring = true).assertExists()
+        compose.onNodeWithText("返回").performClick()
+        compose.onNodeWithText("锦标赛").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("还没有可用于统计的牌局。").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("1 / 50 个样本").assertDoesNotExist()
+    }
+
     @Test fun emptyTrainingRoutesToRecordingSettingsOrHeadsUpCashSetup() {
         val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
         vm.openTraining()

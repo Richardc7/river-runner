@@ -52,11 +52,9 @@ import androidx.compose.ui.unit.sp
 import com.riverrunner.engine.GameMode
 import com.riverrunner.engine.GameSession
 import com.riverrunner.engine.HandRecord
-import com.riverrunner.engine.HeroStats
 import com.riverrunner.engine.SessionConfig
 import com.riverrunner.engine.Stats
 import com.riverrunner.engine.Progress
-import com.riverrunner.engine.Achievements
 import com.riverrunner.engine.TableType
 import com.riverrunner.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
@@ -485,83 +483,6 @@ fun HistoryScreen(vm: AppViewModel) {
                 }
             }
         }
-    }
-}
-
-// ============================================================================ Stats
-
-@Composable
-fun StatsScreen(vm: AppViewModel) {
-    val st = LocalStrings.current
-    BackHandler { vm.screen = Screen.Home }
-    var stats by remember { mutableStateOf<HeroStats?>(null) }
-    LaunchedEffect(Unit) {
-        stats = withContext(Dispatchers.Default) { Stats.compute(vm.history.all()) }
-    }
-    Column(Modifier.fillMaxSize().background(Palette.Bg).padding(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallButton("← " + st.back, { vm.screen = Screen.Home })
-            Text(st.stats, color = Palette.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(
-                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Palette.Panel).padding(12.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                val s = stats
-                SectionTitle(st.heroStatsTitle + (if (s != null) " (${s.hands})" else ""))
-                if (s == null) Text(st.computing, color = Palette.TextDim)
-                else {
-                    StatLine(st.vpip, Format.pct(s.vpip))
-                    StatLine(st.pfr, Format.pct(s.pfr))
-                    StatLine(st.threeBet, Format.pct(s.threeBet))
-                    StatLine(st.wtsd, Format.pct(s.wtsd))
-                    StatLine(st.wsd, Format.pct(s.wsd))
-                    StatLine(st.bbPer100, "%.1f".format(s.bbPer100), s.bbPer100)
-                    StatLine(st.netBB, "%.1f".format(s.netBB), s.netBB)
-                }
-            }
-            Column(
-                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Palette.Panel).padding(12.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                SectionTitle(st.byPosition)
-                val s = stats
-                if (s != null) {
-                    val order = listOf("UTG", "UTG+1", "UTG+2", "HJ", "CO", "BTN", "SB", "BB")
-                    for (pos in order) s.byPosition[pos]?.let { StatLine(pos, "%.1f".format(it), it) }
-                }
-            }
-            Column(
-                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Palette.Panel).padding(12.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                val pr = vm.profile
-                fun c(k: String) = pr.counter(k)
-                val cashBB = c(Progress.CASH_PROFIT_CENTI_BB) / 100.0
-                SectionTitle(st.careerTitleFor(pr.name))
-                StatLine(st.handsLabel, "%,d".format(c(Progress.HANDS)))
-                StatLine(st.sessions, "${c(Progress.CASH_SESSIONS)}")
-                StatLine(st.cashProfitBB, "%.1f".format(cashBB), cashBB)
-                StatLine(st.tournamentsPlayed, "${c(Progress.TOURNEYS)}")
-                StatLine(st.tournamentWins, "${c(Progress.TOURNEY_WINS)}")
-                StatLine(st.itm, "${c(Progress.TOURNEY_ITM)}")
-                StatLine(st.tourneyPoints, "${c(Progress.TOURNEY_POINTS)}", c(Progress.TOURNEY_POINTS).toDouble())
-                StatLine(st.achievements, "${pr.unlocked.size} / ${Achievements.all.size}")
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatLine(label: String, value: String, signed: Double? = null) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text(label, color = Palette.TextDim, fontSize = 13.sp, modifier = Modifier.weight(1f))
-        Text(
-            value, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-            color = when { signed == null -> Palette.Text; signed > 0 -> Palette.Green; signed < 0 -> Palette.Red; else -> Palette.Text },
-        )
     }
 }
 

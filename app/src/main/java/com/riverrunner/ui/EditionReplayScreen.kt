@@ -8,59 +8,73 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.engine.*
 import com.riverrunner.engine.strategy.*
 
+private enum class ReplayPage(val zh: String, val en: String) {
+    TABLE("逐街回放", "Replay"),
+    COMPARISON("双轨分析", "Policy comparison"),
+    BLIND("盲测复盘", "Blind quiz"),
+    WEAKNESSES("弱点报告", "Weaknesses"),
+    RANGE("翻前范围", "Preflop range"),
+    WHAT_IF("情景对比", "What-if");
+
+    fun title(chinese: Boolean) = if (chinese) zh else en
+}
+
 @Composable
 fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boolean = false) {
     var record by remember(initial.id) { mutableStateOf(initial) }
-    var report by remember(initial.id) { mutableStateOf(false) }
-    var coachTab by remember(initial.id, startBlind) { mutableIntStateOf(if (startBlind) 1 else 0) }
-    var startIndex by remember(initial.id) { mutableIntStateOf(0) }
+    var page by remember(initial.id, startBlind) {
+        mutableStateOf(if (startBlind && vm.blindReviewEnabled) ReplayPage.BLIND else ReplayPage.TABLE)
+    }
+    var frameIndex by remember(initial.id) { mutableIntStateOf(0) }
     var analysis by remember(initial.id) { mutableStateOf<HandAnalysis?>(null) }
     var reference by remember(initial.id) { mutableStateOf<ReferenceBook?>(null) }
     var loaded by remember(initial.id) { mutableStateOf(false) }
     LaunchedEffect(initial.id) { analysis = vm.analysisFor(initial); loaded = true }
-    LaunchedEffect(report, initial.id) { if (report) reference = vm.referenceForTraining() }
+    LaunchedEffect(page, initial.id) { if (page == ReplayPage.COMPARISON) reference = vm.referenceForTraining() }
     val leave: () -> Unit = { if (vm.reviewing) vm.continueFromReview() else vm.screen = Screen.History }
     BackHandler(onBack = leave)
-    val zh = LocalStrings.current.isZh
+    val st = LocalStrings.current
+    val zh = st.isZh
     val replayer = remember(initial.id) { Replayer(initial) }
     val nodes = remember(record.id, analysis) { historicalDecisions(record, analysis, replayer) }
+    val tools = buildList {
+        if (vm.blindReviewEnabled) add(ReplayPage.BLIND)
+        if (vm.weaknessReportEnabled) add(ReplayPage.WEAKNESSES)
+        if (vm.preflopCoachEnabled) add(ReplayPage.RANGE)
+        if (vm.riverWhatIfEnabled) add(ReplayPage.WHAT_IF)
+    }
     Column(Modifier.fillMaxSize().background(Palette.Bg)) {
-        if (coachTab != 1 && record.rake > 0) {
-            Text((if (zh) "本手抽水: " else "Hand rake: ") + vm.fmt(record.rake, record.bigBlind), color = Palette.TextDim)
-        }
-        Row(Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { coachTab = 0; report = false }) { Text(if (zh) "逐街回放" else "Replay") }
-            TextButton(onClick = { coachTab = 0; report = true }) { Text(if (zh) "双轨分析" else "Policy comparison") }
-            if (vm.blindReviewEnabled) TextButton(onClick = { coachTab = 1 }) { Text(if (zh) "盲测复盘" else "Blind quiz") }
-            if (vm.weaknessReportEnabled) TextButton(onClick = { coachTab = 2 }) { Text(if (zh) "弱点报告" else "Weaknesses") }
-            if (vm.preflopCoachEnabled) TextButton(onClick = { coachTab = 3 }) { Text(if (zh) "翻前范围" else "Preflop range") }
-            if (vm.riverWhatIfEnabled) TextButton(onClick = { coachTab = 4 }) { Text(if (zh) "情景对比" else "What-if") }
-            TextButton(onClick = leave) { Text(if (vm.reviewing) { if (zh) "下一手" else "Next hand" } else if (zh) "返回" else "Back") }
+        ReplayNavigation(page, tools, if (vm.reviewing) null else leave) { page = it }
+        if (page != ReplayPage.BLIND && record.rake > 0) {
+            Text((if (zh) "本手抽水 " else "Hand rake ") + vm.fmt(record.rake, record.bigBlind),
+                color = Palette.TextDim, modifier = Modifier.padding(horizontal = 12.dp))
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (coachTab == 1 && vm.blindReviewEnabled) {
+            if (page == ReplayPage.BLIND) {
                 if (loaded) BlindReplayCoach(vm, record, nodes)
                 else Text(
                     if (zh) "正在读取盲测决策…" else "Loading blind replay decisions…",
                     color = Palette.TextDim, modifier = Modifier.padding(12.dp),
                 )
-            } else if (coachTab == 2 && vm.weaknessReportEnabled) {
+            } else if (page == ReplayPage.WEAKNESSES) {
                 WeaknessReportCoach(vm)
-            } else if (coachTab == 3 && vm.preflopCoachEnabled) {
+            } else if (page == ReplayPage.RANGE) {
                 PreflopRangeCoachPanel(vm, nodes)
-            } else if (coachTab == 4 && vm.riverWhatIfEnabled) {
+            } else if (page == ReplayPage.WHAT_IF) {
                 RiverWhatIfCoachPanel(vm, nodes)
-            } else if (!report) key(record.id, startIndex) {
-                ReplayContent(record, { vm.fmt(it, record.bigBlind) }, leave,
-                    { vm.toggleFavorite(record.id)?.let { record = it } }, startIndex,
-                    if (vm.reviewing) vm::continueFromReview else null)
+            } else if (page == ReplayPage.TABLE) {
+                ReplayContent(
+                    record = record, fmt = { vm.fmt(it, record.bigBlind) }, onBack = null,
+                    onStar = { vm.toggleFavorite(record.id)?.let { record = it } },
+                    startIndex = frameIndex, decisions = nodes, onFrameChanged = { frameIndex = it },
+                )
             } else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 val data = analysis
                 if (!loaded) Text(if (zh) "\u8bfb\u53d6\u4e2d" else "Loading", color = Palette.Text)
@@ -115,8 +129,8 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                                         Text(StudyPresentation.modelNote(it, zh), color = Palette.TextDim)
                                     }
                                     TextButton(onClick = {
-                                        startIndex = replayer.frames.indexOfFirst { replayer.actionIndexOf(it) == trace.actionIndex }.coerceAtLeast(0)
-                                        report = false
+                                        frameIndex = replayer.frames.indexOfFirst { replayer.actionIndexOf(it) == trace.actionIndex }.coerceAtLeast(0)
+                                        page = ReplayPage.TABLE
                                     }) { Text(if (zh) "\u67e5\u770b\u5bf9\u5e94\u724c\u9762" else "Show replay at this decision") }
                                 }
                             }
@@ -125,6 +139,60 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                 }
             }
         }
+        if (vm.reviewing) {
+            Box(Modifier.fillMaxWidth().background(Palette.Panel).padding(horizontal = 8.dp, vertical = 6.dp),
+                contentAlignment = Alignment.CenterEnd) {
+                ActionButton(st.reviewNext, Palette.Gold, Modifier.width(224.dp).height(40.dp),
+                    textColor = Palette.Ink, onClick = vm::continueFromReview)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReplayNavigation(
+    page: ReplayPage,
+    tools: List<ReplayPage>,
+    onExit: (() -> Unit)?,
+    onPage: (ReplayPage) -> Unit,
+) {
+    val st = LocalStrings.current
+    var expanded by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SingleChoiceSegmentedButtonRow {
+                listOf(ReplayPage.TABLE, ReplayPage.COMPARISON).forEachIndexed { index, target ->
+                    SegmentedButton(
+                        selected = page == target, onClick = { onPage(target) },
+                        shape = SegmentedButtonDefaults.itemShape(index, count = 2),
+                    ) { Text(target.title(st.isZh), maxLines = 1) }
+                }
+            }
+            if (tools.isNotEmpty()) {
+                Box {
+                    OutlinedButton(onClick = { expanded = true }) {
+                        val label = if (page in tools) page.title(st.isZh)
+                        else if (st.isZh) "训练工具" else "Study tools"
+                        Text("$label ▾", maxLines = 1)
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        tools.forEach { target ->
+                            DropdownMenuItem(
+                                text = { Text(target.title(st.isZh)) },
+                                onClick = { expanded = false; onPage(target) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        if (onExit != null) TextButton(onClick = onExit) { Text("← " + st.back) }
     }
 }
 

@@ -301,6 +301,37 @@ class RecordTest {
     }
 }
 
+class StatsTest {
+    @Test fun samplesAndTrendFollowActualOpportunitiesAndChronologicalHands() {
+        val engine = HandEngine(
+            HandSetup(50, 100, 0, 1, listOf(SeatSetup(0, "Hero", 10000), SeatSetup(1, "Bot", 10000))),
+            PresetCardSource(mapOf(0 to Cards.parseMany("AhAd"), 1 to Cards.parseMany("KhKd")),
+                Cards.parseMany("2c3d4h8s9c")),
+        )
+        engine.apply(Move.raiseTo(300))
+        engine.apply(Move.CALL)
+        while (engine.phase != Phase.HAND_DONE) {
+            if (engine.phase == Phase.STREET_DONE) engine.dealNextStreet() else engine.apply(Move.CHECK)
+        }
+        val won = HandRecord.from(engine, GameMode.CASH, 1, 0, 2, emptyMap()).copy(time = 10)
+        val foldEngine = HandEngine(
+            HandSetup(50, 100, 0, 0, listOf(SeatSetup(0, "Hero", 10000), SeatSetup(1, "Bot", 10000))),
+            PresetCardSource(mapOf(0 to Cards.parseMany("AhAd"), 1 to Cards.parseMany("KhKd")),
+                Cards.parseMany("2c3d4h8s9c")),
+        )
+        foldEngine.apply(Move.FOLD)
+        val folded = HandRecord.from(foldEngine, GameMode.CASH, 2, 0, 2, emptyMap()).copy(time = 20)
+
+        val stats = Stats.compute(listOf(folded, won))
+        assertEquals(2, stats.hands)
+        assertEquals(1, stats.threeBetOpportunities)
+        assertEquals(1, stats.flopsSeen)
+        assertEquals(1, stats.showdowns)
+        assertEquals(listOf(NetPoint(10, 3.0), NetPoint(20, 2.5)), stats.netTrend)
+        assertEquals(stats.netTrend.last().cumulativeBB, stats.netBB)
+    }
+}
+
 class SessionTest {
     private fun playOut(cfg: SessionConfig, maxHands: Int): GameSession {
         val s = GameSession(cfg)

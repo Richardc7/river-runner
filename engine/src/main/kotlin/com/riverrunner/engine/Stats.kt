@@ -1,5 +1,7 @@
 package com.riverrunner.engine
 
+data class NetPoint(val time: Long, val cumulativeBB: Double)
+
 data class HeroStats(
     val hands: Int,
     /** voluntarily put money in pot preflop */
@@ -17,6 +19,10 @@ data class HeroStats(
     /** total net result in big blinds */
     val netBB: Double,
     val byPosition: Map<String, Double>,
+    val threeBetOpportunities: Int,
+    val flopsSeen: Int,
+    val showdowns: Int,
+    val netTrend: List<NetPoint>,
 )
 
 object Stats {
@@ -25,7 +31,8 @@ object Stats {
         var sawFlop = 0; var showdowns = 0; var wonSd = 0
         var netBB = 0.0
         val posNet = HashMap<String, Double>()
-        for (r in records) {
+        val trend = ArrayList<NetPoint>(records.size)
+        for (r in records.sortedBy { it.time }) {
             val hero = r.heroSeat
             val pre = r.actions.filter { it.street == Street.PREFLOP && !it.type.isPost }
             val mine = pre.filter { it.seat == hero }
@@ -52,6 +59,7 @@ object Stats {
             }
             val bbNet = r.heroNet.toDouble() / r.bigBlind
             netBB += bbNet
+            trend += NetPoint(r.time, netBB)
             val pos = positionOf(r)
             posNet[pos] = (posNet[pos] ?: 0.0) + bbNet
         }
@@ -61,6 +69,7 @@ object Stats {
             hands = n, vpip = pct(vpip, n), pfr = pct(pfr, n), threeBet = pct(tb, tbOpp),
             wtsd = pct(showdowns, sawFlop), wsd = pct(wonSd, showdowns),
             bbPer100 = if (n == 0) 0.0 else netBB / n * 100, netBB = netBB, byPosition = posNet,
+            threeBetOpportunities = tbOpp, flopsSeen = sawFlop, showdowns = showdowns, netTrend = trend,
         )
     }
 

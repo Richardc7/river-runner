@@ -115,12 +115,6 @@ internal fun SolverReferencePanel(view: DecisionView, reference: ReferenceBook?)
     val zh = LocalStrings.current.isZh
     val choices = node.actions.filter { it.frequency > 0 }.sortedByDescending { it.frequency }
     var details by remember(book, view) { mutableStateOf(false) }
-    fun choiceColor(type: MoveType) = when (type) {
-        MoveType.FOLD -> Palette.Red
-        MoveType.CHECK -> Palette.Blue
-        MoveType.CALL -> Palette.Green
-        MoveType.RAISE -> Palette.Gold
-    }
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Palette.PanelHi).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -128,15 +122,7 @@ internal fun SolverReferencePanel(view: DecisionView, reference: ReferenceBook?)
         Text(if (zh) "外部策略参考" else "External strategy reference",
             color = Palette.Gold, style = MaterialTheme.typography.titleMedium)
         Text(book.provenance.source + " · " + book.provenance.author, color = Palette.Text, fontSize = 12.sp)
-        Row(
-            Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(4.dp)),
-            horizontalArrangement = Arrangement.spacedBy(1.dp),
-        ) {
-            for (choice in choices) {
-                Box(Modifier.weight(choice.frequency.toFloat().coerceAtLeast(Float.MIN_VALUE))
-                    .height(6.dp).background(choiceColor(choice.move.type)))
-            }
-        }
+        StrategyFrequencyBar(choices.map { it.move.type to it.frequency })
         for (choice in choices) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 val action = if (view.legal.isOpeningBet && choice.move.type == MoveType.RAISE) {
@@ -144,7 +130,7 @@ internal fun SolverReferencePanel(view: DecisionView, reference: ReferenceBook?)
                 } else StudyPresentation.move(choice.move, view.bigBlind, zh)
                 Text(action, color = Palette.Text, fontSize = 12.sp, modifier = Modifier.weight(1f))
                 Text("%.1f%%".format(Locale.US, choice.frequency * 100),
-                    color = choiceColor(choice.move.type), fontSize = 12.sp)
+                    color = strategyActionColor(choice.move.type), fontSize = 12.sp)
             }
         }
         TextButton(onClick = { details = !details }) {
@@ -153,6 +139,26 @@ internal fun SolverReferencePanel(view: DecisionView, reference: ReferenceBook?)
         if (details) {
             Text(book.provenance.context, color = Palette.TextDim, fontSize = 11.sp)
             Text(book.provenance.licence, color = Palette.TextDim, fontSize = 11.sp)
+        }
+    }
+}
+
+internal fun strategyActionColor(type: MoveType) = when (type) {
+    MoveType.FOLD -> Palette.Red
+    MoveType.CHECK -> Palette.Blue
+    MoveType.CALL -> Palette.Green
+    MoveType.RAISE -> Palette.Gold
+}
+
+@Composable
+internal fun StrategyFrequencyBar(frequencies: List<Pair<MoveType, Double>>) {
+    Row(
+        Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(4.dp)),
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        for ((type, frequency) in frequencies) {
+            if (frequency > 0) Box(Modifier.weight(frequency.toFloat().coerceAtLeast(Float.MIN_VALUE))
+                .height(6.dp).background(strategyActionColor(type)))
         }
     }
 }
