@@ -229,6 +229,19 @@ private fun SidePanel(
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     val info = ui.practiceInfo
+                    val live = ui.liveStrategy
+                    if (heroTurn && live != null) {
+                        Column(Modifier.fillMaxWidth().background(Palette.PanelHi).padding(5.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(live.label, color = Palette.Gold, fontSize = 10.sp, maxLines = 2)
+                            Text(live.choices.sortedByDescending { it.probability }.take(4).joinToString("  ") {
+                                it.move.type.name + (if (it.move.type == com.riverrunner.engine.MoveType.RAISE)
+                                    " " + fmt(it.move.raiseTo) else "") + " " +
+                                    "%.0f%%".format(java.util.Locale.US, it.probability * 100)
+                            }, color = Palette.Text, fontSize = 10.sp, maxLines = 3)
+                            Text(live.source, color = Palette.TextDim, fontSize = 9.sp, maxLines = 1)
+                        }
+                    }
                     if (ui.practice && info != null) PracticeHud(info, fmt)
                     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                         if (maxHeight > 36.dp) ActionLog(ui.log, Modifier.fillMaxSize())

@@ -72,6 +72,44 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         out
     }
+    /** Aggregates only fingerprint-matched historical hero decision-time records. */
+    suspend fun studyAssessments(): List<DecisionAssessment> = withContext(Dispatchers.IO) {
+        val id = profile.id
+        val store = analysisStore(id)
+        val output = ArrayList<DecisionAssessment>()
+        for (record in history.all().takeLast(300)) {
+            val analysis = runCatching { store.load(record.id) }.getOrNull() ?: continue
+            val replay = Replayer(record)
+            val voluntary = record.actions.filter { !it.type.isPost }
+            for (trace in analysis.decisions) {
+                if (trace.seat != record.heroSeat) continue
+                val view = runCatching {
+                    ObservationFactory.forActor(replay.engineBeforeAction(trace.actionIndex), record.mode)
+                }.getOrNull() ?: continue
+                if (view.actorSeat != record.heroSeat || DecisionFingerprint.of(view) != trace.contextHash) continue
+                val assessed = runCatching {
+                    StudyCoach.assess(record.id, view, trace, voluntary.getOrNull(trace.actionIndex))
+                }.getOrNull() ?: continue
+                output += assessed
+            }
+        }
+        output
+    }
+
+    suspend fun loadSpacedProgress(): ReviewProgress = withContext(Dispatchers.IO) {
+        SpacedReviewStore(analysisRoot, profile.id).load()
+    }
+    fun saveSpacedProgress(value: ReviewProgress) {
+        val id = profile.id
+        viewModelScope.launch(Dispatchers.IO) { SpacedReviewStore(analysisRoot, id).save(value) }
+    }
+    suspend fun getStudyRecord(id: Long): HandRecord? = withContext(Dispatchers.IO) {
+        history.all().firstOrNull { it.id == id }
+    }
+    suspend fun getStudyAnalysis(id: Long): HandAnalysis? = withContext(Dispatchers.IO) {
+        runCatching { analysisStore().load(id) }.getOrNull()
+    }
+
     suspend fun loadTrainingProgress(): TrainingProgress = withContext(Dispatchers.IO) {
         TrainingProgressStore(analysisRoot, profile.id).load()
     }
@@ -89,6 +127,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val editionPrefs = EditionPrefs(app)
     var editionConfig by mutableStateOf(editionPrefs.load()); private set
     fun saveEdition(config: EditionConfig) { editionPrefs.save(config); editionConfig = config }
+
+    var blindReviewEnabled by mutableStateOf(prefs.blindReview); private set
+    var weaknessReportEnabled by mutableStateOf(prefs.weaknessReport); private set
+    var spacedDrillsEnabled by mutableStateOf(prefs.spacedDrills); private set
+    var preflopCoachEnabled by mutableStateOf(prefs.preflopCoach); private set
+    var riverWhatIfEnabled by mutableStateOf(prefs.riverWhatIf); private set
+    var realtimeGtoEnabled by mutableStateOf(prefs.realtimeGto); private set
+    fun setStudyToggle(kind: String, enabled: Boolean) {
+        when (kind) {
+            "blind" -> { prefs.blindReview = enabled; blindReviewEnabled = enabled }
+            "weak" -> { prefs.weaknessReport = enabled; weaknessReportEnabled = enabled }
+            "spaced" -> { prefs.spacedDrills = enabled; spacedDrillsEnabled = enabled }
+            "preflop" -> { prefs.preflopCoach = enabled; preflopCoachEnabled = enabled }
+            "whatif" -> { prefs.riverWhatIf = enabled; riverWhatIfEnabled = enabled }
+            "live" -> { prefs.realtimeGto = enabled; realtimeGtoEnabled = enabled }
+            else -> error("Unknown study toggle")
+        }
+    }
     private var editionReturnScreen: Screen = Screen.Home
     private var trainingReturnScreen: Screen = Screen.Home
 
@@ -137,7 +193,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun deleteProfile(id: String) {
         if (screen == Screen.Table || reviewing) return
-        analysisStore(id).deleteAll(); TrainingProgressStore(analysisRoot, id).delete(); TrainingReferenceStore(analysisRoot, id).delete(); profiles.delete(id); switchProfile(profiles.active().id)
+        analysisStore(id).deleteAll(); TrainingProgressStore(analysisRoot, id).delete(); SpacedReviewStore(analysisRoot, id).delete(); TrainingReferenceStore(analysisRoot, id).delete(); profiles.delete(id); switchProfile(profiles.active().id)
     }
     fun nextProfileName(): String = profiles.nextDefaultName()
     val maxSlots: Int get() = ProfileStore.MAX_SLOTS
@@ -194,6 +250,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun sfx(s: Sound, volume: Float = 1f) { if (!fastForward) sound.play(s, volume) }
     override fun onCleared() { sound.release(); super.onCleared() }
 
+    private var liveStrategyHint by mutableStateOf<LiveStrategyHint?>(null)
     private var table by mutableStateOf<TableUi?>(null)
     private var legal by mutableStateOf<LegalActions?>(null)
     private var practiceInfo by mutableStateOf<PracticeInfo?>(null)
@@ -214,7 +271,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         practice = practice, legal = legal, practiceInfo = practiceInfo, log = log.toList(),
         handOver = handOver, actingName = actingName, heroInHand = heroInHand,
         fastForward = fastForward, sessionOver = sessionOver, notice = notice, soundOn = soundOn,
-        starred = starHand, reviewEach = reviewEachHand,
+        starred = starHand, reviewEach = reviewEachHand, liveStrategy = liveStrategyHint,
     )
     private var session: GameSession? = null
     private var lastConfig: SessionConfig? = null
@@ -229,7 +286,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val botDelay: Long get() = when (prefs.speed) { 0 -> 1500L; 2 -> 450L; else -> 900L }
 
     fun startGame(config: SessionConfig) {
-        gameJob?.cancel(); topUpAvailable = false
+        gameJob?.cancel(); topUpAvailable = false; liveStrategyHint = null
         val selected = config.copy(edition = editionConfig.copy(opponents = editionConfig.opponents.toMap()))
         lastConfig = selected
         val s = GameSession(selected); session = s
@@ -275,8 +332,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         } else null
     }
     private suspend fun runGame(s: GameSession) {
+        val savedReference = if (prefs.realtimeGto) withContext(Dispatchers.IO) {
+            TrainingReferenceStore(analysisRoot, profile.id).load()
+        } else null
         while (!s.isOver && !quitRequested) {
-            topUpAvailable = false
+            topUpAvailable = false; liveStrategyHint = null
             val buyInsBefore = s.buyIns.size
             val e = s.startHand()
             handKey = System.nanoTime(); actionSeq = 0; handNumber = s.handNumber + 1
@@ -312,13 +372,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             if (quitRequested) { apply(e, s, Move.FOLD); continue }
                             fastForward = false; actingName = null
                             withContext(Dispatchers.Default) { s.strategy.capture(e, s.tournamentContext()) }
+                            liveStrategyHint = if (prefs.realtimeGto) withContext(Dispatchers.Default) {
+                                val view = ObservationFactory.forActor(e, s.config.mode)
+                                val match = savedReference?.lookup(view)
+                                if (match != null) LiveStrategyHint(
+                                    "外部声明参考（未验证 GTO） / Unverified external reference",
+                                    match.actions.map { PolicyChoice(it.move, it.frequency) },
+                                    savedReference.provenance.source
+                                ) else {
+                                    val baseline = s.strategy.capturedBaseline(e)
+                                        ?: PolicySnapshot.from(s.strategy.advise(e, BotStyle.GTO, s.tournamentContext()).baseline)
+                                    LiveStrategyHint("启发式基准（非 GTO） / Heuristic, NOT GTO",
+                                        baseline.choices, "Decision-time information only")
+                                }
+                            } else null
                             val la = e.legalActions(); val me = e.player(seat)
                             practiceInfo = PracticeInfo(la.toCall, la.pot,
                                 if (la.toCall > 0) la.toCall.toDouble() / (la.pot + la.toCall) else 0.0,
                                 me.stack.toDouble() / maxOf(1, la.pot), TableMapper.handText(strings, me.hole, e.board))
                             legal = la; publish(s, e, TableMapper.Stage.LIVE); sound.play(Sound.TURN, 0.55f, varyPitch = false)
                             val d = CompletableDeferred<Move>(); heroMove = d
-                            val move = d.await(); heroMove = null; legal = null; practiceInfo = null
+                            val move = d.await(); heroMove = null; legal = null; practiceInfo = null; liveStrategyHint = null
                             apply(e, s, move); if (e.player(seat).folded) heroInHand = false
                         } else {
                             actingName = s.players[seat].name
@@ -332,7 +406,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     Phase.HAND_DONE -> {}
                 }
             }
-            legal = null; actingName = null
+            legal = null; actingName = null; liveStrategyHint = null
             val infosBefore = seatInfos(s); val built = s.completeHand(e)
             val rec = if (starHand) built.copy(favorite = true) else built
             val store = history; val traces = analysisStore(); val analysis = s.lastAnalysis

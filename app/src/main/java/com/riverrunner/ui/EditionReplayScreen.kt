@@ -2,6 +2,7 @@ package com.riverrunner.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,6 +17,7 @@ import com.riverrunner.engine.strategy.*
 fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
     var record by remember(initial.id) { mutableStateOf(initial) }
     var report by remember(initial.id) { mutableStateOf(false) }
+    var coachTab by remember(initial.id) { mutableIntStateOf(0) }
     var startIndex by remember(initial.id) { mutableIntStateOf(0) }
     var analysis by remember(initial.id) { mutableStateOf<HandAnalysis?>(null) }
     var loaded by remember(initial.id) { mutableStateOf(false) }
@@ -24,15 +26,29 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
     BackHandler(onBack = leave)
     val zh = vm.prefs.chinese
     val replayer = remember(initial.id) { Replayer(initial) }
+    val nodes = remember(record.id, analysis) { historicalDecisions(record, analysis, replayer) }
     Column(Modifier.fillMaxSize().background(Palette.Bg)) {
         if (record.rake > 0) Text((if (zh) "\u672c\u624b\u62bd\u6c34: " else "Hand rake: ") + vm.fmt(record.rake, record.bigBlind), color = Palette.TextDim)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { report = false }) { Text(if (zh) "\u9010\u8857\u56de\u653e" else "Street replay") }
-            TextButton(onClick = { report = true }) { Text(if (zh) "\u53cc\u8f68\u7b56\u7565\u5206\u6790" else "Decision-time strategy report") }
-            TextButton(onClick = leave) { Text(if (vm.reviewing) { if (zh) "\u4e0b\u4e00\u624b" else "Next hand" } else if (zh) "\u8fd4\u56de" else "Back") }
+        Row(Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TextButton(onClick = { coachTab = 0; report = false }) { Text(if (zh) "逐街回放" else "Replay") }
+            TextButton(onClick = { coachTab = 0; report = true }) { Text(if (zh) "双轨分析" else "Policy comparison") }
+            if (vm.blindReviewEnabled) TextButton(onClick = { coachTab = 1 }) { Text(if (zh) "盲测复盘" else "Blind quiz") }
+            if (vm.weaknessReportEnabled) TextButton(onClick = { coachTab = 2 }) { Text(if (zh) "弱点报告" else "Weaknesses") }
+            if (vm.preflopCoachEnabled) TextButton(onClick = { coachTab = 3 }) { Text(if (zh) "翻前范围" else "Preflop range") }
+            if (vm.riverWhatIfEnabled) TextButton(onClick = { coachTab = 4 }) { Text("What-if") }
+            TextButton(onClick = leave) { Text(if (vm.reviewing) { if (zh) "下一手" else "Next hand" } else if (zh) "返回" else "Back") }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (!report) key(record.id, startIndex) {
+            if (coachTab == 1 && vm.blindReviewEnabled) {
+                BlindReplayCoach(vm, record, nodes)
+            } else if (coachTab == 2 && vm.weaknessReportEnabled) {
+                WeaknessReportCoach(vm)
+            } else if (coachTab == 3 && vm.preflopCoachEnabled) {
+                PreflopRangeCoachPanel(vm, nodes)
+            } else if (coachTab == 4 && vm.riverWhatIfEnabled) {
+                RiverWhatIfCoachPanel(vm, nodes)
+            } else if (!report) key(record.id, startIndex) {
                 ReplayContent(record, { vm.fmt(it, record.bigBlind) }, leave,
                     { vm.toggleFavorite(record.id)?.let { record = it } }, startIndex,
                     if (vm.reviewing) vm::continueFromReview else null)

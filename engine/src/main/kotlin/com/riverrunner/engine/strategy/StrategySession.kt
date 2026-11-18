@@ -52,6 +52,11 @@ class StrategySession(private val seed: Long, private val mode: GameMode, val co
             advice.status, advice.evidence.toList(), snapshot.values.sortedBy { it.seat },
             actionValues = river?.values ?: emptyList(), notes = notes)
     }
+    fun capturedBaseline(engine: HandEngine): PolicySnapshot? {
+        if (engine.phase != Phase.BETTING || engine.toAct != GameSession.HERO_SEAT) return null
+        val view = ObservationFactory.forActor(engine, mode)
+        return pending[view.actionIndex]?.takeIf { it.contextHash == DecisionFingerprint.of(view) }?.baseline
+    }
     fun finishAnalysis(handId: Long): HandAnalysis? = if (pending.isEmpty()) null else HandAnalysis(
         handId, "exploit-0.3.0", StrategyRandom.VERSION, seed, config.aiMode, pending.values.toList())
 

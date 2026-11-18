@@ -30,12 +30,14 @@ data class WinLine(val name: String, val amount: Int, val handName: String?)
 data class ShowLine(val name: String, val cards: IntArray, val handName: String, val won: Int, val isHero: Boolean)
 data class HandOverUi(val winners: List<WinLine>, val showdown: List<ShowLine>, val heroNet: Int, val byFold: Boolean)
 data class PracticeInfo(val toCall: Int, val pot: Int, val potOdds: Double, val spr: Double, val handText: String)
+data class LiveStrategyHint(val label: String, val choices: List<com.riverrunner.engine.strategy.PolicyChoice>, val source: String)
 data class TableScreenUi(
     val table: TableUi?, val handNumber: Int, val blindsText: String, val levelText: String?,
     val practice: Boolean, val legal: LegalActions?, val practiceInfo: PracticeInfo?, val log: List<LogLine>,
     val handOver: HandOverUi?, val actingName: String?, val heroInHand: Boolean,
     val fastForward: Boolean, val sessionOver: Boolean, val notice: String? = null,
     val starred: Boolean = false, val reviewEach: Boolean = false, val soundOn: Boolean = true,
+    val liveStrategy: LiveStrategyHint? = null,
 )
 data class SeatInfo(val seat: Int, val name: String, val isHero: Boolean, val stack: Int, val busted: Boolean)
 
