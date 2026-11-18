@@ -436,20 +436,21 @@ private fun HeroSeat(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Stri
         Box {
             PodFrame(s, pulse, Modifier.size((g.podW + 16).dp, g.podH.dp)) {
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(s.name, color = Palette.Text, fontSize = 12.sp, lineHeight = 14.sp,
                             fontWeight = FontWeight.SemiBold, maxLines = 1)
                         if (s.position.isNotEmpty()) {
-                            Spacer(Modifier.width(5.dp))
                             Text(s.position, color = Palette.TextDim, fontSize = 10.sp, lineHeight = 12.sp,
                                 fontWeight = FontWeight.Bold)
                         }
+                        Text(
+                            if (s.busted) "—" else fmt(s.stack), color = if (s.allIn) Palette.Red else Palette.Gold,
+                            fontSize = 17.sp, lineHeight = 19.sp, fontFamily = Numeric,
+                            fontWeight = FontWeight.SemiBold, maxLines = 1,
+                        )
                     }
-                    Text(
-                        if (s.busted) "—" else fmt(s.stack), color = if (s.allIn) Palette.Red else Palette.Gold,
-                        fontSize = 19.sp, lineHeight = 20.sp, fontFamily = Numeric, fontWeight = FontWeight.SemiBold, maxLines = 1,
-                    )
-                    SeatStatus(s, fmt)
+                    Spacer(Modifier.height(3.dp))
+                    SeatStatus(s, fmt, Modifier.padding(horizontal = 5.dp))
                 }
             }
             if (s.isButton) Box(Modifier.align(Alignment.CenterStart).offset(x = (-22).dp)) { DealerButton() }

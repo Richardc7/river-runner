@@ -364,7 +364,7 @@ fun ResultScreen(vm: AppViewModel, summary: com.riverrunner.engine.SessionSummar
             Spacer(Modifier.weight(1f))
             ActionButton(st.playAgain, Palette.RaiseBtn, modifier = Modifier.fillMaxWidth()) { vm.playAgain() }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ActionButton(st.history, Palette.PanelHi, modifier = Modifier.weight(1f)) { vm.screen = Screen.History }
+                ActionButton(st.history, Palette.PanelHi, modifier = Modifier.weight(1f)) { vm.openHistory() }
                 ActionButton(st.home, Palette.PanelHi, modifier = Modifier.weight(1f)) { vm.screen = Screen.Home }
             }
         }

@@ -299,10 +299,14 @@ private fun HistoryRow(entry: HistoryEntry, showResults: Boolean, deviated: Bool
                 fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
         if (onBlind != null) SmallButton(t("盲测", "Blind quiz"), onBlind)
-        Text(if (hand.favorite) "★" else "☆", color = Palette.Gold, fontSize = 22.sp,
-            modifier = Modifier.clickable(role = Role.Button,
+        Box(Modifier.size(44.dp)
+            .clickable(role = Role.Button,
                 onClickLabel = if (hand.favorite) t("取消收藏", "Remove favourite") else t("收藏", "Favourite"),
-                onClick = onFavorite).padding(6.dp))
-        Text("›", color = Palette.TextDim, fontSize = 24.sp, lineHeight = 24.sp)
+                onClick = onFavorite), contentAlignment = Alignment.Center) {
+            Text(if (hand.favorite) "★" else "☆", color = Palette.Gold, fontSize = 22.sp)
+        }
+        Box(Modifier.width(20.dp), contentAlignment = Alignment.Center) {
+            Text("›", color = Palette.TextDim, fontSize = 24.sp, lineHeight = 24.sp)
+        }
     }
 }

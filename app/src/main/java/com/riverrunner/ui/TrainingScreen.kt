@@ -174,7 +174,7 @@ internal fun DecisionQuestion(
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.weight(.95f).fillMaxHeight().verticalScroll(rememberScrollState())
             .clip(RoundedCornerShape(14.dp)).background(Palette.Panel).padding(13.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(if (explanation) t("本题回顾", "Question review") else t("决策情景", "Decision scenario"),
                 color = Palette.Gold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Text(t("历史牌局", "Saved hand") + " #" + item.record.handNumber +
@@ -188,15 +188,21 @@ internal fun DecisionQuestion(
                     QuestionMetric(t("跟注所需胜率", "Equity needed"), "%.0f%%".format(Locale.US, 100 * potOdds), Modifier.weight(1f))
                 }
             }
-            Text(t("你的底牌", "Your cards"), color = Palette.TextDim, fontSize = 12.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                view.ownHole.forEach { PlayingCard(it, 32.dp) }
-            }
-            Text(t("当时可见的公共牌", "Board at decision time"),
-                color = Palette.TextDim, fontSize = 12.sp)
-            if (view.board.isEmpty()) Text(t("翻牌前尚无公共牌", "No public cards yet"), color = Palette.Text)
-            else Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                view.board.forEach { PlayingCard(it, 27.dp) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(t("你的底牌", "Your cards"), color = Palette.TextDim, fontSize = 12.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        view.ownHole.forEach { PlayingCard(it, 30.dp) }
+                    }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(t("当时可见的公共牌", "Board at decision time"), color = Palette.TextDim, fontSize = 12.sp)
+                    if (view.board.isEmpty()) Text(t("翻牌前尚无公共牌", "No public cards yet"),
+                        color = Palette.Text, fontSize = 11.sp)
+                    else Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        view.board.forEach { PlayingCard(it, 25.dp) }
+                    }
+                }
             }
             val position = HandEngine.positionName(view.order.indexOf(view.actorSeat), view.order.size)
             Text(t("位置：", "Position: ") + position +
