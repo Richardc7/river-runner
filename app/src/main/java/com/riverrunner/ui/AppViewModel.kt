@@ -65,7 +65,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val exercise = TrainingCurriculum.fromHistory(listOf(analysis)).firstOrNull {
                     it.id == "h" + record.id + "a" + trace.actionIndex
                 } ?: continue
-                out += TrainingItem(exercise, record, view, trace.baseline)
+                out += TrainingItem(exercise, record, view, trace.baseline, trace.notes.toList())
             }
         }
         out

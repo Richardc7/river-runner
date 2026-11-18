@@ -8,6 +8,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import com.riverrunner.engine.*
 import com.riverrunner.engine.strategy.*
 
@@ -16,11 +18,13 @@ data class TrainingItem(
     val record: HandRecord,
     val view: DecisionView,
     val baseline: PolicySnapshot,
+    val notes: List<String>,
 )
 
 /** Practices past decision-time *model* action values, not privileged showdown outcomes. */
 @Composable
 fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
+    val clipboard = LocalClipboardManager.current
     val zh = vm.prefs.chinese
     fun label(cn: String, en: String) = if (zh) cn else en
     var entries by remember(vm.profile.id) { mutableStateOf<List<TrainingItem>>(emptyList()) }
@@ -60,7 +64,7 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
         else {
             val d = item.drill
             Text(label("练习场景", "Scenario") + " · " + d.category, color = Palette.Text)
-            Text("Hand #" + item.record.id + " | " + d.street + " | #" + item.view.actionIndex, color = Palette.TextDim)
+            Text("Hand #" + item.record.id + " | " + item.view.street + " | #" + item.view.actionIndex, color = Palette.TextDim)
             Text(label("手牌：", "Hole: ") + Cards.format(item.view.ownHole.toIntArray()) +
                 "  " + label("公共牌：", "Board: ") + Cards.format(item.view.board.toIntArray()), color = Palette.Text)
             Text(label("底池：", "Pot: ") + vm.fmt(item.view.pot, item.record.bigBlind), color = Palette.Text)
@@ -81,7 +85,7 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
                         " BB [" + "%.2f".format(java.util.Locale.US, it.low / item.record.bigBlind) +
                         ", " + "%.2f".format(java.util.Locale.US, it.high / item.record.bigBlind) + "]", color = Palette.TextDim)
                 }
-                d.assumptions.take(4).forEach { Text(it, color = Palette.TextDim) }
+                item.notes.take(4).forEach { Text(it, color = Palette.TextDim) }
                 Button(onClick = {
                     progress = progress.record(result)
                     vm.saveTrainingProgress(progress)
@@ -99,6 +103,12 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
         }
         HorizontalDivider()
         TextButton(onClick = { showImport = !showImport }) { Text(label("离线参考策略导入", "Offline reference import")) }
+        val savedReference = reference
+        if (savedReference != null) {
+            OutlinedButton(onClick = { clipboard.setText(AnnotatedString(ReferenceCodec.encode(savedReference))) }) {
+                Text(label("复制已保存参考策略", "Copy saved reference"))
+            }
+        }
         if (showImport) {
             Text(label("仅接受 RR-REFERENCE-1 格式及精确决策哈希；不包含求解器数据。",
                 "Accepts RR-REFERENCE-1 with exact decision hashes. No solver data is bundled."), color = Palette.TextDim)
