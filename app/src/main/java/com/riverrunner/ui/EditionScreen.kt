@@ -91,5 +91,5 @@ fun editionSummary(config: EditionConfig, chinese: Boolean): String {
         if (chinese) "无抽水" else "No rake"
     } else "${config.cashRules.rakeBasisPoints / 100.0}% rake"
     val straddle = if (config.cashRules.utgStraddle) " · UTG Straddle" else ""
-    return "$"+"mode · $"+"opponents · $"+"rake$"+"straddle"
+    return listOf(mode, opponents, rake).joinToString(" · ") + straddle
 }
