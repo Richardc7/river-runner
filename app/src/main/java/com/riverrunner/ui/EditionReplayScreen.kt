@@ -36,7 +36,7 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
             if (vm.blindReviewEnabled) TextButton(onClick = { coachTab = 1 }) { Text(if (zh) "盲测复盘" else "Blind quiz") }
             if (vm.weaknessReportEnabled) TextButton(onClick = { coachTab = 2 }) { Text(if (zh) "弱点报告" else "Weaknesses") }
             if (vm.preflopCoachEnabled) TextButton(onClick = { coachTab = 3 }) { Text(if (zh) "翻前范围" else "Preflop range") }
-            if (vm.riverWhatIfEnabled) TextButton(onClick = { coachTab = 4 }) { Text("What-if") }
+            if (vm.riverWhatIfEnabled) TextButton(onClick = { coachTab = 4 }) { Text(if (zh) "情景对比" else "What-if") }
             TextButton(onClick = leave) { Text(if (vm.reviewing) { if (zh) "下一手" else "Next hand" } else if (zh) "返回" else "Back") }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -66,20 +66,43 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
                         val matches = view != null && DecisionFingerprint.of(view) == trace.contextHash
                         Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("${trace.street} / #${trace.actionIndex}")
+                                Text(StudyPresentation.street(trace.street, zh) + " · " +
+                                    (if (zh) "决策 #" else "Decision #") + trace.actionIndex,
+                                    color = Palette.Gold, style = MaterialTheme.typography.titleMedium)
                                 if (view == null || !matches) Text(if (zh) "\u8bb0\u5f55\u4e0e\u51b3\u7b56\u573a\u666f\u4e0d\u5339\u914d\uff0c\u4e0d\u5c55\u793a\u5efa\u8bae\u3002" else "Trace does not match this decision context; advice withheld.")
                                 else {
                                     Text("${Cards.format(view.ownHole.toIntArray())} | ${Cards.format(view.board.toIntArray())}")
                                     val actual = record.actions.filter { !it.type.isPost }.getOrNull(trace.actionIndex)
                                     actual?.let { Text((if (zh) "\u4f60\u7684\u884c\u52a8\uff1a" else "Your action: ") + vm.actionLabel(it, record.bigBlind)) }
-                                    Text((if (zh) "\u57fa\u51c6\uff1a" else "Baseline: ") + policyText(trace.baseline, record.bigBlind))
-                                    Text((if (zh) "\u5265\u524a\uff1a" else "Exploit: ") + policyText(trace.exploit, record.bigBlind))
+                                    Text((if (zh) "基准参考：" else "Baseline model: ") +
+                                        policyText(trace.baseline, record.bigBlind, zh), color = Palette.Text)
+                                    Text((if (zh) "针对性调整：" else "Exploit adjustment: ") +
+                                        policyText(trace.exploit, record.bigBlind, zh), color = Palette.Gold)
                                     Text(statusText(trace.status, zh))
                                     for (evidence in trace.evidence) {
-                                        Text("${reasonText(evidence.code, zh)} | seat ${evidence.seat} | ${evidence.successes}/${evidence.opportunities} | p=${percent(evidence.posterior)} | w=${percent(evidence.evidenceWeight)}")
+                                        Text(reasonText(evidence.code, zh) +
+                                            (if (zh) " · 对手座位 " else " · Seat ") + evidence.seat +
+                                            (if (zh) " · 观察 " else " · Observed ") +
+                                            evidence.successes + "/" + evidence.opportunities +
+                                            (if (zh) " · 行为倾向估计 " else " · Behaviour estimate ") +
+                                            percent(evidence.posterior) +
+                                            (if (zh) " · 样本证据权重 " else " · Evidence weight ") +
+                                            percent(evidence.evidenceWeight),
+                                            color = Palette.TextDim)
                                     }
-                                    for (value in trace.actionValues) Text("${value.move.type} ${value.move.raiseTo}: EV ~ ${"%.2f".format(value.chips / record.bigBlind)} BB [${"%.2f".format(value.low / record.bigBlind)}, ${"%.2f".format(value.high / record.bigBlind)}]")
-                                    trace.notes.forEach { Text(it) }
+                                    if (trace.actionValues.isNotEmpty()) Text(
+                                        if (zh) "各行动的条件模型 EV（非真实盈亏）" else "Conditional model EV per action (not realised profit)",
+                                        color = Palette.Gold, style = MaterialTheme.typography.labelLarge)
+                                    for (value in trace.actionValues) Text(
+                                        StudyPresentation.move(value.move, record.bigBlind, zh) +
+                                            (if (zh) " · 估计 " else " · estimate ") +
+                                            "%.2f".format(java.util.Locale.US, value.chips / record.bigBlind) +
+                                            " BB [" + "%.2f".format(java.util.Locale.US, value.low / record.bigBlind) +
+                                            ", " + "%.2f".format(java.util.Locale.US, value.high / record.bigBlind) + "]",
+                                        color = Palette.TextDim)
+                                    trace.notes.forEach {
+                                        Text(StudyPresentation.modelNote(it, zh), color = Palette.TextDim)
+                                    }
                                     TextButton(onClick = {
                                         startIndex = replayer.frames.indexOfFirst { replayer.actionIndexOf(it) == trace.actionIndex }.coerceAtLeast(0)
                                         report = false
@@ -95,10 +118,10 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
 }
 
 private fun percent(value: Double): String = "%.0f%%".format(value * 100)
-private fun policyText(policy: PolicySnapshot, bb: Int): String = policy.choices.joinToString(" / ") {
-    val size = if (it.move.type == MoveType.RAISE) " ${"%.2f".format(it.move.raiseTo.toDouble() / bb)}BB" else ""
-    "${it.move.type}$size ${percent(it.probability)}"
-}
+private fun policyText(policy: PolicySnapshot, bb: Int, zh: Boolean): String =
+    policy.choices.joinToString(" / ") { choice ->
+        StudyPresentation.move(choice.move, bb, zh) + " " + percent(choice.probability)
+    }
 private fun statusText(status: AdviceStatus, zh: Boolean): String = when (status) {
     AdviceStatus.ADJUSTED -> if (zh) "\u5df2\u6309\u8bc1\u636e\u4f5c\u6709\u9650\u8c03\u6574" else "Bounded evidence-based adjustment"
     AdviceStatus.INSUFFICIENT_EVIDENCE -> if (zh) "\u8bc1\u636e\u4e0d\u8db3\uff1a\u4fdd\u7559\u57fa\u51c6" else "Insufficient evidence: baseline retained"
