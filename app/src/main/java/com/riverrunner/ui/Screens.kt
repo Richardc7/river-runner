@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.riverrunner.engine.GameMode
+import com.riverrunner.engine.GameSession
 import com.riverrunner.engine.HandRecord
 import com.riverrunner.engine.HeroStats
 import com.riverrunner.engine.SessionConfig
@@ -60,6 +61,7 @@ import com.riverrunner.engine.TableType
 import com.riverrunner.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -327,6 +329,7 @@ fun ResultScreen(vm: AppViewModel, summary: com.riverrunner.engine.SessionSummar
     val st = LocalStrings.current
     val cash = summary.mode == GameMode.CASH
     val earlyTournament = !cash && summary.endedEarly
+    val settlementAmount = remember { DecimalFormat("#,##0.0#") }
     val headline = when {
         cash -> if (st.isZh) "筹码局结算" else "Cash game results"
         earlyTournament -> if (st.isZh) "锦标赛提前结束" else "Tournament ended early"
@@ -354,7 +357,7 @@ fun ResultScreen(vm: AppViewModel, summary: com.riverrunner.engine.SessionSummar
                     else -> Palette.Text
                 }
                 Text(
-                    "${st.profit}: " + (if (profit > 0) "+" else "") + "%.1f".format(profit) + unit,
+                    "${st.profit}: " + (if (profit > 0) "+" else "") + settlementAmount.format(profit) + unit,
                     color = profitColor, fontSize = 18.sp, fontWeight = FontWeight.Bold,
                 )
             }
@@ -382,10 +385,12 @@ fun ResultScreen(vm: AppViewModel, summary: com.riverrunner.engine.SessionSummar
                 ) {
                     if (!cash) Text("#${s.place}", color = Palette.Text, fontSize = 20.sp, fontFamily = Numeric, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(44.dp))
                     Text(if (s.isHuman) st.you else s.name, color = Palette.Text, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                    Text(
-                        if (cash || s.stack > 0) Format.amount(s.stack, 100, vm.showInBB && cash) else st.busted,
-                        color = Palette.TextDim, fontSize = 14.sp,
-                    )
+                    val stackText = when {
+                        cash && vm.showInBB -> settlementAmount.format(s.stack.toDouble() / GameSession.BASE_BB) + " BB"
+                        cash || s.stack > 0 -> Format.amount(s.stack, GameSession.BASE_BB, false)
+                        else -> st.busted
+                    }
+                    Text(stackText, color = Palette.TextDim, fontSize = 14.sp)
                 }
             }
         }
