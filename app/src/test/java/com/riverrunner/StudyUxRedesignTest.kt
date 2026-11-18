@@ -76,6 +76,9 @@ class StudyUxRedesignTest {
         val result = (if (net > 0) "+" else "") + "%.1f BB".format(net)
         compose.onNodeWithText(result).assertDoesNotExist()
         compose.onNodeWithText("盲测").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("盲测复盘 · 先选后看").fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithText("盲测复盘 · 先选后看").assertExists()
         compose.onNodeWithText("复盘 · 第 1 手").assertDoesNotExist()
     }
