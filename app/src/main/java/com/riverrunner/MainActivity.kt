@@ -39,6 +39,9 @@ class MainActivity : ComponentActivity() {
                                 Text(if (vm.prefs.chinese) "Exploit Edition \u7b56\u7565\u8bbe\u7f6e" else "Exploit Edition strategy settings", color = Palette.Gold)
                             }
                         }
+                        if (vm.topUpAvailable && (vm.screen == Screen.Table || vm.reviewing)) {
+                            TextButton(onClick = vm::topUpHero) { Text(if (vm.prefs.chinese) "\u624b\u95f4\u8865\u7801\u81f3\u8d77\u59cb\u7b79\u7801" else "Top up between hands", color = Palette.Gold) }
+                        }
                         Box(Modifier.weight(1f).fillMaxWidth()) {
                             when (val s = vm.screen) {
                                 Screen.Home -> HomeScreen(vm)

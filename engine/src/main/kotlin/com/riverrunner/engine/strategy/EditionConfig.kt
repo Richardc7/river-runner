@@ -11,8 +11,15 @@ data class EditionConfig(
     val aiMode: AiMode = AiMode.LEGACY,
     val opponents: Map<Int, OpponentPreset> = emptyMap(),
     val recordAdvice: Boolean = true,
+    val cashRules: CashRules = CashRules(),
+    val seatStackBB: Map<Int, Int> = emptyMap(),
+    val automaticRebuys: Int = 0,
 ) {
-    init { require(opponents.keys.all { it in 1..8 }) { "Only bot seats 1..8 may be overridden" } }
+    init {
+        require(opponents.keys.all { it in 1..8 }) { "Only bot seats 1..8 may be overridden" }
+        require(seatStackBB.all { it.key in 0..8 && it.value in 10..10000 })
+        require(automaticRebuys in 0..20)
+    }
 }
 
 /** Self-style adjustment, never used as knowledge about another player's range. */

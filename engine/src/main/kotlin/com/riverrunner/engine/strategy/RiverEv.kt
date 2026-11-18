@@ -17,6 +17,7 @@ object RiverEv {
         fun unsupported(reason: String) = RiverAnalysis(false, emptyList(), null, emptyMap(), listOf(reason))
         if (view.mode != GameMode.CASH || view.street != Street.RIVER || view.opponents.size != 1)
             return unsupported("Only heads-up cash river nodes are modelled")
+        if (view.cashRules.hasRake) return unsupported("Raked action values require fee-aware continuation modelling; no EV is shown")
         val hero = view.actor; val villain = view.opponents.single(); val la = view.legal
         if (la.canCheck && !view.inPosition && !villain.allIn) return unsupported("Out-of-position check has a future decision; no terminal check EV")
         if (view.pot != view.seats.sumOf { it.committed } || hero.committed - hero.streetBet != villain.committed - villain.streetBet)

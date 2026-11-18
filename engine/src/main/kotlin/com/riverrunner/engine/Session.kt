@@ -14,7 +14,7 @@ class SessionPlayer(val seat: Int, val name: String, val style: BotStyle, val is
 }
 data class Standing(val seat: Int, val name: String, val place: Int, val stack: Int, val isHuman: Boolean)
 data class SessionSummary(val mode: GameMode, val standings: List<Standing>, val heroPlace: Int,
-    val heroProfit: Double, val handsPlayed: Int, val endedEarly: Boolean)
+    val heroProfit: Double, val handsPlayed: Int, val endedEarly: Boolean, val rakePaid: Int = 0, val heroBuyIns: Int = 0)
 class GameSession(val config: SessionConfig) {
     val random = Random(config.seed)
     val strategy = StrategySession(config.seed, config.mode, config.edition)
@@ -24,6 +24,29 @@ class GameSession(val config: SessionConfig) {
     var current: HandEngine? = null; private set
     private var finished: SessionSummary? = null
     var lastAnalysis: HandAnalysis? = null; private set
+    var totalRake: Int = 0; private set
+    private val paidIn = linkedMapOf<Int, Int>()
+    private val autoCounts = hashMapOf<Int, Int>()
+    private val buyInLog = mutableListOf<BuyInEvent>()
+    val buyIns: List<BuyInEvent> get() = buyInLog.toList()
+    fun targetStackBB(seat: Int): Int = if (config.mode == GameMode.CASH) config.edition.seatStackBB[seat] ?: config.startingBB else config.startingBB
+    fun paidIn(seat: Int): Int = paidIn[seat] ?: 0
+    private fun canAutoRebuy(p: SessionPlayer): Boolean = config.mode == GameMode.CASH && p.stack == 0 &&
+        (autoCounts[p.seat] ?: 0) < config.edition.automaticRebuys
+    fun rebuy(seat: Int, targetBB: Int = targetStackBB(seat), automatic: Boolean = false): Int {
+        check(config.mode == GameMode.CASH && current == null && finished == null) { "Rebuys are cash-only and between hands" }
+        require(targetBB in 1..10000)
+        val player = players.first { it.seat == seat }
+        require(!automatic || canAutoRebuy(player))
+        val amount = (targetBB * BASE_BB - player.stack).coerceAtLeast(0)
+        if (amount == 0) return 0
+        require((paidIn[seat] ?: 0).toLong() + amount <= 100000000L)
+        player.stack += amount; player.place = 0
+        paidIn[seat] = (paidIn[seat] ?: 0) + amount
+        buyInLog += BuyInEvent(seat, amount, handNumber, automatic)
+        if (automatic) autoCounts[seat] = (autoCounts[seat] ?: 0) + 1
+        return amount
+    }
     companion object {
         const val HERO_SEAT = 0
         const val BASE_BB = 100
@@ -37,9 +60,11 @@ class GameSession(val config: SessionConfig) {
         }
     }
     init {
-        require(config.tableSize in 2..9)
-        val names = BOT_NAMES.shuffled(random); val start = config.startingBB * BASE_BB
+        require(config.tableSize in 2..9 && config.startingBB in 1..10000)
+        require(config.cashAnteFraction.isFinite() && config.cashAnteFraction in 0.0..10.0)
+        val names = BOT_NAMES.shuffled(random)
         players = List(config.tableSize) { i ->
+            val start = targetStackBB(i) * BASE_BB
             if (i == HERO_SEAT) SessionPlayer(i, "You", BotStyle.GTO, true, start)
             else {
                 val style = if (config.tableType == TableType.GTO) BotStyle.GTO else MIXED_POOL[random.nextInt(MIXED_POOL.size)]
@@ -47,6 +72,7 @@ class GameSession(val config: SessionConfig) {
             }
         }
         buttonSeat = random.nextInt(config.tableSize)
+        players.forEach { paidIn[it.seat] = it.stack }
     }
     val hero: SessionPlayer get() = players[HERO_SEAT]
     val alivePlayers: List<SessionPlayer> get() = players.filter { it.alive }
@@ -55,10 +81,11 @@ class GameSession(val config: SessionConfig) {
         GameMode.TOURNAMENT -> levelFor(handNumber / config.handsPerLevel.coerceAtLeast(1))
         GameMode.CASH -> BlindLevel(1, BASE_BB / 2, BASE_BB, (BASE_BB * config.cashAnteFraction).toInt())
     }
-    val isOver: Boolean get() = finished != null || alivePlayers.size <= 1 || !hero.alive
+    val isOver: Boolean get() = finished != null || players.count { it.alive || canAutoRebuy(it) } <= 1 || (!hero.alive && !canAutoRebuy(hero))
     fun tournamentContext(): TournamentContext? = if (config.mode == GameMode.TOURNAMENT) TournamentContext(alivePlayers.associate { it.seat to it.stack }, payouts) else null
     fun startHand(): HandEngine {
-        check(!isOver)
+        check(current == null && !isOver)
+        if (config.mode == GameMode.CASH) players.filter { canAutoRebuy(it) }.forEach { rebuy(it.seat, automatic = true) }
         val alive = alivePlayers
         if (handNumber > 0) {
             var b = buttonSeat
@@ -66,7 +93,8 @@ class GameSession(val config: SessionConfig) {
             buttonSeat = b
         } else if (!players[buttonSeat].alive) buttonSeat = alive.first().seat
         val lvl = currentLevel()
-        val setup = HandSetup(lvl.smallBlind, lvl.bigBlind, lvl.ante, buttonSeat, alive.map { SeatSetup(it.seat, it.name, it.stack) })
+        val setup = HandSetup(lvl.smallBlind, lvl.bigBlind, lvl.ante, buttonSeat, alive.map { SeatSetup(it.seat, it.name, it.stack) },
+            if (config.mode == GameMode.CASH) config.edition.cashRules else CashRules())
         val deckRandom = if (config.edition.aiMode == AiMode.ADAPTIVE)
             StrategyRandom.forDecision(config.seed, handNumber, -1, -1, 0) else random
         val engine = HandEngine(setup, RandomCardSource(deckRandom))
@@ -88,12 +116,14 @@ class GameSession(val config: SessionConfig) {
     }
 
     fun completeHand(engine: HandEngine): HandRecord {
+        require(engine === current) { "Hand does not belong to this live session" }
         val result = checkNotNull(engine.result) { "Hand not finished" }; val aliveBefore = alivePlayers.size
         for (ps in engine.players) players[ps.seat].stack = ps.stack
         val busted = engine.players.filter { it.stack == 0 }.sortedBy { it.startStack }; var place = aliveBefore
         for (b in busted) { players[b.seat].place = place; place-- }
         handNumber++
         val record = HandRecord.from(engine, config.mode, handNumber, HERO_SEAT, config.tableSize, styles = players.associate { it.seat to it.style })
+        totalRake += result.rake
         lastAnalysis = strategy.finishAnalysis(record.id)
         current = null
         return record.copy(won = result.won)
@@ -104,9 +134,9 @@ class GameSession(val config: SessionConfig) {
         val standings = players.map { Standing(it.seat, it.name, it.place, it.stack, it.isHuman) }.sortedBy { it.place }
         val heroPlace = hero.place
         val profit = when (config.mode) {
-            GameMode.CASH -> (hero.stack - hero.startStack).toDouble() / BASE_BB
+            GameMode.CASH -> (hero.stack - paidIn(HERO_SEAT)).toDouble() / BASE_BB
             GameMode.TOURNAMENT -> { val pool = 100.0 * config.tableSize; val pay = payouts.getOrNull(heroPlace - 1) ?: 0.0; pool * pay - 100.0 }
         }
-        val s = SessionSummary(config.mode, standings, heroPlace, profit, handNumber, early); finished = s; return s
+        val s = SessionSummary(config.mode, standings, heroPlace, profit, handNumber, early, totalRake, paidIn(HERO_SEAT)); finished = s; return s
     }
 }
