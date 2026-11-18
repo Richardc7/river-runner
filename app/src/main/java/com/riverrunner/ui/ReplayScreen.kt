@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -189,6 +192,9 @@ fun ReplayContent(
     val policy = if (decisionIndex >= 0) policyCache[decisionIndex] else null
     val table = replayTable(st, record, frames, idx, equityCache[eqKey], fmt)
     val log = remember(record.id, st) { replayLog(st, record, frames, fmt) }
+    var explainExpanded by remember(record.id) { mutableStateOf(true) }
+    val opponentAction = frame.action?.takeIf { it.seat != record.heroSeat && !it.type.isPost }
+    val opponent = opponentAction?.let { action -> record.players.firstOrNull { it.seat == action.seat } }
 
     Row(Modifier.fillMaxSize().background(Palette.Bg)) {
         Box(Modifier.weight(1f).fillMaxHeight().padding(start = 4.dp, top = 4.dp, bottom = 2.dp)) {
@@ -219,12 +225,65 @@ fun ReplayContent(
                 SmallButton("▶", { if (idx < frames.size - 1) idx++ }, Modifier.weight(1.3f), highlight = true)
                 SmallButton("⏭", { idx = frames.size - 1 }, Modifier.weight(1f))
             }
-            if (heroAction != null) AnalysisCard(heroAction, frame.action?.seat == record.heroSeat, policy, fmt)
-            ActionLog(log, Modifier.weight(1f), highlightIndex = idx, onClick = { idx = it })
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (st.isZh) "行动记录 · 点击一条可查看原因" else "Action log · tap to inspect",
+                    modifier = Modifier.weight(1f), color = Palette.TextDim, fontSize = 10.sp, maxLines = 2)
+                if (heroAction != null || opponentAction != null) {
+                    SmallButton(if (explainExpanded) "−" else "+", { explainExpanded = !explainExpanded })
+                }
+            }
+            if (explainExpanded && (heroAction != null || opponentAction != null)) {
+                Column(Modifier.weight(.54f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    if (heroAction != null) {
+                        AnalysisCard(heroAction, frame.action?.seat == record.heroSeat, policy, fmt)
+                    }
+                    if (opponentAction != null && opponent != null) {
+                        OpponentInsightCard(opponentAction, opponent, frame.board, st, fmt)
+                    }
+                }
+                HorizontalDivider(color = Palette.Line)
+                ActionLog(log, Modifier.weight(.46f), highlightIndex = idx, onClick = { idx = it })
+            } else {
+                ActionLog(log, Modifier.weight(1f), highlightIndex = idx, onClick = { idx = it })
+            }
             if (onContinue != null) {
                 ActionButton(st.reviewNext, Palette.Gold, Modifier.fillMaxWidth(), textColor = Palette.Ink, onClick = onContinue)
             }
         }
+    }
+}
+
+@Composable
+private fun OpponentInsightCard(
+    action: Action, player: com.riverrunner.engine.RecordPlayer, board: List<Int>,
+    st: Strings, fmt: (Int) -> String,
+) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .background(Palette.PanelHi).padding(9.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Text((if (st.isZh) "对手行动解读 · " else "Opponent decision · ") + player.name,
+            color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text((if (st.isZh) "实际行动：" else "Recorded action: ") +
+            TableMapper.actionLabel(st, action, fmt), color = Palette.Text, fontSize = 12.sp)
+        Text((if (st.isZh) "模拟对手风格：" else "Bot preset: ") + st.styleName(player.style),
+            color = Palette.TextDim, fontSize = 11.sp)
+        Text((if (st.isZh) "赛后回看对手底牌：" else "Opponent hole cards, revealed in replay: ") +
+            Cards.format(player.hole), color = Palette.Text, fontSize = 12.sp)
+        if (board.size >= 3) {
+            val visibleCards = player.hole.toList() + board
+            val rank = HandEvaluator.evaluate(Cards.mask(visibleCards.toIntArray()))
+            Text((if (st.isZh) "本街牌型：" else "Hand on this street: ") +
+                HandEvaluator.categoryName(rank, st.isZh), color = Palette.TextDim, fontSize = 11.sp)
+        }
+        Text(StudyPresentation.opponentReason(action, player.style, st.isZh),
+            color = Palette.Text, fontSize = 12.sp)
+        Text(if (st.isZh)
+            "对手底牌只供赛后回看；上述可能原因来自行动与预设类型，并非 AI 当时的内部推理或真实 GTO 判断。"
+            else "A plausible explanation from the public action and preset, not a recorded internal bot rationale or verified GTO.",
+            color = Palette.TextDim, fontSize = 10.sp)
     }
 }
 
@@ -249,7 +308,8 @@ private fun AnalysisCard(heroAction: Action, decided: Boolean, policy: Policy?, 
                 "$name ${Format.pct(p)}"
             }
         }
-        Text("${st.gtoSuggest}: " + parts.joinToString(" / "), color = Palette.Accent, fontSize = 13.sp)
+        Text((if (st.isZh) "启发式基准参考：" else "Heuristic baseline (not GTO): ") +
+            parts.joinToString(" / "), color = Palette.Accent, fontSize = 12.sp)
         // bet-size mix of the raises, measured against the pot before the decision
         val sizes = policy.options.filter { it.first.type == MoveType.RAISE }
             .groupBy { SizeClass.of(it.first.raiseTo, policy.pot) }
@@ -277,6 +337,9 @@ private fun AnalysisCard(heroAction: Action, decided: Boolean, policy: Policy?, 
                 )
             }
         }
+        Text(if (st.isZh) "模型偏离不等于已经证明的失误；可结合位置、赔率和对手范围判断。"
+             else "A model deviation is not a proven mistake; consider position, odds and ranges.",
+             color = Palette.TextDim, fontSize = 10.sp)
         policy.equity?.let { Text("${st.estEquity}: ${Format.pct(it)}", color = Palette.TextDim, fontSize = 11.sp) }
         if (policy.potOdds > 0) Text("${st.needEquity}: ${Format.pct(policy.potOdds)}", color = Palette.TextDim, fontSize = 11.sp)
     }

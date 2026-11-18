@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.engine.*
 import com.riverrunner.engine.strategy.*
 import kotlinx.coroutines.Dispatchers
@@ -44,12 +45,12 @@ private fun studyChoices(view: DecisionView): List<Move> = buildList {
     }
 }.distinct()
 
-private fun studyMoveLabel(move: Move, bb: Int): String = move.type.name +
-    if (move.type == MoveType.RAISE) " " + number(move.raiseTo.toDouble() / bb) + " BB" else ""
+private fun studyMoveLabel(move: Move, bb: Int, zh: Boolean): String =
+    StudyPresentation.move(move, bb, zh)
 
 @Composable
 fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<HistoricalDecision>) {
-    val zh = vm.prefs.chinese
+    val zh = LocalStrings.current.isZh
     fun t(cn: String, en: String) = if (zh) cn else en
     var index by remember(record.id) { mutableIntStateOf(0) }
     var answer by remember(record.id) { mutableStateOf<Move?>(null) }
@@ -70,7 +71,8 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
             val view = node.view
             val trace = node.trace
             val chosen = answer
-            Text(t("决策", "Decision") + " " + (index + 1) + "/" + nodes.size + " · " + view.street,
+            Text(t("决策", "Decision") + " " + (index + 1) + "/" + nodes.size + " · " +
+                StudyPresentation.street(view.street, zh),
                 color = Palette.Text, fontWeight = FontWeight.Bold)
             Text(t("自己的牌：", "Your cards: ") + Cards.format(view.ownHole.toIntArray()) +
                 t(" · 当前公共牌：", " · Current board: ") +
@@ -82,14 +84,14 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
                 color = Palette.TextDim)
             Text(t("此前公开行动：", "Public actions so far: ") +
                 (view.actions.filter { !it.type.isPost }.takeLast(8).joinToString(" / ") {
-                    it.seat.toString() + ": " + it.type.name +
+                    it.seat.toString() + ": " + StudyPresentation.actionType(it.type, zh) +
                         if (it.type.isAggressive) " " + number(it.streetTotal.toDouble() / view.bigBlind) + "BB" else ""
                 }.ifBlank { "-" }), color = Palette.TextDim)
             Text(t("你会怎么打？", "What would you do?"), color = Palette.Gold)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (move in studyChoices(view)) {
                     OutlinedButton(onClick = { answer = move }, enabled = chosen == null) {
-                        Text(studyMoveLabel(move, view.bigBlind))
+                        Text(studyMoveLabel(move, view.bigBlind, zh))
                     }
                 }
             }
@@ -98,14 +100,16 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
                 val best = policy.choices.groupBy { it.move.type }.mapValues { (_, options) -> options.sumOf { it.probability } }
                     .maxBy { it.value }.key
                 val score = if (chosen.type == best) 1.0 else 0.0
-                Text(t("模型偏好的行动：", "Model-favoured move: ") + best.name +
-                    t("；你选：", "; your pick: ") + chosen.type.name, color = Palette.Text)
+                Text(t("模型偏好的行动：", "Model-favoured move: ") +
+                    StudyPresentation.moveType(best, zh) +
+                    t("；你选：", "; your pick: ") + StudyPresentation.moveType(chosen.type, zh),
+                    color = Palette.Text)
                 Text(t("模型混合频率：", "Model mixed action frequencies: ") + policy.choices.joinToString(" / ") {
-                    it.move.type.name + " " + number(it.probability * 100) + "%"
+                    StudyPresentation.moveType(it.move.type, zh) + " " + number(it.probability * 100) + "%"
                 }, color = Palette.TextDim)
                 node.action?.let {
                     Text(t("实际历史行动：", "Original recorded move: ") +
-                        studyMoveLabel(StudyCoach.moveOf(it) ?: Move.FOLD, view.bigBlind),
+                        studyMoveLabel(StudyCoach.moveOf(it) ?: Move.FOLD, view.bigBlind, zh),
                         color = Palette.TextDim)
                 }
                 val modeled = trace.actionValues.firstOrNull { it.move == chosen }
@@ -134,7 +138,7 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
 
 @Composable
 fun WeaknessReportCoach(vm: AppViewModel) {
-    val zh = vm.prefs.chinese
+    val zh = LocalStrings.current.isZh
     var data by remember(vm.profile.id) { mutableStateOf<List<DecisionAssessment>?>(null) }
     LaunchedEffect(vm.profile.id) { data = vm.studyAssessments() }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
@@ -154,7 +158,8 @@ fun WeaknessReportCoach(vm: AppViewModel) {
             for (category in StudyCoach.categories(rows).take(35)) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(category.key, color = Palette.Text, fontWeight = FontWeight.Bold)
+                        Text(StudyPresentation.category(category.key, zh),
+                            color = Palette.Text, fontWeight = FontWeight.Bold)
                         Text((if (zh) "样本 " else "Sample ") + category.hands +
                             (if (zh) " · 偏离 " else " · Flags ") + category.marked +
                             " (" + number(category.reviewRate * 100) + "%)", color = Palette.TextDim)
@@ -171,7 +176,7 @@ fun WeaknessReportCoach(vm: AppViewModel) {
 
 @Composable
 fun PreflopRangeCoachPanel(vm: AppViewModel, nodes: List<HistoricalDecision>) {
-    val zh = vm.prefs.chinese
+    val zh = LocalStrings.current.isZh
     val relevant = remember(nodes) { nodes.filter { it.view.street == Street.PREFLOP } }
     var selected by remember { mutableIntStateOf(0) }
     val node = relevant.getOrNull(selected.coerceIn(0, (relevant.size - 1).coerceAtLeast(0)))
@@ -201,7 +206,7 @@ fun PreflopRangeCoachPanel(vm: AppViewModel, nodes: List<HistoricalDecision>) {
                 color = Palette.Text)
             Text((if (zh) "你拿到：" else "Your hand: ") + result.ownClass +
                 " · " + Cards.format(node.view.ownHole.toIntArray()), color = Palette.Gold)
-            Text(result.explanation, color = Palette.TextDim)
+            Text(StudyPresentation.modelNote(result.explanation, zh), color = Palette.TextDim)
             Row(Modifier.horizontalScroll(rememberScrollState())) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     for (row in result.cells) Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -225,7 +230,7 @@ fun PreflopRangeCoachPanel(vm: AppViewModel, nodes: List<HistoricalDecision>) {
 
 @Composable
 fun RiverWhatIfCoachPanel(vm: AppViewModel, nodes: List<HistoricalDecision>) {
-    val zh = vm.prefs.chinese
+    val zh = LocalStrings.current.isZh
     val candidates = remember(nodes) { nodes.filter {
         it.view.street == Street.RIVER && it.view.mode == GameMode.CASH && it.view.opponents.size == 1
     } }
@@ -257,7 +262,7 @@ fun RiverWhatIfCoachPanel(vm: AppViewModel, nodes: List<HistoricalDecision>) {
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        Text(if (zh) "河牌 What-if 情景比较" else "River what-if sensitivity",
+        Text(if (zh) "河牌条件情景推演" else "River what-if sensitivity",
             style = MaterialTheme.typography.titleMedium, color = Palette.Gold)
         Text(if (zh) "只分析支持的单挑现金局河牌，输入改变的是模型假设，不改变真实历史。无抽水之外的情况将拒绝计算。"
             else "Supported heads-up cash river only. Controls change assumptions, not actual history. Raked situations are refused.",
@@ -285,18 +290,18 @@ fun RiverWhatIfCoachPanel(vm: AppViewModel, nodes: List<HistoricalDecision>) {
             if (running) Text(if (zh) "模型运算中…" else "Computing model…", color = Palette.Text)
             val result = outcome
             if (result != null) {
-                if (!result.supported) Text((if (zh) "暂不支持：" else "Unsupported: ") + result.note,
+                if (!result.supported) Text((if (zh) "暂不支持：" else "Unsupported: ") + StudyPresentation.modelNote(result.note, zh),
                     color = Palette.TextDim)
                 else {
                     Text((if (zh) "选定尺度模型 EV：" else "Selected size model EV: ") +
                         (result.chosenEv?.let { number(it.chips / node.view.bigBlind) + " BB" } ?: "-"),
                         color = Palette.Gold)
                     for (ev in result.comparison.take(12)) Text(
-                        studyMoveLabel(ev.move, node.view.bigBlind) + ": " +
+                        studyMoveLabel(ev.move, node.view.bigBlind, zh) + ": " +
                             number(ev.chips / node.view.bigBlind) + " BB [" +
                             number(ev.low / node.view.bigBlind) + ", " +
                             number(ev.high / node.view.bigBlind) + "]", color = Palette.Text)
-                    Text(result.note, color = Palette.TextDim)
+                    Text(StudyPresentation.modelNote(result.note, zh), color = Palette.TextDim)
                 }
             }
         }

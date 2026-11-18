@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -199,52 +200,68 @@ private fun SidePanel(
             Text(ui.blindsText, color = Palette.TextDim, fontSize = 11.sp, maxLines = 1)
             if (ui.levelText != null) Text(ui.levelText, color = Palette.Gold, fontSize = 11.sp, maxLines = 1)
         }
-        // practice switch
-        Row(
-            Modifier.fillMaxWidth().height(26.dp).clip(RoundedCornerShape(8.dp)).background(Palette.PanelHi).padding(start = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(st.practice, color = Palette.Text, fontSize = 12.sp, modifier = Modifier.weight(1f))
-            Switch(
-                checked = ui.practice, onCheckedChange = onPractice, modifier = Modifier.scale(0.62f),
-                colors = SwitchDefaults.colors(checkedTrackColor = Palette.AccentDim, checkedThumbColor = Palette.Accent, uncheckedTrackColor = Palette.PanelHi2),
-            )
+        // Compact toggles preserve action-log space even on short landscape screens.
+        Row(Modifier.fillMaxWidth().height(28.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(7.dp))
+                .background(if (ui.practice) Palette.GoldDim else Palette.PanelHi)
+                .pressable { onPractice(!ui.practice) }, contentAlignment = Alignment.Center) {
+                Text((if (st.isZh) "练习" else "Coach") +
+                    (if (ui.practice) " ●" else " ○"),
+                    color = Palette.Text, fontSize = 11.sp, maxLines = 1)
+            }
+            Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(7.dp))
+                .background(if (ui.reviewEach) Palette.GoldDim else Palette.PanelHi)
+                .pressable { onReview(!ui.reviewEach) }, contentAlignment = Alignment.Center) {
+                Text((if (st.isZh) "每手复盘" else "Review") +
+                    (if (ui.reviewEach) " ●" else " ○"),
+                    color = Palette.Text, fontSize = 11.sp, maxLines = 1)
+            }
         }
-        // review switch: open each hand's replay when it ends
-        Row(
-            Modifier.fillMaxWidth().height(26.dp).clip(RoundedCornerShape(8.dp)).background(Palette.PanelHi).padding(start = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(st.reviewEach, color = Palette.Text, fontSize = 12.sp, modifier = Modifier.weight(1f))
-            Switch(
-                checked = ui.reviewEach, onCheckedChange = onReview, modifier = Modifier.scale(0.62f),
-                colors = SwitchDefaults.colors(checkedTrackColor = Palette.AccentDim, checkedThumbColor = Palette.Accent, uncheckedTrackColor = Palette.PanelHi2),
-            )
-        }
-        // middle: results, or practice info + action log
+        // The action log stays visible; secondary information scrolls independently.
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val over = ui.handOver
             if (over != null) {
                 HandOverPanel(over, fmt)
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
                     val info = ui.practiceInfo
-                    val live = ui.liveStrategy
-                    if (heroTurn && live != null) {
-                        Column(Modifier.fillMaxWidth().background(Palette.PanelHi).padding(5.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(live.label, color = Palette.Gold, fontSize = 10.sp, maxLines = 2)
-                            Text(live.choices.sortedByDescending { it.probability }.take(4).joinToString("  ") {
-                                it.move.type.name + (if (it.move.type == com.riverrunner.engine.MoveType.RAISE)
-                                    " " + fmt(it.move.raiseTo) else "") + " " +
-                                    "%.0f%%".format(java.util.Locale.US, it.probability * 100)
-                            }, color = Palette.Text, fontSize = 10.sp, maxLines = 3)
-                            Text(live.source, color = Palette.TextDim, fontSize = 9.sp, maxLines = 1)
+                    val live = if (heroTurn) ui.liveStrategy else null
+                    val infoMaxHeight = maxHeight * .55f
+                    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        if (live != null || (ui.practice && info != null)) {
+                            Column(Modifier.fillMaxWidth().heightIn(max = infoMaxHeight)
+                                .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                if (live != null) {
+                                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                                        .background(Palette.PanelHi).padding(6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        val heading = when (live.label) {
+                                            "declared-reference" -> if (st.isZh)
+                                                "外部参考（来源声明，非已验证GTO）"
+                                            else "External reference (unverified GTO)"
+                                            else -> if (st.isZh) "启发式策略参考（非GTO）"
+                                                else "Heuristic policy (NOT GTO)"
+                                        }
+                                        Text(heading, color = Palette.Gold, fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold)
+                                        for (option in live.choices.sortedByDescending { it.probability }.take(4)) {
+                                            Text(StudyPresentation.move(option.move,
+                                                ui.table?.bigBlind ?: 100, st.isZh) + "  " +
+                                                "%.0f%%".format(java.util.Locale.US, option.probability * 100),
+                                                color = Palette.Text, fontSize = 10.sp)
+                                        }
+                                        Text(if (live.source == "decision-time") {
+                                            if (st.isZh) "仅基于决策时信息" else "Decision-time information only"
+                                        } else live.source, color = Palette.TextDim, fontSize = 9.sp,
+                                            maxLines = 2)
+                                    }
+                                }
+                                if (ui.practice && info != null) PracticeHud(info, fmt)
+                            }
                         }
-                    }
-                    if (ui.practice && info != null) PracticeHud(info, fmt)
-                    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                        if (maxHeight > 36.dp) ActionLog(ui.log, Modifier.fillMaxSize())
+                        ActionLog(ui.log, Modifier.weight(1f))
                     }
                 }
             }

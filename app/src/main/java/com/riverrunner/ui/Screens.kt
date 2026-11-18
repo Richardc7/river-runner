@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import com.riverrunner.engine.Cards
 import com.riverrunner.data.Prefs
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.offset
@@ -70,7 +71,7 @@ fun HomeScreen(vm: AppViewModel) {
     val st = LocalStrings.current
     val p = vm.prefs
     Row(Modifier.fillMaxSize().background(Palette.Bg).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(Modifier.width(300.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.width(270.dp).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text("River Runner", color = Palette.Text, fontSize = 30.sp, lineHeight = 30.sp, fontFamily = Numeric, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(10.dp))
@@ -101,36 +102,56 @@ fun HomeScreen(vm: AppViewModel) {
                 .padding(18.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Box(Modifier.height(96.dp).width(130.dp)) {
-                    Box(Modifier.align(Alignment.Center).offset(x = (-24).dp).graphicsLayer { rotationZ = -10f }) {
-                        PlayingCard(Cards.parse("As"), 62.dp)
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Box(Modifier.height(72.dp).width(110.dp)) {
+                        Box(Modifier.align(Alignment.Center).offset(x = (-19).dp).graphicsLayer { rotationZ = -9f }) {
+                            PlayingCard(Cards.parse("As"), 49.dp)
+                        }
+                        Box(Modifier.align(Alignment.Center).offset(x = 19.dp).graphicsLayer { rotationZ = 9f }) {
+                            PlayingCard(Cards.parse("Kh"), 49.dp)
+                        }
                     }
-                    Box(Modifier.align(Alignment.Center).offset(x = 24.dp).graphicsLayer { rotationZ = 10f }) {
-                        PlayingCard(Cards.parse("Kh"), 62.dp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(if (st.isZh) "牌桌 · 训练中心" else "Play · Training",
+                            color = Palette.Text, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                        Text(if (st.isZh) "开始牌局，或针对弱项专项练习"
+                            else "Play a table or practise your weakest spots",
+                            color = Palette.TextDim, fontSize = 11.sp, maxLines = 2)
                     }
                 }
-                ActionButton(st.startGame, Palette.Gold, textColor = Palette.Ink, modifier = Modifier.width(260.dp).height(52.dp)) {
-                    vm.screen = Screen.Setup
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ActionButton(st.startGame, Palette.Gold, textColor = Palette.Ink,
+                        modifier = Modifier.weight(1f).height(48.dp)) { vm.screen = Screen.Setup }
+                    ActionButton(if (st.isZh) "专项训练" else "Training", Palette.CallBtn,
+                        modifier = Modifier.weight(1f).height(48.dp)) { vm.openTraining() }
                 }
                 val summary = st.setupSummary(
                     p.lastMode == GameMode.TOURNAMENT, p.lastSize, p.lastStackBB,
                     p.lastTableType == TableType.MIXED, p.lastHandsPerLevel, p.lastAnte,
                 )
-                Column(
-                    Modifier.width(260.dp).pressable { vm.startGame(lastConfig(p)) }.clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x66000000)).border(1.dp, Palette.Gold.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                ) {
-                    Text(st.quickStart + "  ▶", color = Palette.Gold, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        summary.take(2).joinToString(if (st.isZh) "，" else ", "), color = Palette.Text.copy(alpha = 0.85f),
-                        fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                TextButton(onClick = vm::openEditionSettings) {
-                    Text(if (st.isZh) "⚙ 自定义 AI / 对手 / 私人局" else "⚙ Customize AI / opponents / cash rules",
-                        color = Palette.Gold, fontSize = 12.sp, maxLines = 1)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(
+                        Modifier.weight(1f).pressable { vm.startGame(lastConfig(p)) }
+                            .clip(RoundedCornerShape(12.dp)).background(Color(0x66000000))
+                            .border(1.dp, Palette.Gold.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    ) {
+                        Text(st.quickStart + "  ▶", color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text(summary.take(2).joinToString(if (st.isZh) "，" else ", "),
+                            color = Palette.Text.copy(alpha = 0.85f), fontSize = 11.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    TextButton(onClick = vm::openEditionSettings) {
+                        Text(if (st.isZh) "自定义" else "Customize",
+                            color = Palette.Gold, fontSize = 12.sp)
+                    }
                 }
             }
         }
@@ -162,6 +183,8 @@ fun SetupScreen(vm: AppViewModel) {
         onBack = { vm.screen = Screen.Home },
         onCustomize = vm::openEditionSettings,
         selectedEdition = editionSummary(vm.editionConfig, vm.prefs.chinese),
+        liveStrategyEnabled = vm.realtimeGtoEnabled,
+        onLiveStrategyChange = { vm.setStudyToggle("live", it) },
         onStart = { c ->
             p.lastMode = c.mode; p.lastSize = c.tableSize; p.lastStackBB = c.startingBB
             p.lastTableType = c.tableType; p.lastHandsPerLevel = c.handsPerLevel; p.lastAnte = c.cashAnteFraction > 0
@@ -174,6 +197,7 @@ fun SetupScreen(vm: AppViewModel) {
 fun SetupContent(
     initial: SessionConfig, onBack: () -> Unit, onStart: (SessionConfig) -> Unit,
     onCustomize: (() -> Unit)? = null, selectedEdition: String? = null,
+    liveStrategyEnabled: Boolean = false, onLiveStrategyChange: ((Boolean) -> Unit)? = null,
 ) {
     val st = LocalStrings.current
     var mode by remember { mutableStateOf(initial.mode) }
@@ -217,6 +241,21 @@ fun SetupContent(
                     Pill(st.gtoTable, table == TableType.GTO, { table = TableType.GTO })
                     Pill(st.mixedTable, table == TableType.MIXED, { table = TableType.MIXED })
                 }
+                if (onLiveStrategyChange != null) {
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(Palette.PanelHi).padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(if (st.isZh) "本局显示实时策略参考" else "Show live strategy during this game",
+                                color = Palette.Text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(if (st.isZh) "只在你行动时显示；默认是启发式模型，非已验证 GTO"
+                                else "Only on your turn; heuristic model, not verified GTO",
+                                color = Palette.TextDim, fontSize = 11.sp)
+                        }
+                        Switch(checked = liveStrategyEnabled, onCheckedChange = onLiveStrategyChange,
+                            modifier = Modifier.testTag("live-strategy-switch"))
+                    }
+                }
                 if (mode == GameMode.TOURNAMENT) {
                     OptionRow(st.handsPerLevel) {
                         for (h in listOf(5, 8, 10, 15, 20)) Pill("$h", hpl == h, { hpl = h }, Modifier.width(52.dp))
@@ -243,6 +282,13 @@ fun SetupContent(
                 Text((if (st.isZh) "Exploit 配置：" else "Exploit config: ") + selectedEdition,
                     color = Palette.Gold, fontSize = 11.sp, maxLines = 3)
             }
+            if (onLiveStrategyChange != null) {
+                Text(if (liveStrategyEnabled) {
+                    if (st.isZh) "实时参考：开启（非已验证 GTO）" else "Live reference: ON (not verified GTO)"
+                } else {
+                    if (st.isZh) "实时参考：关闭" else "Live reference: OFF"
+                }, color = if (liveStrategyEnabled) Palette.Gold else Palette.TextDim, fontSize = 11.sp)
+            }
             Spacer(Modifier.weight(1f))
             ActionButton(st.start, Palette.Gold, textColor = Palette.Ink, modifier = Modifier.fillMaxWidth().height(52.dp)) {
                 onStart(
@@ -265,6 +311,7 @@ private fun OptionRow(label: String, content: @Composable () -> Unit) {
             modifier = Modifier.width(92.dp).padding(top = 10.dp),
         )
         FlowRow(
+            modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) { content() }
@@ -520,7 +567,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     .background(Palette.Panel).padding(14.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                SectionTitle("Exploit Edition V0.5")
+                SectionTitle("Exploit Edition V0.5.1")
                 Text(if (st.isZh) "AI、对手、抽水与筹码设置已集成；保存后从新牌桌开始生效。" else
                     "AI, opponents, rake and stacks are configurable. Saved settings apply to the next table.",
                     color = Palette.TextDim, fontSize = 12.sp)
@@ -529,7 +576,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     Palette.Gold, textColor = Palette.Ink, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                     vm.openEditionSettings()
                 }
-                ActionButton(if (st.isZh) "V0.4 专项训练" else "V0.4 Training",
+                ActionButton(if (st.isZh) "专项训练中心" else "Training centre",
                     Palette.PanelHi, modifier = Modifier.fillMaxWidth().height(42.dp)) { vm.openTraining() }
                 Text(if (st.isZh) "说明：默认是原版 AI；动态剥削需主动开启，且证据不足时会保留基准策略。" else
                     "Default AI is Legacy. Enable Adaptive explicitly; sparse evidence retains the baseline.",
@@ -553,11 +600,11 @@ fun SettingsScreen(vm: AppViewModel) {
                 ToggleRow(if (st.isZh) "5. 河牌 What-if 情景比较" else "5. River what-if scenarios", vm.riverWhatIfEnabled) {
                     vm.setStudyToggle("whatif", it)
                 }
-                ToggleRow(if (st.isZh) "实时 GTO/参考策略显示" else "Live GTO / strategy reference", vm.realtimeGtoEnabled) {
+                ToggleRow(if (st.isZh) "新牌局默认显示策略参考" else "Default live strategy reference in new games", vm.realtimeGtoEnabled) {
                     vm.setStudyToggle("live", it)
                 }
-                Text(if (st.isZh) "没有已验证的求解器资料时，实时显示只标记为「启发式基准」，绝不冒充 GTO。实时提示只在你的行动回合出现。"
-                    else "Without verified solver data, live advice is explicitly labelled heuristic, NOT GTO; only visible on hero turns.",
+                Text(if (st.isZh) "也可在「开始游戏」的牌局配置中选择开启或关闭。未匹配已验证的求解器数据时，只显示「启发式基准」；仅你的回合出现。"
+                    else "Choose ON/OFF directly in New Game as well. Without verified solver data, advice is heuristic only, shown on your turn.",
                     color = Palette.TextDim, fontSize = 10.sp)
                 ActionButton(if (st.isZh) "打开历史复盘与盲测" else "Open history & blind replay",
                     Palette.PanelHi, modifier = Modifier.fillMaxWidth().height(38.dp)) { vm.screen = Screen.History }

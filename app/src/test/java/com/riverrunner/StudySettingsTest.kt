@@ -27,7 +27,7 @@ class StudySettingsTest {
         for (label in listOf(
             "1. 盲测复盘", "2. 弱点分类报告", "3. 错题与间隔复习",
             "4. 翻前范围矩阵教练", "5. 河牌 What-if 情景比较",
-            "实时 GTO/参考策略显示"
+            "新牌局默认显示策略参考"
         )) compose.onNodeWithText(label).assertExists()
     }
     @Test fun featureTogglesPersistIndependentlyAndLiveDefaultsOff() {
