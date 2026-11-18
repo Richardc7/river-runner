@@ -1,178 +1,69 @@
-name: Build APK
+name: Exploit Edition verification
 
 on:
   push:
-    branches: [ main, 'ui-*', 'dev-*' ]
-    tags: [ 'v*' ]
+    branches: [main, exploit-edition, 'exploit/**']
   pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: exploit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
-    env:
-      VERSION_CODE: ${{ github.run_number }}
-      # VERSION_NAME is set by the "Version and notes from CHANGELOG.md" step.
-      # Signing material is restored from secrets below and shredded afterwards.
-      RR_KEYSTORE_PATH: keystore/release.p12
-      RR_STORE_PASSWORD: ${{ secrets.RR_STORE_PASSWORD }}
-      RR_KEY_ALIAS: ${{ secrets.RR_KEY_ALIAS }}
-      RR_KEY_PASSWORD: ${{ secrets.RR_KEY_PASSWORD }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-
-      # The top "## X.Y" heading of CHANGELOG.md is the version line: builds are X.Y.<run number>.
-      # A v* tag uses the tag name. The top section becomes the release notes.
-      - name: Version and notes from CHANGELOG.md
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            v="$GITHUB_REF_NAME"
-          else
-            base=$(grep -m1 -E '^## [0-9]+\.[0-9]+' CHANGELOG.md | sed -E 's/^## ([0-9]+\.[0-9]+).*/\1/')
-            if [ -z "$base" ]; then
-              echo "::error::CHANGELOG.md needs a '## X.Y' heading at the top"
-              exit 1
-            fi
-            v="${base}.${GITHUB_RUN_NUMBER}"
-          fi
-          echo "VERSION_NAME=$v" >> "$GITHUB_ENV"
-          awk '/^## /{n++} n==1' CHANGELOG.md > release-notes.md
-          echo "version $v"; cat release-notes.md
-
-      - uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '17'
-
-      - uses: gradle/actions/setup-gradle@v4
-
-      - name: Engine unit tests
-        run: ./gradlew :engine:test --no-daemon
-
-      - name: Restore signing key
-        if: github.event_name != 'pull_request'
-        env:
-          RR_KEYSTORE_BASE64: ${{ secrets.RR_KEYSTORE_BASE64 }}
+          persist-credentials: false
+      - name: Archive exact source for reproducible review
         run: |
-          if [ -z "$RR_KEYSTORE_BASE64" ]; then
-            echo "::error::Signing key not configured. Add the RR_KEYSTORE_BASE64 secret (base64 of keystore/release.p12)."
-            exit 1
-          fi
-          mkdir -p "$(dirname "$RR_KEYSTORE_PATH")"
-          printf '%s' "$RR_KEYSTORE_BASE64" | base64 -d > "$RR_KEYSTORE_PATH"
-          echo "signing key restored: $(wc -c < "$RR_KEYSTORE_PATH") bytes"
-
-      - name: Build release APK
-        if: github.event_name != 'pull_request'
-        run: |
-          ./gradlew :app:assembleRelease --no-daemon 2>&1 | tee build.log
-          exit ${PIPESTATUS[0]}
-
-      - name: Shred signing key
-        if: always()
-        run: rm -f "$RR_KEYSTORE_PATH"
-
-      - name: Report build errors
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          touch build.log
-          grep -E "^e: |What went wrong|Could not|error:" -A3 build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
-          mkdir -p /tmp/logs && cp build.log /tmp/logs/ && cd /tmp/logs && echo "${GITHUB_SHA}" > COMMIT
-          git init -q && git checkout -q -b ci-logs && git add -A
-          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "build log ${GITHUB_SHA::7}"
-          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-logs
-
-      - name: Rename APK
-        if: github.event_name != 'pull_request'
-        run: cp app/build/outputs/apk/release/app-release.apk river-runner-${VERSION_NAME}.apk
-
-      - name: Print signer certificate
-        if: github.event_name != 'pull_request'
-        run: |
-          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          BUILD_TOOLS="$(ls -d "$SDK"/build-tools/* | sort -V | tail -1)"
-          "$BUILD_TOOLS/apksigner" verify --print-certs river-runner-*.apk | tee signer.txt
-
+          git archive --format=zip HEAD -o source-checkout.zip
+          git rev-parse HEAD > SOURCE_COMMIT.txt
       - uses: actions/upload-artifact@v4
-        if: github.event_name != 'pull_request'
         with:
-          name: river-runner-apk
-          path: river-runner-*.apk
-
-      - name: Publish rolling "latest" release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          CERT=$(grep -m1 "SHA-256 digest" signer.txt | sed 's/.*digest: //')
-          {
-            cat release-notes.md
-            echo
-            echo "---"
-            echo
-            echo "Automatic build of ${GITHUB_SHA::7}. Full history: [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)"
-            echo
-            echo "**签名密钥已在 0.3.0 更换**：从 0.2.x 升级请先卸载旧版本再安装，签名不同无法直接覆盖。"
-            echo
-            echo "Signing key changed at 0.3.0: uninstall the 0.2.x build before installing this one."
-            echo
-            echo "Signer certificate SHA-256: ${CERT}"
-          } > notes.md
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest river-runner-*.apk --prerelease \
-            --title "Latest build (${VERSION_NAME})" \
-            --notes-file notes.md
-
-      - name: Publish tagged release
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" river-runner-*.apk --title "${GITHUB_REF_NAME}" --notes-file release-notes.md
-
-  screenshots:
-    # Renders the UI on the JVM (Robolectric + Roborazzi) and publishes the PNGs to the
-    # "screenshots" branch, so layout changes can be reviewed without a device.
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v4
-
+          name: source-checkout
+          path: |
+            source-checkout.zip
+            SOURCE_COMMIT.txt
+          retention-days: 7
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - uses: gradle/actions/setup-gradle@v4
-
-      - name: Render screenshots
+      - name: Engine and Android tests, installable debug APK
+        run: ./gradlew :engine:test :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace
+      - name: Record APK integrity and signing identity
         run: |
-          ./gradlew :app:recordRoborazziDebug --no-daemon 2>&1 | tee render.log
-          exit ${PIPESTATUS[0]}
-
-      - name: Report render errors
-        if: failure()
-        run: |
-          touch render.log
-          grep -E "^e: |What went wrong|FAILED|Exception" -A3 render.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
-
-      - name: Publish to screenshots branch
+          cp app/build/outputs/apk/debug/app-debug.apk river-runner-exploit-debug.apk
+          sha256sum river-runner-exploit-debug.apk > SHA256SUMS.txt
+          build_tools=$(find "${ANDROID_HOME}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          "${build_tools}/apksigner" verify --print-certs river-runner-exploit-debug.apk > APK_CERTIFICATE.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: river-runner-exploit-debug
+          path: |
+            river-runner-exploit-debug.apk
+            SHA256SUMS.txt
+            APK_CERTIFICATE.txt
+            SOURCE_COMMIT.txt
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
         if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p /tmp/shots
-          cp app/build/screenshots/*.png /tmp/shots/ 2>/dev/null || true
-          cp render.log /tmp/shots/ 2>/dev/null || true
-          if [ -d app/build/reports/tests/testDebugUnitTest ]; then cp -r app/build/reports/tests/testDebugUnitTest /tmp/shots/test-report; fi
-          cd /tmp/shots
-          echo "${GITHUB_SHA}" > COMMIT
-          git init -q
-          git checkout -q -b screenshots
-          git add -A
-          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "Screenshots for ${GITHUB_SHA::7}"
-          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" screenshots
+        with:
+          name: verification-reports
+          path: |
+            engine/build/test-results/
+            engine/build/reports/tests/
+            app/build/test-results/
+            app/build/reports/tests/
+            app/build/outputs/roborazzi/
+          if-no-files-found: ignore
+          retention-days: 14
