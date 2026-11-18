@@ -1,5 +1,6 @@
 package com.riverrunner.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -24,6 +25,7 @@ data class TrainingItem(
 /** Practices past decision-time *model* action values, not privileged showdown outcomes. */
 @Composable
 fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
     val clipboard = LocalClipboardManager.current
     val zh = vm.prefs.chinese
     fun label(cn: String, en: String) = if (zh) cn else en

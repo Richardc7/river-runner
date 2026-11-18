@@ -74,7 +74,9 @@ fun HomeScreen(vm: AppViewModel) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text("River Runner", color = Palette.Text, fontSize = 30.sp, lineHeight = 30.sp, fontFamily = Numeric, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(10.dp))
-                Text(st.tagline, color = Palette.TextDim, fontSize = 12.sp, maxLines = 1, modifier = Modifier.padding(bottom = 3.dp))
+                Text("Exploit " + (vm.changelog.firstOrNull()?.version ?: "Edition"),
+                    color = Palette.Gold, fontSize = 12.sp, maxLines = 1,
+                    modifier = Modifier.padding(bottom = 3.dp))
             }
             PlayerCard(vm.profile, vm.profileList.size, vm.maxSlots, onSwitch = { vm.screen = Screen.Saves }, modifier = Modifier.fillMaxWidth())
             val tiles = listOf(
@@ -126,6 +128,10 @@ fun HomeScreen(vm: AppViewModel) {
                         fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
+                TextButton(onClick = vm::openEditionSettings) {
+                    Text(if (st.isZh) "⚙ 自定义 AI / 对手 / 私人局" else "⚙ Customize AI / opponents / cash rules",
+                        color = Palette.Gold, fontSize = 12.sp, maxLines = 1)
+                }
             }
         }
     }
@@ -154,6 +160,8 @@ fun SetupScreen(vm: AppViewModel) {
     SetupContent(
         initial = lastConfig(p),
         onBack = { vm.screen = Screen.Home },
+        onCustomize = vm::openEditionSettings,
+        selectedEdition = editionSummary(vm.editionConfig, vm.prefs.chinese),
         onStart = { c ->
             p.lastMode = c.mode; p.lastSize = c.tableSize; p.lastStackBB = c.startingBB
             p.lastTableType = c.tableType; p.lastHandsPerLevel = c.handsPerLevel; p.lastAnte = c.cashAnteFraction > 0
@@ -163,7 +171,10 @@ fun SetupScreen(vm: AppViewModel) {
 }
 
 @Composable
-fun SetupContent(initial: SessionConfig, onBack: () -> Unit, onStart: (SessionConfig) -> Unit) {
+fun SetupContent(
+    initial: SessionConfig, onBack: () -> Unit, onStart: (SessionConfig) -> Unit,
+    onCustomize: (() -> Unit)? = null, selectedEdition: String? = null,
+) {
     val st = LocalStrings.current
     var mode by remember { mutableStateOf(initial.mode) }
     var size by remember { mutableIntStateOf(initial.tableSize) }
@@ -179,6 +190,12 @@ fun SetupContent(initial: SessionConfig, onBack: () -> Unit, onStart: (SessionCo
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SmallButton("←", onBack)
                 Text(st.newGame, color = Palette.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                if (onCustomize != null) {
+                    TextButton(onClick = onCustomize) {
+                        Text(if (st.isZh) "⚙ 自定义对手及规则" else "⚙ Customize opponents / rules",
+                            color = Palette.Gold, fontSize = 12.sp)
+                    }
+                }
             }
             Spacer(Modifier.height(8.dp))
             Column(
@@ -222,6 +239,10 @@ fun SetupContent(initial: SessionConfig, onBack: () -> Unit, onStart: (SessionCo
             val lines = st.setupSummary(mode == GameMode.TOURNAMENT, size, stackBB, table == TableType.MIXED, hpl, ante)
             Text(lines[0], color = Palette.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 24.sp)
             for (l in lines.drop(1)) Text(l, color = Palette.Text.copy(alpha = 0.85f), fontSize = 13.sp, lineHeight = 19.sp)
+            if (selectedEdition != null) {
+                Text((if (st.isZh) "Exploit 配置：" else "Exploit config: ") + selectedEdition,
+                    color = Palette.Gold, fontSize = 11.sp, maxLines = 3)
+            }
             Spacer(Modifier.weight(1f))
             ActionButton(st.start, Palette.Gold, textColor = Palette.Ink, modifier = Modifier.fillMaxWidth().height(52.dp)) {
                 onStart(
@@ -495,12 +516,30 @@ fun SettingsScreen(vm: AppViewModel) {
                 ActionButton(st.clearHistory, Palette.FoldBtn, modifier = Modifier.fillMaxWidth()) { confirmClear = true }
             }
             Column(
-                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Palette.Panel).padding(14.dp),
+                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp))
+                    .background(Palette.Panel).padding(14.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                SectionTitle("Exploit Edition V0.4")
+                Text(if (st.isZh) "AI、对手、抽水与筹码设置已集成；保存后从新牌桌开始生效。" else
+                    "AI, opponents, rake and stacks are configurable. Saved settings apply to the next table.",
+                    color = Palette.TextDim, fontSize = 12.sp)
+                Text(editionSummary(vm.editionConfig, st.isZh), color = Palette.Gold, fontSize = 13.sp)
+                ActionButton(if (st.isZh) "⚙ 自定义 AI、对手与私人局" else "⚙ Customize AI, opponents & cash",
+                    Palette.Gold, textColor = Palette.Ink, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                    vm.openEditionSettings()
+                }
+                ActionButton(if (st.isZh) "V0.4 专项训练" else "V0.4 Training",
+                    Palette.PanelHi, modifier = Modifier.fillMaxWidth().height(42.dp)) { vm.openTraining() }
+                Text(if (st.isZh) "说明：默认是原版 AI；动态剥削需主动开启，且证据不足时会保留基准策略。" else
+                    "Default AI is Legacy. Enable Adaptive explicitly; sparse evidence retains the baseline.",
+                    color = Palette.TextDim, fontSize = 11.sp)
+                Spacer(Modifier.height(6.dp))
                 SectionTitle(st.about)
                 Text(st.aboutText, color = Palette.Text, fontSize = 13.sp, lineHeight = 19.sp)
                 Spacer(Modifier.height(8.dp))
-                Text("github.com/shunzhe1121/river-runner", color = Palette.TextDim, fontSize = 12.sp)
+                Text("github.com/Richardc7/river-runner (Fork of shunzhe1121/river-runner)",
+                    color = Palette.TextDim, fontSize = 12.sp)
                 Spacer(Modifier.height(14.dp))
                 val ctx = androidx.compose.ui.platform.LocalContext.current
                 val version = remember {
