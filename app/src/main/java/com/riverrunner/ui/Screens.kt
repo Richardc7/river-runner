@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import com.riverrunner.engine.Cards
 import com.riverrunner.data.Prefs
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.offset
@@ -251,7 +252,8 @@ fun SetupContent(
                                 else "Only on your turn; heuristic model, not verified GTO",
                                 color = Palette.TextDim, fontSize = 11.sp)
                         }
-                        Switch(checked = liveStrategyEnabled, onCheckedChange = onLiveStrategyChange)
+                        Switch(checked = liveStrategyEnabled, onCheckedChange = onLiveStrategyChange,
+                            modifier = Modifier.testTag("live-strategy-switch"))
                     }
                 }
                 if (mode == GameMode.TOURNAMENT) {

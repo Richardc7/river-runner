@@ -150,7 +150,7 @@ private fun TrainingEmpty(message: String) {
 }
 
 @Composable
-private fun DecisionQuestion(
+internal fun DecisionQuestion(
     vm: AppViewModel,
     item: TrainingItem,
     reference: ReferenceBook?,
