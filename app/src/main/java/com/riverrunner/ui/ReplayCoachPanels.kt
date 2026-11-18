@@ -261,7 +261,7 @@ fun RiverWhatIfCoachPanel(vm: AppViewModel, nodes: List<HistoricalDecision>) {
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        Text(if (zh) "河牌 What-if 情景比较" else "River what-if sensitivity",
+        Text(if (zh) "河牌条件情景推演" else "River what-if sensitivity",
             style = MaterialTheme.typography.titleMedium, color = Palette.Gold)
         Text(if (zh) "只分析支持的单挑现金局河牌，输入改变的是模型假设，不改变真实历史。无抽水之外的情况将拒绝计算。"
             else "Supported heads-up cash river only. Controls change assumptions, not actual history. Raked situations are refused.",

@@ -65,7 +65,8 @@ fun SpacedErrorCoach(vm: AppViewModel) {
                     Text(StudyPresentation.topic(a.topic, zh) + " · " + a.position,
                         color = Palette.Text, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text(StudyPresentation.street(a.street, zh) + " · " +
-                        t("有效筹码：", "Effective stack: ") + a.stackGroup,
+                        (if (zh) StudyPresentation.category("depth:" + a.stackGroup, true)
+                        else "Effective stack: " + a.stackGroup),
                         color = Palette.TextDim, fontSize = 12.sp)
                     Text(t("你的底牌：", "Your cards: "), color = Palette.TextDim, fontSize = 12.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {

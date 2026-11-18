@@ -130,8 +130,8 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
                                 vm.saveTrainingReference(it)
                                 importStatus = t("验证成功，已保存", "Validated and saved")
                             }.onFailure {
-                                importStatus = t("格式校验失败", "Invalid reference format") +
-                                    ": " + (it.message ?: "")
+                                importStatus = if (zh) "格式校验失败：请检查参考库文本及策略频率"
+                                else "Invalid reference format: " + (it.message ?: "")
                             }
                         }) { Text(t("校验并导入", "Validate & import")) }
                         if (importStatus.isNotEmpty()) Text(importStatus, color = Palette.TextDim)

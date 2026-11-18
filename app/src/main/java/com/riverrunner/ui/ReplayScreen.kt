@@ -239,7 +239,7 @@ fun ReplayContent(
                         AnalysisCard(heroAction, frame.action?.seat == record.heroSeat, policy, fmt)
                     }
                     if (opponentAction != null && opponent != null) {
-                        OpponentInsightCard(opponentAction, opponent, st, fmt)
+                        OpponentInsightCard(opponentAction, opponent, frame.board, st, fmt)
                     }
                 }
                 HorizontalDivider(color = Palette.Line)
@@ -256,7 +256,7 @@ fun ReplayContent(
 
 @Composable
 private fun OpponentInsightCard(
-    action: Action, player: com.riverrunner.engine.RecordPlayer,
+    action: Action, player: com.riverrunner.engine.RecordPlayer, board: List<Int>,
     st: Strings, fmt: (Int) -> String,
 ) {
     Column(
@@ -270,10 +270,18 @@ private fun OpponentInsightCard(
             TableMapper.actionLabel(st, action, fmt), color = Palette.Text, fontSize = 12.sp)
         Text((if (st.isZh) "模拟对手风格：" else "Bot preset: ") + st.styleName(player.style),
             color = Palette.TextDim, fontSize = 11.sp)
+        Text((if (st.isZh) "赛后回看对手底牌：" else "Opponent hole cards, revealed in replay: ") +
+            Cards.format(player.hole), color = Palette.Text, fontSize = 12.sp)
+        if (board.size >= 3) {
+            val visibleCards = player.hole.toList() + board
+            val rank = HandEvaluator.evaluate(Cards.mask(visibleCards.toIntArray()))
+            Text((if (st.isZh) "本街牌型：" else "Hand on this street: ") +
+                HandEvaluator.categoryName(rank, st.isZh), color = Palette.TextDim, fontSize = 11.sp)
+        }
         Text(StudyPresentation.opponentReason(action, player.style, st.isZh),
             color = Palette.Text, fontSize = 12.sp)
         Text(if (st.isZh)
-            "以上是依据动作和对手预设给出的可能原因，并非记录了 AI 当时的内部思考或真实 GTO 判断。"
+            "对手底牌只供赛后回看；上述可能原因来自行动与预设类型，并非 AI 当时的内部推理或真实 GTO 判断。"
             else "A plausible explanation from the public action and preset, not a recorded internal bot rationale or verified GTO.",
             color = Palette.TextDim, fontSize = 10.sp)
     }
