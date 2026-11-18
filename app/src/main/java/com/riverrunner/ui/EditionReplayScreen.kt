@@ -29,7 +29,9 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
     val replayer = remember(initial.id) { Replayer(initial) }
     val nodes = remember(record.id, analysis) { historicalDecisions(record, analysis, replayer) }
     Column(Modifier.fillMaxSize().background(Palette.Bg)) {
-        if (record.rake > 0) Text((if (zh) "\u672c\u624b\u62bd\u6c34: " else "Hand rake: ") + vm.fmt(record.rake, record.bigBlind), color = Palette.TextDim)
+        if (coachTab != 1 && record.rake > 0) {
+            Text((if (zh) "本手抽水: " else "Hand rake: ") + vm.fmt(record.rake, record.bigBlind), color = Palette.TextDim)
+        }
         Row(Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             TextButton(onClick = { coachTab = 0; report = false }) { Text(if (zh) "逐街回放" else "Replay") }
