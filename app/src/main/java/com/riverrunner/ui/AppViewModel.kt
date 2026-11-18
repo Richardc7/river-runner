@@ -376,14 +376,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                 val view = ObservationFactory.forActor(e, s.config.mode)
                                 val match = savedReference?.lookup(view)
                                 if (match != null) LiveStrategyHint(
-                                    "外部声明参考（未验证 GTO） / Unverified external reference",
+                                    "declared-reference",
                                     match.actions.map { PolicyChoice(it.move, it.frequency) },
                                     savedReference.provenance.source
                                 ) else {
                                     val baseline = s.strategy.capturedBaseline(e)
                                         ?: PolicySnapshot.from(s.strategy.advise(e, BotStyle.GTO, s.tournamentContext()).baseline)
-                                    LiveStrategyHint("启发式基准（非 GTO） / Heuristic, NOT GTO",
-                                        baseline.choices, "Decision-time information only")
+                                    LiveStrategyHint("heuristic",
+                                        baseline.choices, "decision-time")
                                 }
                             } else null
                             val la = e.legalActions(); val me = e.player(seat)
