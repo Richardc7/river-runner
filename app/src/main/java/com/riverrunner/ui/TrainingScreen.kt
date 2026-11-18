@@ -1,7 +1,6 @@
 package com.riverrunner.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +18,7 @@ import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.engine.*
 import com.riverrunner.engine.strategy.*
 import java.util.Locale
+import kotlin.math.roundToInt
 
 data class TrainingItem(
     val drill: TrainingDrill,
@@ -48,20 +48,26 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
         loading = false
     }
     val completed = progress.categories.values.sumOf { it.attempts }
+    val exact = progress.categories.values.sumOf { it.exact }
 
     Column(Modifier.fillMaxSize().background(Palette.Bg).padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(onClick = onBack) { Text(t("← 返回", "← Back")) }
-            Column(Modifier.weight(1f)) {
-                Text(t("专项训练中心", "Training centre"), fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold, color = Palette.Text)
-                Text(t("情景判断 → 选择行动 → 解析 → 下一题",
-                    "Scenario → Choose → Explain → Next"), color = Palette.TextDim, fontSize = 11.sp)
+            Text(t("专项训练中心", "Training centre"), modifier = Modifier.weight(1f), fontSize = 20.sp,
+                fontWeight = FontWeight.Bold, color = Palette.Text)
+            if (completed > 0) {
+                val accuracy = exact.toFloat() / completed
+                CircularProgressIndicator(progress = { accuracy }, modifier = Modifier.size(24.dp),
+                    color = Palette.Gold, trackColor = Palette.Line, strokeWidth = 3.dp)
+                Column {
+                    Text(t("与模型首选一致", "Matches model favourite") + " ${(accuracy * 100).roundToInt()}%",
+                        color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(t("累计练习 $completed 次", "$completed total attempts"),
+                        color = Palette.TextDim, fontSize = 11.sp)
+                }
             }
-            Text(t("已练习 ", "Completed ") + completed, color = Palette.Gold,
-                fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             listOf(
@@ -160,6 +166,9 @@ internal fun DecisionQuestion(
     val options = remember(d) { StudyPresentation.choices(d) }
     val explanation = picked != null
     val bb = item.record.bigBlind.coerceAtLeast(1)
+    val toCall = view.legal.toCall
+    val potOdds = if (toCall > 0) toCall.toDouble() / (view.pot + toCall) else null
+    var showDetails by remember(d.id) { mutableStateOf(false) }
 
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.weight(.95f).fillMaxHeight().verticalScroll(rememberScrollState())
@@ -185,12 +194,16 @@ internal fun DecisionQuestion(
             Text(t("位置：", "Position: ") + position +
                 "  ·  " + t("有效人数：", "Players: ") + view.seats.size,
                 color = Palette.Text, fontSize = 12.sp)
-            Text(t("底池：", "Pot: ") + "%.1f".format(Locale.US, view.pot.toDouble() / bb) +
-                " BB  ·  " + t("跟注额：", "To call: ") +
-                "%.1f".format(Locale.US, view.legal.toCall.toDouble() / bb) + " BB",
-                color = Palette.Text, fontSize = 13.sp)
-            Text(t("只使用决策时的信息，不泄露对手底牌或未来公共牌。",
-                "Only decision-time information; no hidden opponent cards or future board."),
+            HorizontalDivider(color = Palette.Line)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuestionMetric(t("底池", "Pot"), "%.1f BB".format(Locale.US, view.pot.toDouble() / bb), Modifier.weight(1f))
+                QuestionMetric(t("跟注额", "To call"), "%.1f BB".format(Locale.US, toCall.toDouble() / bb), Modifier.weight(1f))
+                if (potOdds != null) {
+                    QuestionMetric(t("跟注所需胜率", "Equity needed"), "%.0f%%".format(Locale.US, 100 * potOdds), Modifier.weight(1f))
+                }
+            }
+            Text(t("选题依据：优先练习尚未尝试或与模型首选一致率较低的决策类型。",
+                "Why this spot: the trainer prioritizes new categories and those with lower model agreement."),
                 color = Palette.TextDim, fontSize = 11.sp)
         }
         Column(Modifier.weight(1.05f).fillMaxHeight().verticalScroll(rememberScrollState())
@@ -199,20 +212,15 @@ internal fun DecisionQuestion(
             if (!explanation) {
                 Text(t("你会选择哪个行动？", "What would you do?"),
                     color = Palette.Text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text(t("先作答，下一屏再看模型解析。选项来自真实记录，不会伪造行动 EV。",
-                    "Choose first; the model explanation follows. Options are saved, not invented."),
-                    color = Palette.TextDim, fontSize = 11.sp)
-                for ((index, option) in options.withIndex()) {
-                    OutlinedButton(
+                for (option in options) {
+                    Button(
                         onClick = { onSelect(option.move) },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 38.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
                         shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, Palette.Line),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.Text,
+                        colors = ButtonDefaults.buttonColors(contentColor = Palette.Text,
                             containerColor = Palette.PanelHi),
                     ) {
-                        Text(('A' + index).toString() + "   " + StudyPresentation.move(option.move, bb, zh),
-                            fontSize = 13.sp)
+                        Text(StudyPresentation.move(option.move, bb, zh), fontSize = 14.sp)
                     }
                 }
                 Text(t("此题有 ", "Available answers: ") + options.size +
@@ -243,8 +251,14 @@ internal fun DecisionQuestion(
                         color = if (option.move == best.move) Palette.Green else Palette.TextDim,
                         fontSize = 12.sp)
                 }
-                for (note in item.notes.take(3)) {
-                    Text(StudyPresentation.modelNote(note, zh), color = Palette.TextDim, fontSize = 11.sp)
+                TextButton(onClick = { showDetails = !showDetails }) {
+                    Text(if (showDetails) t("收起详情", "Hide details") else t("模型与牌谱详情", "Model and hand details"))
+                }
+                if (showDetails) {
+                    Text(t("牌谱 ID", "Hand ID") + " · " + item.record.id, color = Palette.TextDim, fontSize = 11.sp)
+                    for (note in item.notes) {
+                        Text(StudyPresentation.modelNote(note, zh), color = Palette.TextDim, fontSize = 11.sp)
+                    }
                 }
                 Text(t("这里比较的是模型假设下的 EV，并非真实盈亏或求解器 GTO。",
                     "Model-assumption EV, not realised profit or verified solver GTO."),
@@ -256,5 +270,13 @@ internal fun DecisionQuestion(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun QuestionMetric(label: String, value: String, modifier: Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, color = Palette.TextDim, fontSize = 11.sp)
+        Text(value, color = Palette.Gold, fontFamily = Numeric, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
     }
 }

@@ -1,12 +1,10 @@
 package com.riverrunner.ui
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -20,7 +18,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,10 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -68,11 +62,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.hypot
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -90,7 +81,7 @@ class TableGeometry(val w: Float, val h: Float, val n: Int) {
         crowded -> 100f
         else -> 112f
     }
-    val podH = 46f
+    val podH = 50f
     val miniCardW = if (n == 9 && w < 445f) 20f else if (crowded) 22f else 24f
     val boardCardW = if (crowded) 32f else if (w < 520f || h < 320f) 34f else 38f
     val boardCardH = boardCardW * 1.4f
@@ -107,8 +98,6 @@ class TableGeometry(val w: Float, val h: Float, val n: Int) {
     /** The pot sits under the board. In replay the result banner takes its place. */
     val potCenter = Offset(cx, boardBottom + 14f)
     val bannerCenter = Offset(cx, boardBottom + 16f)
-    /** hero's action badge (right of the cards, on the pod's top edge) and winnings badge (left) */
-    val heroBadgeRight = Offset(cx + heroCardsW / 2 + 50f, heroPodTop - 9f)
     val heroBadgeLeft = Offset(cx - heroCardsW / 2 - 46f, heroPodTop - 9f)
 
     fun seatCenter(rel: Int): Offset {
@@ -120,90 +109,6 @@ class TableGeometry(val w: Float, val h: Float, val n: Int) {
             x.coerceIn(podW / 2 + 8f, w - podW / 2 - 4f),
             y.coerceIn(podH / 2 + 20f, h - podH / 2 - 18f),
         )
-    }
-
-    private class Box4(val l: Float, val t: Float, val r: Float, val b: Float)
-
-    /**
-     * Bet spots for every seat. Each seat tries points from its pod towards the middle (and a little
-     * to either side) and takes the first that touches no seat, badge, card, the board, the pot or
-     * another bet. Several seat orders are tried; the one with the least overlap wins.
-     */
-    val betSpots: List<Offset> by lazy { computeBetSpots() }
-
-    private fun computeBetSpots(): List<Offset> {
-        val hw = 32f
-        val hh = 12f
-        val obstacles = ArrayList<Box4>()
-        for (r in 1 until n) {
-            val s = seatCenter(r)
-            obstacles += Box4(s.x - podW / 2 - 6f, s.y - podH / 2 - 18f, s.x + podW / 2 + 6f, s.y + podH / 2 + 16f)
-        }
-        obstacles += Box4(cx - boardW / 2 - 4f, boardTop - 4f, cx + boardW / 2 + 4f, boardBottom + 4f)
-        obstacles += Box4(cx - 58f, boardBottom, cx + 58f, boardBottom + 28f)
-        obstacles += Box4(cx - (podW + 16f) / 2, heroPodTop, cx + (podW + 16f) / 2, h)
-        obstacles += Box4(cx - heroCardsW / 2 - 4f, heroCardsTop - 12f, cx + heroCardsW / 2 + 4f, heroPod.y)
-        obstacles += Box4(heroBadgeRight.x - 54f, heroBadgeRight.y - 13f, heroBadgeRight.x + 54f, heroBadgeRight.y + 13f)
-        obstacles += Box4(heroBadgeLeft.x - 48f, heroBadgeLeft.y - 13f, heroBadgeLeft.x + 48f, heroBadgeLeft.y + 13f)
-
-        fun overlap(x: Float, y: Float, boxes: List<Box4>): Float {
-            var total = 0f
-            if (x - hw < 0f || x + hw > w || y - hh < 0f || y + hh > h) total += 1000f
-            for (o in boxes) {
-                val ox = min(x + hw, o.r) - maxOf(x - hw, o.l)
-                val oy = min(y + hh, o.b) - maxOf(y - hh, o.t)
-                if (ox > 0f && oy > 0f) total += ox * oy
-            }
-            return total
-        }
-
-        fun candidates(rel: Int): List<Offset> {
-            if (rel == 0) {
-                return (0 until 12).map { Offset(cx, heroCardsTop - 14f - it * 3f) } +
-                    listOf(-60f, 60f, -90f, 90f).map { Offset(cx + it, heroCardsTop - 14f) }
-            }
-            val s = seatCenter(rel)
-            val dx = cx - s.x
-            val dy = cy - s.y
-            val len = hypot(dx, dy).coerceAtLeast(1f)
-            val ux = dx / len
-            val uy = dy / len
-            val out = ArrayList<Offset>()
-            var t = 20f
-            val lateral = intArrayOf(0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 8, -8, 10, -10)
-            while (t < len) {
-                for (k in lateral) out += Offset(s.x + ux * t - uy * k * 8f, s.y + uy * t + ux * k * 8f)
-                t += 4f
-            }
-            return out
-        }
-
-        val cand = (0 until n).map { candidates(it) }
-        var best: Pair<Float, List<Offset>>? = null
-        val orders = ArrayList<List<Int>>()
-        for (k in 0 until maxOf(1, n - 1)) {
-            orders += listOf(0) + (0 until n - 1).map { 1 + (k + it) % (n - 1) }
-            orders += listOf(0) + (0 until n - 1).map { 1 + Math.floorMod(k - it, n - 1) }
-        }
-        for (order in orders) {
-            val placed = ArrayList<Box4>()
-            val spots = arrayOfNulls<Offset>(n)
-            var cost = 0f
-            for (r in order) {
-                if (r >= n) continue
-                val all = obstacles + placed
-                var chosen: Offset? = cand[r].firstOrNull { overlap(it.x, it.y, all) == 0f }
-                if (chosen == null) {
-                    chosen = cand[r].minByOrNull { overlap(it.x, it.y, all) } ?: seatCenter(r)
-                    cost += overlap(chosen.x, chosen.y, all) + 1f
-                }
-                spots[r] = chosen
-                placed += Box4(chosen.x - hw - 2f, chosen.y - hh - 2f, chosen.x + hw + 2f, chosen.y + hh + 2f)
-            }
-            if (best == null || cost < best.first) best = cost to spots.map { it ?: Offset(cx, cy) }
-            if (cost == 0f) break
-        }
-        return best!!.second
     }
 }
 
@@ -288,15 +193,6 @@ fun PokerTable(
             }
         }
 
-        // bets (animated between seat, bet spot and pot); bigger bets are drawn on top
-        val spots = remember(g.w, g.h, n) { g.betSpots }
-        for (i in t.seats.indices.sortedBy { t.seats[it].streetBet }) {
-            val s = t.seats[i]
-            key(s.seat) {
-                val r = rel(i)
-                BetChip(s.streetBet, g.seatCenter(r), spots[r], g.potCenter, fmt)
-            }
-        }
         // winnings flying from the pot to the winner
         for ((i, s) in t.seats.withIndex()) {
             if (s.won > 0) WinChip(t.handKey, s.won, g.potCenter, g.seatCenter(rel(i)), fmt)
@@ -398,25 +294,19 @@ private fun ThinkingBar(key: Int, durationMs: Long, modifier: Modifier) {
     }
 }
 
+/** Keep the action in the seat frame so it never covers another seat or a card. */
 @Composable
-private fun ActionBadge(text: String?, kind: ActKind?, gold: Boolean = false) {
-    AnimatedContent(
-        targetState = text,
-        transitionSpec = {
-            (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = 500f)) + fadeIn()) togetherWith fadeOut(tween(120))
-        },
-        label = "badge",
-    ) { txt ->
-        if (txt != null) {
-            Text(
-                txt, color = if (gold) Palette.Ink else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1,
-                modifier = Modifier.clip(RoundedCornerShape(50))
-                    .background(if (gold) Palette.Gold else actColor(kind))
-                    .border(1.dp, Color(0x55FFFFFF), RoundedCornerShape(50))
-                    .padding(horizontal = 7.dp, vertical = 1.dp),
-            )
-        }
+private fun SeatStatus(seat: SeatUi, fmt: (Int) -> String, modifier: Modifier = Modifier) {
+    val caption = seat.handName ?: seat.action ?: seat.streetBet.takeIf { it > 0 }?.let(fmt)
+    val color = when {
+        seat.handName != null && seat.won > 0 -> Palette.Gold
+        seat.actKind == ActKind.BET -> Palette.Gold
+        seat.actKind == ActKind.ALLIN -> Palette.Red
+        else -> Palette.TextDim
     }
+    Text(caption.orEmpty(), modifier = modifier.height(12.dp), color = color,
+        fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium,
+        maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable
@@ -452,39 +342,39 @@ private fun SeatPod(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Strin
     val dimAlpha by animateFloatAsState(if (s.busted) 0.3f else if (s.folded) 0.5f else 1f, tween(300), label = "fold")
     Box(Modifier.size((g.podW + 12).dp, (g.podH + 36).dp), contentAlignment = Alignment.Center) {
         PodFrame(s, pulse, Modifier.size(g.podW.dp, g.podH.dp).alpha(dimAlpha)) {
-            Row(Modifier.fillMaxSize().padding(start = 8.dp, end = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(s.name, color = Palette.Text, fontSize = 12.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        if (s.busted) "—" else fmt(s.stack), maxLines = 1,
-                        color = if (s.allIn && !s.busted) Palette.Red else Palette.Gold, fontSize = if (g.crowded) 16.sp else 17.sp, lineHeight = 18.sp, fontFamily = Numeric, fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                val hole = s.hole
-                if (hole != null && !s.busted) {
-                    AnimatedVisibility(!s.folded || s.faceUp, enter = fadeIn(), exit = fadeOut(tween(250)) + scaleOut(tween(250), targetScale = 0.4f)) {
-                        DealIn(t.handKey, dealDelay, dealFrom, animateDeal) {
-                            Box(Modifier.size((g.miniCardW * 1.68f).dp, (g.miniCardW * 1.4f).dp)) {
-                                val dim = t.highlight.isNotEmpty()
-                                FlipCard(hole[0], s.faceUp, g.miniCardW.dp, dim && hole[0] !in t.highlight)
-                                Box(Modifier.offset(x = (g.miniCardW * 0.68f).dp, y = 0.dp)) {
-                                    FlipCard(hole[1], s.faceUp, g.miniCardW.dp, dim && hole[1] !in t.highlight)
+            Column(Modifier.fillMaxSize().padding(start = 8.dp, end = 5.dp)) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(s.name, color = Palette.Text, fontSize = 12.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            if (s.busted) "—" else fmt(s.stack), maxLines = 1,
+                            color = if (s.allIn && !s.busted) Palette.Red else Palette.Gold, fontSize = if (g.crowded) 16.sp else 17.sp, lineHeight = 18.sp, fontFamily = Numeric, fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    val hole = s.hole
+                    if (hole != null && !s.busted) {
+                        AnimatedVisibility(!s.folded || s.faceUp, enter = fadeIn(), exit = fadeOut(tween(250)) + scaleOut(tween(250), targetScale = 0.4f)) {
+                            DealIn(t.handKey, dealDelay, dealFrom, animateDeal) {
+                                Box(Modifier.size((g.miniCardW * 1.68f).dp, (g.miniCardW * 1.4f).dp)) {
+                                    val dim = t.highlight.isNotEmpty()
+                                    FlipCard(hole[0], s.faceUp, g.miniCardW.dp, dim && hole[0] !in t.highlight)
+                                    Box(Modifier.offset(x = (g.miniCardW * 0.68f).dp, y = 0.dp)) {
+                                        FlipCard(hole[1], s.faceUp, g.miniCardW.dp, dim && hole[1] !in t.highlight)
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                SeatStatus(s, fmt, Modifier.fillMaxWidth())
+                Spacer(Modifier.height(3.dp))
             }
             if (s.isActing) {
-                ThinkingBar(t.actionSeq, t.thinkingMs, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp))
+                ThinkingBar(t.actionSeq, t.thinkingMs, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 8.dp))
             }
         }
         // dealer button (top-left)
         if (s.isButton) Box(Modifier.align(Alignment.TopStart).offset(x = 0.dp, y = 11.dp)) { DealerButton() }
-        // action / hand badge (top-centre)
-        Box(Modifier.align(Alignment.TopCenter)) {
-            ActionBadge(s.handName ?: s.action, s.actKind, gold = s.handName != null && s.won > 0)
-        }
         // position (+ style in replay) (bottom-left)
         val posText = listOfNotNull(s.position.takeIf { it.isNotEmpty() }, s.tag).joinToString(" · ")
         if (posText.isNotEmpty()) {
@@ -557,47 +447,14 @@ private fun HeroSeat(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Stri
                         if (s.busted) "—" else fmt(s.stack), color = if (s.allIn) Palette.Red else Palette.Gold,
                         fontSize = 19.sp, lineHeight = 20.sp, fontFamily = Numeric, fontWeight = FontWeight.SemiBold, maxLines = 1,
                     )
+                    SeatStatus(s, fmt)
                 }
             }
             if (s.isButton) Box(Modifier.align(Alignment.CenterStart).offset(x = (-22).dp)) { DealerButton() }
         }
     }
-    // badges on the pod's top edge: action / made hand to the right of the cards, winnings to the left
-    if (hole != null && !s.busted) {
-        Box(Modifier.fillMaxSize().centerAt(g.heroBadgeRight)) {
-            ActionBadge(s.handName ?: s.action, s.actKind, gold = s.handName != null && s.won > 0)
-        }
-        Box(Modifier.fillMaxSize().centerAt(g.heroBadgeLeft)) {
-            WonOrEquity(s, fmt)
-        }
-    }
-}
-
-/** A bet that slides out of the seat, then into the pot when the street ends. */
-@Composable
-private fun BetChip(amount: Int, seat: Offset, spot: Offset, pot: Offset, fmt: (Int) -> String) {
-    val pos = remember { Animatable(seat, Offset.VectorConverter) }
-    val alpha = remember { Animatable(0f) }
-    var shown by remember { mutableIntStateOf(0) }
-    LaunchedEffect(amount, spot) {
-        if (amount > 0) {
-            if (shown == 0) {
-                pos.snapTo(seat)
-                alpha.snapTo(0f)
-            }
-            shown = amount
-            launch { alpha.animateTo(1f, tween(160)) }
-            pos.animateTo(spot, tween(320, easing = FastOutSlowInEasing))
-        } else if (shown > 0) {
-            launch { pos.animateTo(pot, tween(380, easing = FastOutSlowInEasing)) }
-            alpha.animateTo(0f, tween(420, easing = LinearEasing))
-            shown = 0
-        }
-    }
-    if (shown > 0) {
-        Box(Modifier.fillMaxSize().centerAt(pos.value).alpha(alpha.value)) {
-            ChipLabel(fmt(shown))
-        }
+    Box(Modifier.fillMaxSize().centerAt(g.heroBadgeLeft)) {
+        WonOrEquity(s, fmt)
     }
 }
 
