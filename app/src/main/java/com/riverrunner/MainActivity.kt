@@ -28,15 +28,24 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vm: AppViewModel = viewModel()
             var editionOpen by remember { mutableStateOf(false) }
+            var trainingOpen by remember { mutableStateOf(false) }
+            BackHandler(enabled = trainingOpen) { trainingOpen = false }
             BackHandler(enabled = editionOpen) { editionOpen = false }
             RiverTheme(vm.strings, vm.deckStyle) {
                 Box(Modifier.fillMaxSize().background(Palette.Bg).windowInsetsPadding(WindowInsets.displayCutout)) {
-                    if (editionOpen) {
+                    if (trainingOpen) {
+                        TrainingScreen(vm) { trainingOpen = false }
+                    } else if (editionOpen) {
                         EditionScreen(vm.editionConfig, vm.prefs.chinese, vm::saveEdition) { editionOpen = false }
                     } else Column(Modifier.fillMaxSize()) {
                         if (vm.screen == Screen.Home || vm.screen == Screen.Setup || vm.screen == Screen.Settings) {
                             TextButton(onClick = { editionOpen = true }) {
                                 Text(if (vm.prefs.chinese) "Exploit Edition \u7b56\u7565\u8bbe\u7f6e" else "Exploit Edition strategy settings", color = Palette.Gold)
+                            }
+                        }
+                        if (vm.screen == Screen.Home || vm.screen == Screen.Settings || vm.screen == Screen.History) {
+                            TextButton(onClick = { trainingOpen = true }) {
+                                Text(if (vm.prefs.chinese) "V0.4 专项训练" else "V0.4 Training", color = Palette.Gold)
                             }
                         }
                         if (vm.topUpAvailable && (vm.screen == Screen.Table || vm.reviewing)) {
