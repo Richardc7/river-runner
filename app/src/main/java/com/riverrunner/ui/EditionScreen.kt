@@ -19,7 +19,7 @@ fun EditionScreen(initial: EditionConfig, chinese: Boolean, onSave: (EditionConf
     Column(Modifier.fillMaxSize().background(Palette.Bg).verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Exploit Edition V0.4", style = MaterialTheme.typography.headlineSmall,
+            Text("Exploit Edition V0.5", style = MaterialTheme.typography.headlineSmall,
                 color = Palette.Text, modifier = Modifier.weight(1f))
             OutlinedButton(onClick = onBack) { Text(text("返回", "Back")) }
             Button(onClick = { onSave(config); onBack() }) { Text(text("保存配置", "Save settings")) }

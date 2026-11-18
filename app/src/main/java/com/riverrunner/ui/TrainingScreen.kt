@@ -49,7 +49,7 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TextButton(onClick = onBack) { Text(label("返回", "Back")) }
-            Text("Exploit V0.4 · " + label("专项训练", "Training"), color = Palette.Text, style = MaterialTheme.typography.titleLarge)
+            Text("Exploit V0.5 · " + label("专项训练", "Training"), color = Palette.Text, style = MaterialTheme.typography.titleLarge)
         }
         Text(label(
             "仅使用你已保存的河牌决策时模型；模型 EV 差异不代表真实损失或 GTO。没有对应牌谱时不会生成假练习。",
