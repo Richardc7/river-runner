@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
@@ -28,13 +29,19 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val vm: AppViewModel = viewModel()
+            val pageState = rememberSaveableStateHolder()
             RiverTheme(vm.strings, vm.deckStyle) {
                 Box(Modifier.fillMaxSize().background(Palette.Bg).windowInsetsPadding(WindowInsets.displayCutout)) {
                     when (val screen = vm.screen) {
                         Screen.Home -> HomeScreen(vm)
                         Screen.Table -> TableScreen(vm)
                         is Screen.Result -> ResultScreen(vm, screen.summary)
-                        Screen.History -> HistoryScreen(vm)
+                        Screen.History -> {
+                            val key = "hands"
+                            pageState.SaveableStateProvider(key) {
+                                HistoryScreen(vm, onClose = { pageState.removeState(key) })
+                            }
+                        }
                         is Screen.Replay -> EditionReplayScreen(vm, screen.record, screen.blind)
                         Screen.Stats -> StatsScreen(vm)
                         Screen.Settings -> SettingsScreen(vm)

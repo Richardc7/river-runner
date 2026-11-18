@@ -9,8 +9,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -18,8 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.riverrunner.engine.Cards
@@ -43,14 +48,19 @@ private data class HistoryEntry(val hand: HandRecord, val date: String, val titl
 }
 
 @Composable
-fun HistoryScreen(vm: AppViewModel) {
+fun HistoryScreen(vm: AppViewModel, onClose: () -> Unit = {}) {
     val st = LocalStrings.current
     fun t(zh: String, en: String) = if (st.isZh) zh else en
-    val back = { vm.screen = vm.historyReturnScreen }
+    val back = {
+        onClose()
+        vm.screen = vm.historyReturnScreen
+    }
     BackHandler(onBack = back)
     val store = vm.history
     val scope = rememberCoroutineScope()
     val resolver = LocalContext.current.contentResolver
+    val focus = LocalFocusManager.current
+    val listState = rememberLazyListState()
     var records by remember(store) { mutableStateOf<List<HandRecord>?>(null) }
     var showResults by rememberSaveable(vm.blindReviewEnabled) { mutableStateOf(!vm.blindReviewEnabled) }
     var favOnly by rememberSaveable { mutableStateOf(false) }
@@ -153,6 +163,15 @@ fun HistoryScreen(vm: AppViewModel) {
             OutlinedTextField(value = query, onValueChange = { query = it.take(100) },
                 modifier = Modifier.weight(1f), singleLine = true,
                 placeholder = { Text(t("搜索牌号、位置、日期或底牌", "Search hand, position, date or cards"), fontSize = 12.sp) },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        TextButton(onClick = { query = ""; focus.clearFocus() }) {
+                            Text(t("清除", "Clear"))
+                        }
+                    }
+                },
                 textStyle = MaterialTheme.typography.bodySmall)
             Row(Modifier.weight(1.3f).horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -184,7 +203,7 @@ fun HistoryScreen(vm: AppViewModel) {
                 Text(message, color = Palette.TextDim, fontSize = 14.sp)
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(shown, key = { it.hand.id }) { entry ->
                     HistoryRow(entry, showResults, deviations?.contains(entry.hand.id) == true,
                         onReplay = { vm.openReplay(entry.hand) },
