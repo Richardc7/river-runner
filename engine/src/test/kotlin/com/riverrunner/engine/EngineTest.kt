@@ -418,6 +418,16 @@ class AchievementTest {
         val ids2 = Achievements.all.map { it.id }
         assertEquals(ids2.size, ids2.toSet().size)
     }
+
+    @Test fun anEarlyTournamentLeaderOnlyCountsAsParticipation() {
+        val config = SessionConfig(GameMode.TOURNAMENT, 8, 50, TableType.GTO, seed = 7)
+        val session = GameSession(config)
+        session.hero.stack += 100
+        val summary = session.finish(early = true)
+        assertEquals(1, summary.heroPlace)
+        assertEquals(0.0, summary.heroProfit)
+        assertEquals(mapOf(Progress.TOURNEYS to 1L), Facts.forSession(summary, config))
+    }
 }
 
 class FunAchievementTest {

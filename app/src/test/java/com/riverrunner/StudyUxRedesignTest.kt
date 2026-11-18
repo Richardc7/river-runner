@@ -122,6 +122,21 @@ class StudyUxRedesignTest {
         assertTrue(compose.onAllNodesWithText(latest).fetchSemanticsNodes().isNotEmpty())
     }
 
+    @Test fun resultOnlyUsesTheChampionHeadlineForAFinishedTournament() {
+        val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
+        var summary by mutableStateOf(SessionSummary(GameMode.CASH, emptyList(), 1, 0.0, 2, true))
+        compose.setContent { RiverTheme(ZH) { ResultScreen(vm, summary) } }
+        compose.onNodeWithText("筹码局结算").assertExists()
+        compose.onNodeWithText("冠军！").assertDoesNotExist()
+
+        compose.runOnIdle { summary = summary.copy(mode = GameMode.TOURNAMENT) }
+        compose.onNodeWithText("锦标赛提前结束").assertExists()
+        compose.onNodeWithText("冠军！").assertDoesNotExist()
+
+        compose.runOnIdle { summary = summary.copy(endedEarly = false) }
+        compose.onNodeWithText("冠军！").assertExists()
+    }
+
     @Test fun trainingShowsQuestionThenExplanationAndNext() {
         val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
         val engine = GameSession(SessionConfig(GameMode.CASH, 2, 100, TableType.GTO, seed = 7)).startHand()

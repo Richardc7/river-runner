@@ -325,21 +325,39 @@ private fun OptionRow(label: String, content: @Composable () -> Unit) {
 @Composable
 fun ResultScreen(vm: AppViewModel, summary: com.riverrunner.engine.SessionSummary) {
     val st = LocalStrings.current
+    val cash = summary.mode == GameMode.CASH
+    val earlyTournament = !cash && summary.endedEarly
+    val headline = when {
+        cash -> if (st.isZh) "筹码局结算" else "Cash game results"
+        earlyTournament -> if (st.isZh) "锦标赛提前结束" else "Tournament ended early"
+        summary.heroPlace == 1 -> st.champion
+        else -> st.placeN(summary.heroPlace)
+    }
     BackHandler { vm.screen = Screen.Home }
     Row(Modifier.fillMaxSize().background(Palette.Bg).padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.width(260.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(st.result, color = Palette.TextDim, fontSize = 14.sp)
-            Text(
-                if (summary.heroPlace == 1) st.champion else st.placeN(summary.heroPlace),
-                color = Palette.Gold, fontSize = 30.sp, fontWeight = FontWeight.Bold,
-            )
-            if (summary.endedEarly) Text(st.endedEarly, color = Palette.TextDim, fontSize = 13.sp)
-            val profit = summary.heroProfit
-            val unit = if (summary.mode == GameMode.CASH) " BB" else if (st.isZh) " 积分" else " pts"
-            Text(
-                "${st.profit}: " + (if (profit >= 0) "+" else "") + "%.1f".format(profit) + unit,
-                color = if (profit >= 0) Palette.Green else Palette.Red, fontSize = 18.sp, fontWeight = FontWeight.Bold,
-            )
+            if (!cash) Text(st.result, color = Palette.TextDim, fontSize = 14.sp)
+            Text(headline, color = Palette.Gold, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            if (earlyTournament) {
+                Text(
+                    if (st.isZh) "离桌时按筹码暂列 ${st.placeN(summary.heroPlace)}"
+                    else "Chip standings at exit · ${st.placeN(summary.heroPlace)}",
+                    color = Palette.Text, fontSize = 15.sp,
+                )
+            } else {
+                if (summary.endedEarly) Text(st.endedEarly, color = Palette.Text, fontSize = 15.sp)
+                val profit = summary.heroProfit
+                val unit = if (cash) " BB" else if (st.isZh) " 积分" else " pts"
+                val profitColor = when {
+                    profit > 0 -> Palette.Green
+                    profit < 0 -> Palette.Red
+                    else -> Palette.Text
+                }
+                Text(
+                    "${st.profit}: " + (if (profit > 0) "+" else "") + "%.1f".format(profit) + unit,
+                    color = profitColor, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                )
+            }
             Text("${st.handsPlayed}: ${summary.handsPlayed}", color = Palette.Text, fontSize = 14.sp)
             Spacer(Modifier.weight(1f))
             ActionButton(st.playAgain, Palette.RaiseBtn, modifier = Modifier.fillMaxWidth()) { vm.playAgain() }
@@ -352,16 +370,22 @@ fun ResultScreen(vm: AppViewModel, summary: com.riverrunner.engine.SessionSummar
             Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(Palette.Panel).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            items(summary.standings) { s ->
+            if (cash) item {
+                SectionTitle(if (st.isZh) "离桌筹码" else "Closing stacks")
+            }
+            items(if (cash) summary.standings.sortedBy { it.seat } else summary.standings) { s ->
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
                         .background(if (s.isHuman) Palette.AccentDim else Palette.PanelHi)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("#${s.place}", color = Palette.Text, fontSize = 20.sp, fontFamily = Numeric, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(44.dp))
+                    if (!cash) Text("#${s.place}", color = Palette.Text, fontSize = 20.sp, fontFamily = Numeric, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(44.dp))
                     Text(if (s.isHuman) st.you else s.name, color = Palette.Text, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                    Text(if (s.stack > 0) Format.amount(s.stack, 100, vm.showInBB && summary.mode == GameMode.CASH) else st.busted, color = Palette.TextDim, fontSize = 14.sp)
+                    Text(
+                        if (cash || s.stack > 0) Format.amount(s.stack, 100, vm.showInBB && cash) else st.busted,
+                        color = Palette.TextDim, fontSize = 14.sp,
+                    )
                 }
             }
         }
