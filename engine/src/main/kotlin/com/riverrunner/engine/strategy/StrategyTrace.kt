@@ -51,6 +51,8 @@ object DecisionFingerprint {
             append(view.legal).append('|')
             view.seats.sortedBy { it.seat }.forEach { append(it).append(';') }
             append('|'); view.actions.forEach { append(it).append(';') }
+            // Default H1 nodes keep the exact historical fingerprint.
+            if (!view.cashRules.isDefault) append("|cash-rules-v1|").append(view.cashRules)
         }
         return MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it.toInt() and 255) }

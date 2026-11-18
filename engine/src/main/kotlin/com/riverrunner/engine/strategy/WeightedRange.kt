@@ -52,7 +52,11 @@ object RangeModel {
         val vpip = model.stat(StatKind.VPIP).estimate(.30, 30.0).mean
         val pfr = model.stat(StatKind.PFR).estimate(.18, 30.0).mean
         val threeBet = model.stat(StatKind.THREE_BET).estimate(.08, 30.0).mean
-        val preOrder = if (view.order.size == 2) listOf(view.buttonSeat, view.order.first()) else view.order.drop(2) + view.order.take(2)
+        val straddle = view.actions.firstOrNull { it.type == ActionType.STRADDLE }?.seat
+        val preOrder = if (straddle != null) {
+            val first = (view.order.indexOf(straddle) + 1) % view.order.size
+            List(view.order.size) { view.order[(first + it) % view.order.size] }
+        } else if (view.order.size == 2) listOf(view.buttonSeat, view.order.first()) else view.order.drop(2) + view.order.take(2)
         val behind = (preOrder.size - preOrder.indexOf(seat) - 1).coerceAtLeast(0)
         val opening = (Bot.rfiWidth(behind, view.order.size == 2) * pfr / .18).coerceIn(.03, .9)
         val observations = mutableListOf<Evidence>()

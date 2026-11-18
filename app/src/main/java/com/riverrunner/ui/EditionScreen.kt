@@ -34,9 +34,7 @@ fun EditionScreen(initial: EditionConfig, chinese: Boolean, onSave: (EditionConf
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(text("\u5ea7\u4f4d", "Seat") + " $seat", color = Palette.Text, modifier = Modifier.padding(top = 12.dp))
                 Box {
-                    OutlinedButton(onClick = { expanded = true }) {
-                        Text(presetLabel(config.opponents[seat], chinese))
-                    }
+                    OutlinedButton(onClick = { expanded = true }) { Text(presetLabel(config.opponents[seat], chinese)) }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         val choices: List<OpponentPreset?> = listOf(null) + OpponentPreset.entries
                         choices.forEach { preset ->
@@ -51,6 +49,7 @@ fun EditionScreen(initial: EditionConfig, chinese: Boolean, onSave: (EditionConf
             }
         }
         Text(text("\u57fa\u51c6\u662f\u542f\u53d1\u5f0f\u8fd1\u4f3c\uff0c\u4e0d\u662f\u7ecf\u9a8c\u8bc1\u7684 GTO \u6c42\u89e3\u5668\u3002\u8bc1\u636e\u4e0d\u8db3\u65f6\u4fdd\u7559\u57fa\u51c6\u3002", "The baseline is heuristic, not a verified GTO solver. Sparse evidence retains the baseline."), color = Palette.TextDim)
+        HouseRulesSettings(config, chinese) { config = it }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { onSave(config); onBack() }) { Text(text("\u4fdd\u5b58", "Save")) }
             OutlinedButton(onClick = onBack) { Text(text("\u8fd4\u56de", "Back")) }

@@ -21,6 +21,7 @@ data class DecisionView(
     val actions: List<Action>,
     val legal: LegalActions,
     val mode: GameMode,
+    val cashRules: CashRules = CashRules(),
 ) {
     init {
         require(ownHole.size == 2 && (ownHole + board).all { it in 0..51 })
@@ -42,7 +43,7 @@ object ObservationFactory {
             seat, engine.player(seat).hole.toList(), engine.street, engine.board.toList(),
             engine.pot, engine.bigBlind, engine.buttonSeat, engine.order.toList(),
             engine.players.map { PublicSeat(it.seat, it.startStack, it.stack, it.streetBet, it.committed, it.folded, it.allIn) },
-            engine.actions.toList(), engine.legalActions().copy(), mode,
+            engine.actions.toList(), engine.legalActions().copy(), mode, engine.setup.cashRules,
         )
     }
 }

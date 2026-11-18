@@ -25,6 +25,7 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
     val zh = vm.prefs.chinese
     val replayer = remember(initial.id) { Replayer(initial) }
     Column(Modifier.fillMaxSize().background(Palette.Bg)) {
+        if (record.rake > 0) Text((if (zh) "\u672c\u624b\u62bd\u6c34: " else "Hand rake: ") + vm.fmt(record.rake, record.bigBlind), color = Palette.TextDim)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = { report = false }) { Text(if (zh) "\u9010\u8857\u56de\u653e" else "Street replay") }
             TextButton(onClick = { report = true }) { Text(if (zh) "\u53cc\u8f68\u7b56\u7565\u5206\u6790" else "Decision-time strategy report") }
@@ -50,9 +51,9 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
                         Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("${trace.street} / #${trace.actionIndex}")
-                                if (!matches) Text(if (zh) "\u8bb0\u5f55\u4e0e\u51b3\u7b56\u573a\u666f\u4e0d\u5339\u914d\uff0c\u4e0d\u5c55\u793a\u5efa\u8bae\u3002" else "Trace does not match this decision context; advice withheld.")
+                                if (view == null || !matches) Text(if (zh) "\u8bb0\u5f55\u4e0e\u51b3\u7b56\u573a\u666f\u4e0d\u5339\u914d\uff0c\u4e0d\u5c55\u793a\u5efa\u8bae\u3002" else "Trace does not match this decision context; advice withheld.")
                                 else {
-                                    Text("${Cards.format(view!!.ownHole.toIntArray())} | ${Cards.format(view.board.toIntArray())}")
+                                    Text("${Cards.format(view.ownHole.toIntArray())} | ${Cards.format(view.board.toIntArray())}")
                                     val actual = record.actions.filter { !it.type.isPost }.getOrNull(trace.actionIndex)
                                     actual?.let { Text((if (zh) "\u4f60\u7684\u884c\u52a8\uff1a" else "Your action: ") + vm.actionLabel(it, record.bigBlind)) }
                                     Text((if (zh) "\u57fa\u51c6\uff1a" else "Baseline: ") + policyText(trace.baseline, record.bigBlind))

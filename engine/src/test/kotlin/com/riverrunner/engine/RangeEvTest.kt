@@ -63,6 +63,7 @@ class RangeEvTest {
         assertFalse(RiverEv.analyze(v.copy(mode = GameMode.TOURNAMENT), r).supported)
         assertFalse(RiverEv.analyze(v.copy(order = listOf(0, 1)), r).supported)
         assertFalse(RiverEv.analyze(v.copy(pot = 999), r).supported)
+        assertFalse(RiverEv.analyze(v.copy(cashRules = CashRules(rakeBasisPoints = 500, rakeCapBB = 3)), r).supported)
     }
     @Test fun publicRangeInferenceIsFiniteAndCardSafe() {
         val v = view(); val r = RangeModel.infer(v, 1, null)

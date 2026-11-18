@@ -53,7 +53,7 @@ class StrategySession(private val seed: Long, private val mode: GameMode, val co
             actionValues = river?.values ?: emptyList(), notes = notes)
     }
     fun finishAnalysis(handId: Long): HandAnalysis? = if (pending.isEmpty()) null else HandAnalysis(
-        handId, "exploit-0.2.0", StrategyRandom.VERSION, seed, config.aiMode, pending.values.toList())
+        handId, "exploit-0.3.0", StrategyRandom.VERSION, seed, config.aiMode, pending.values.toList())
 
     fun choose(engine: HandEngine, style: BotStyle, legacyRandom: Random, tournament: TournamentContext? = null): Move {
         if (config.aiMode == AiMode.LEGACY && config.opponents[engine.toAct] != OpponentPreset.LOOSE_PASSIVE) {

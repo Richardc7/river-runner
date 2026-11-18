@@ -50,6 +50,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val editionPrefs = EditionPrefs(app)
     var editionConfig by mutableStateOf(editionPrefs.load()); private set
     fun saveEdition(config: EditionConfig) { editionPrefs.save(config); editionConfig = config }
+    var topUpAvailable by mutableStateOf(false); private set
+    fun topUpHero() {
+        val s = session ?: return
+        if (!topUpAvailable || s.current != null) return
+        val added = s.rebuy(GameSession.HERO_SEAT)
+        topUpAvailable = false; sessionOver = s.isOver
+        notice = if (prefs.chinese) "\u5df2\u8865\u7801 ${fmt(added, GameSession.BASE_BB)}\uff0c\u4e0b\u4e00\u624b\u663e\u793a" else "Added ${fmt(added, GameSession.BASE_BB)}; shown next hand"
+    }
 
     private val profiles = ProfileStore(app.filesDir, prefs) { i -> (if (prefs.chinese) ZH else EN).saveDefaultName(i) }
     var profile by mutableStateOf(profiles.active()); private set
@@ -166,7 +174,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val botDelay: Long get() = when (prefs.speed) { 0 -> 1500L; 2 -> 450L; else -> 900L }
 
     fun startGame(config: SessionConfig) {
-        gameJob?.cancel()
+        gameJob?.cancel(); topUpAvailable = false
         val selected = config.copy(edition = editionConfig.copy(opponents = editionConfig.opponents.toMap()))
         lastConfig = selected
         val s = GameSession(selected); session = s
@@ -213,10 +221,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     private suspend fun runGame(s: GameSession) {
         while (!s.isOver && !quitRequested) {
+            topUpAvailable = false
+            val buyInsBefore = s.buyIns.size
             val e = s.startHand()
             handKey = System.nanoTime(); actionSeq = 0; handNumber = s.handNumber + 1
             updateBlinds(s); log.clear(); handOver = null; starHand = false; lastRecordId = null
             heroInHand = true; fastForward = false; legal = null; practiceInfo = null; actingName = null
+            s.buyIns.drop(buyInsBefore).forEach { log += LogLine(LogKind.RESULT, "Rebuy: seat ${it.seat} +${fmt(it.amount, GameSession.BASE_BB)}") }
             log += LogLine(LogKind.STREET, strings.preflop)
             for (a in e.actions) logAction(e, s, a)
             val lvl = s.currentLevel(); val prev = lastBlinds
@@ -271,7 +282,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val rec = if (starHand) built.copy(favorite = true) else built
             val store = history; val traces = analysisStore(); val analysis = s.lastAnalysis
             val analysisSaved = withContext(Dispatchers.IO) {
-                store.add(rec) // the hand is authoritative; optional analysis must never destroy it
+                store.add(rec)
                 try {
                     if (analysis != null) traces.save(analysis)
                     traces.retain(store.all().map { it.id }.toSet()); true
@@ -291,6 +302,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             table = TableMapper.build(strings, e, infosBefore, handKey, actionSeq, TableMapper.Stage.FINAL, { fmt(it, bb) })
             if ((e.result?.net?.get(GameSession.HERO_SEAT) ?: 0) > 0) sfx(Sound.WIN, 0.8f) else sfx(Sound.COLLECT, 0.7f)
             TableMapper.resultBanner(strings, e, infosBefore) { fmt(it, bb) }?.let { log += LogLine(LogKind.RESULT, it) }
+            if (rec.rake > 0) log += LogLine(LogKind.RESULT, (if (prefs.chinese) "\u672c\u624b\u62bd\u6c34 " else "Hand rake ") + fmt(rec.rake, bb))
+            topUpAvailable = s.config.mode == GameMode.CASH && s.hero.stack < s.targetStackBB(0) * GameSession.BASE_BB
             handOver = TableMapper.handOver(strings, e, infosBefore, GameSession.HERO_SEAT)
             sessionOver = s.isOver; fastForward = false
             if (!quitRequested) {
@@ -300,7 +313,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         val summary = s.finish(early = quitRequested && !(s.alivePlayers.size <= 1 || !s.hero.alive))
-        record(Facts.forSession(summary, s.config)); table = null; handOver = null; screen = Screen.Result(summary)
+        record(Facts.forSession(summary, s.config)); topUpAvailable = false; table = null; handOver = null; screen = Screen.Result(summary)
     }
     fun toggleFavorite(id: Long): HandRecord? {
         val r = history.toggleFavorite(id); if (r?.favorite == true) record(mapOf(Progress.STARS to 1L)); return r
