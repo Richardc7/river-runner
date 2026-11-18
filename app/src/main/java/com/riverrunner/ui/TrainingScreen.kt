@@ -17,6 +17,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.engine.*
 import com.riverrunner.engine.strategy.*
 import java.util.Locale
@@ -33,7 +34,7 @@ data class TrainingItem(
 @Composable
 fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
-    val zh = vm.prefs.chinese
+    val zh = LocalStrings.current.isZh
     fun t(cn: String, en: String) = if (zh) cn else en
     val clipboard = LocalClipboardManager.current
     var items by remember(vm.profile.id) { mutableStateOf<List<TrainingItem>>(emptyList()) }
@@ -159,7 +160,7 @@ internal fun DecisionQuestion(
     onSelect: (Move) -> Unit,
     onNext: () -> Unit,
 ) {
-    val zh = vm.prefs.chinese
+    val zh = LocalStrings.current.isZh
     fun t(cn: String, en: String) = if (zh) cn else en
     val d = item.drill
     val view = item.view

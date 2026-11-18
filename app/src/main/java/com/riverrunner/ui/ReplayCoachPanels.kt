@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.engine.*
 import com.riverrunner.engine.strategy.*
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +50,7 @@ private fun studyMoveLabel(move: Move, bb: Int, zh: Boolean): String =
 
 @Composable
 fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<HistoricalDecision>) {
-    val zh = vm.prefs.chinese
+    val zh = LocalStrings.current.isZh
     fun t(cn: String, en: String) = if (zh) cn else en
     var index by remember(record.id) { mutableIntStateOf(0) }
     var answer by remember(record.id) { mutableStateOf<Move?>(null) }
@@ -137,7 +138,7 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
 
 @Composable
 fun WeaknessReportCoach(vm: AppViewModel) {
-    val zh = vm.prefs.chinese
+    val zh = LocalStrings.current.isZh
     var data by remember(vm.profile.id) { mutableStateOf<List<DecisionAssessment>?>(null) }
     LaunchedEffect(vm.profile.id) { data = vm.studyAssessments() }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
@@ -175,7 +176,7 @@ fun WeaknessReportCoach(vm: AppViewModel) {
 
 @Composable
 fun PreflopRangeCoachPanel(vm: AppViewModel, nodes: List<HistoricalDecision>) {
-    val zh = vm.prefs.chinese
+    val zh = LocalStrings.current.isZh
     val relevant = remember(nodes) { nodes.filter { it.view.street == Street.PREFLOP } }
     var selected by remember { mutableIntStateOf(0) }
     val node = relevant.getOrNull(selected.coerceIn(0, (relevant.size - 1).coerceAtLeast(0)))
@@ -229,7 +230,7 @@ fun PreflopRangeCoachPanel(vm: AppViewModel, nodes: List<HistoricalDecision>) {
 
 @Composable
 fun RiverWhatIfCoachPanel(vm: AppViewModel, nodes: List<HistoricalDecision>) {
-    val zh = vm.prefs.chinese
+    val zh = LocalStrings.current.isZh
     val candidates = remember(nodes) { nodes.filter {
         it.view.street == Street.RIVER && it.view.mode == GameMode.CASH && it.view.opponents.size == 1
     } }

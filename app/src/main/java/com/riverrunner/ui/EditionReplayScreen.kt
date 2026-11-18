@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.engine.*
 import com.riverrunner.engine.strategy.*
 
@@ -24,7 +25,7 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
     LaunchedEffect(initial.id) { analysis = vm.analysisFor(initial); loaded = true }
     val leave: () -> Unit = { if (vm.reviewing) vm.continueFromReview() else vm.screen = Screen.History }
     BackHandler(onBack = leave)
-    val zh = vm.prefs.chinese
+    val zh = LocalStrings.current.isZh
     val replayer = remember(initial.id) { Replayer(initial) }
     val nodes = remember(record.id, analysis) { historicalDecisions(record, analysis, replayer) }
     Column(Modifier.fillMaxSize().background(Palette.Bg)) {

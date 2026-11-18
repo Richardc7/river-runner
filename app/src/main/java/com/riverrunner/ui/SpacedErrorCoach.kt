@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.engine.Cards
 import com.riverrunner.engine.MoveType
 import com.riverrunner.engine.strategy.*
@@ -22,7 +23,7 @@ import java.util.Locale
 /** A genuine blind-question/answer-explanation flow; no opponent private cards or future boards. */
 @Composable
 fun SpacedErrorCoach(vm: AppViewModel) {
-    val zh = vm.prefs.chinese
+    val zh = LocalStrings.current.isZh
     fun t(cn: String, en: String) = if (zh) cn else en
     var loading by remember(vm.profile.id) { mutableStateOf(true) }
     var assessments by remember(vm.profile.id) { mutableStateOf<List<DecisionAssessment>>(emptyList()) }
