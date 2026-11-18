@@ -47,6 +47,43 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val id = profile.id; val retained = history.all().map { it.id }.toSet()
         return withContext(Dispatchers.IO) { analysisStore(id).also { it.retain(retained) }.load(record.id) }
     }
+    /** V0.4 drills: derive only from saved, contemporaneously modelled river choices. */
+    suspend fun trainingItems(): List<TrainingItem> = withContext(Dispatchers.IO) {
+        val id = profile.id
+        val records = history.all().takeLast(300)
+        val store = analysisStore(id)
+        val out = ArrayList<TrainingItem>()
+        for (record in records) {
+            val analysis = runCatching { store.load(record.id) }.getOrNull() ?: continue
+            val replayer = Replayer(record)
+            for (trace in analysis.decisions) {
+                if (trace.actionValues.size < 2 || trace.seat != record.heroSeat) continue
+                val view = runCatching { ObservationFactory.forActor(
+                    replayer.engineBeforeAction(trace.actionIndex), record.mode
+                ) }.getOrNull() ?: continue
+                if (DecisionFingerprint.of(view) != trace.contextHash) continue
+                val exercise = TrainingCurriculum.fromHistory(listOf(analysis)).firstOrNull {
+                    it.id == "h" + record.id + "a" + trace.actionIndex
+                } ?: continue
+                out += TrainingItem(exercise, record, view, trace.baseline)
+            }
+        }
+        out
+    }
+    suspend fun loadTrainingProgress(): TrainingProgress = withContext(Dispatchers.IO) {
+        TrainingProgressStore(analysisRoot, profile.id).load()
+    }
+    fun saveTrainingProgress(progress: TrainingProgress) {
+        val id = profile.id
+        viewModelScope.launch(Dispatchers.IO) { TrainingProgressStore(analysisRoot, id).save(progress) }
+    }
+    suspend fun referenceForTraining(): ReferenceBook? = withContext(Dispatchers.IO) {
+        TrainingReferenceStore(analysisRoot, profile.id).load()
+    }
+    fun saveTrainingReference(book: ReferenceBook) {
+        val id = profile.id
+        viewModelScope.launch(Dispatchers.IO) { TrainingReferenceStore(analysisRoot, id).save(book) }
+    }
     private val editionPrefs = EditionPrefs(app)
     var editionConfig by mutableStateOf(editionPrefs.load()); private set
     fun saveEdition(config: EditionConfig) { editionPrefs.save(config); editionConfig = config }
@@ -82,7 +119,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun deleteProfile(id: String) {
         if (screen == Screen.Table || reviewing) return
-        analysisStore(id).deleteAll(); profiles.delete(id); switchProfile(profiles.active().id)
+        analysisStore(id).deleteAll(); TrainingProgressStore(analysisRoot, id).delete(); TrainingReferenceStore(analysisRoot, id).delete(); profiles.delete(id); switchProfile(profiles.active().id)
     }
     fun nextProfileName(): String = profiles.nextDefaultName()
     val maxSlots: Int get() = ProfileStore.MAX_SLOTS
