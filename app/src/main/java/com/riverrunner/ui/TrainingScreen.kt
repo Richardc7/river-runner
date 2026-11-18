@@ -55,8 +55,13 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
             "仅使用你已保存的河牌决策时模型；模型 EV 差异不代表真实损失或 GTO。没有对应牌谱时不会生成假练习。",
             "Exercises use saved decision-time river models only. Model EV loss is not actual loss or verified GTO. No fabricated exercises."
         ), color = Palette.TextDim)
+        if (vm.spacedDrillsEnabled) {
+            HorizontalDivider()
+            SpacedErrorCoach(vm)
+            HorizontalDivider()
+        }
         val completed = progress.categories.values.sumOf { it.attempts }
-        Text(label("完成练习：", "Attempts: ") + completed, color = Palette.Text)
+        Text(label("模型 EV 练习次数：", "Model-EV drill attempts: ") + completed, color = Palette.Text)
         if (loading) Text(label("正在读取历史...", "Loading saved hands..."), color = Palette.Text)
         else if (item == null) Text(
             label("暂时没有适用的练习。先开启决策分析、打现金局并记录支持的河牌决策。",

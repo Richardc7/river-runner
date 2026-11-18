@@ -105,7 +105,8 @@ data class ReviewProgress(val entries: Map<String, ReviewMemory> = emptyMap(), v
         val all = candidates.filter { !onlyWeak || it.needsStudy }
         if (all.isEmpty()) return null
         val due = all.filter { entries[it.id]?.dueDay?.let { next -> next <= day } ?: true }
-        val pool = due.ifEmpty { all }.filter { it.id != lastDrill }.ifEmpty { due.ifEmpty { all } }
+        if (due.isEmpty()) return null
+        val pool = due.filter { it.id != lastDrill }.ifEmpty { due }
         return pool.minWithOrNull(compareBy<DecisionAssessment> {
             entries[it.id]?.dueDay ?: 0L
         }.thenByDescending { it.needsStudy }.thenBy { it.id })
