@@ -21,8 +21,10 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
     var coachTab by remember(initial.id, startBlind) { mutableIntStateOf(if (startBlind) 1 else 0) }
     var startIndex by remember(initial.id) { mutableIntStateOf(0) }
     var analysis by remember(initial.id) { mutableStateOf<HandAnalysis?>(null) }
+    var reference by remember(initial.id) { mutableStateOf<ReferenceBook?>(null) }
     var loaded by remember(initial.id) { mutableStateOf(false) }
     LaunchedEffect(initial.id) { analysis = vm.analysisFor(initial); loaded = true }
+    LaunchedEffect(report, initial.id) { if (report) reference = vm.referenceForTraining() }
     val leave: () -> Unit = { if (vm.reviewing) vm.continueFromReview() else vm.screen = Screen.History }
     BackHandler(onBack = leave)
     val zh = LocalStrings.current.isZh
@@ -110,6 +112,8 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                                     trace.notes.forEach {
                                         Text(StudyPresentation.modelNote(it, zh), color = Palette.TextDim)
                                     }
+                                    SolverReferencePanel(view, reference)
+                                    ExportSolverSpot(view)
                                     TextButton(onClick = {
                                         startIndex = replayer.frames.indexOfFirst { replayer.actionIndexOf(it) == trace.actionIndex }.coerceAtLeast(0)
                                         report = false

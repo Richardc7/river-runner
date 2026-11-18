@@ -12,8 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,20 +34,17 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     val zh = LocalStrings.current.isZh
     fun t(cn: String, en: String) = if (zh) cn else en
-    val clipboard = LocalClipboardManager.current
     var items by remember(vm.profile.id) { mutableStateOf<List<TrainingItem>>(emptyList()) }
     var progress by remember(vm.profile.id) { mutableStateOf(TrainingProgress()) }
     var reference by remember(vm.profile.id) { mutableStateOf<ReferenceBook?>(null) }
     var loading by remember(vm.profile.id) { mutableStateOf(true) }
     var tab by remember(vm.profile.id) { mutableIntStateOf(0) }
     var answer by remember(vm.profile.id) { mutableStateOf<Move?>(null) }
-    var rawReference by remember(vm.profile.id) { mutableStateOf("") }
-    var importStatus by remember(vm.profile.id) { mutableStateOf("") }
 
     LaunchedEffect(vm.profile.id) {
+        reference = vm.referenceForTraining()
         items = vm.trainingItems()
         progress = vm.loadTrainingProgress()
-        reference = vm.referenceForTraining()
         loading = false
     }
     val completed = progress.categories.values.sumOf { it.attempts }
@@ -72,7 +67,7 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
             listOf(
                 t("决策答题", "Decision quiz"),
                 t("错题复习", "Spaced review"),
-                t("策略参考库", "Reference library"),
+                t("GTO 策略参考", "GTO strategy reference"),
             ).forEachIndexed { index, title ->
                 FilterChip(selected = tab == index, onClick = { tab = index },
                     label = { Text(title, fontSize = 12.sp) })
@@ -99,42 +94,7 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
                     }
                 } else TrainingEmpty(t("请在设置中开启「错题与间隔复习」。",
                     "Enable spaced error drills in Settings."))
-                else -> {
-                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                        .clip(RoundedCornerShape(14.dp)).background(Palette.Panel)
-                        .padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(t("离线参考策略数据库", "Offline strategy reference library"),
-                            color = Palette.Gold, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                        Text(t("只接受带来源声明的 RR-REFERENCE-1 文本。场景必须精确匹配；外部数据并不自动等于真实 GTO。",
-                            "Only provenance-labelled RR-REFERENCE-1 data. Exact decision matching; third-party data is not automatically verified GTO."),
-                            color = Palette.TextDim, fontSize = 12.sp)
-                        val saved = reference
-                        if (saved != null) {
-                            Text(t("已导入来源：", "Imported source: ") + saved.provenance.source,
-                                color = Palette.Text, fontSize = 13.sp)
-                            Text(t("节点：", "Nodes: ") + saved.nodes.size,
-                                color = Palette.TextDim, fontSize = 12.sp)
-                            OutlinedButton(onClick = {
-                                clipboard.setText(AnnotatedString(ReferenceCodec.encode(saved)))
-                            }) { Text(t("复制已保存数据", "Copy saved reference")) }
-                        }
-                        OutlinedTextField(rawReference, onValueChange = {
-                                if (it.length <= 1_000_000) rawReference = it
-                            }, label = { Text(t("粘贴参考策略数据", "Paste strategy reference")) },
-                            modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 6)
-                        Button(onClick = {
-                            runCatching { ReferenceCodec.decode(rawReference) }.onSuccess {
-                                reference = it
-                                vm.saveTrainingReference(it)
-                                importStatus = t("验证成功，已保存", "Validated and saved")
-                            }.onFailure {
-                                importStatus = if (zh) "格式校验失败：请检查参考库文本及策略频率"
-                                else "Invalid reference format: " + (it.message ?: "")
-                            }
-                        }) { Text(t("校验并导入", "Validate & import")) }
-                        if (importStatus.isNotEmpty()) Text(importStatus, color = Palette.TextDim)
-                    }
-                }
+                else -> SolverReferenceLibrary(vm, reference) { reference = it }
             }
         }
     }
@@ -284,17 +244,8 @@ internal fun DecisionQuestion(
                 for (note in item.notes.take(3)) {
                     Text(StudyPresentation.modelNote(note, zh), color = Palette.TextDim, fontSize = 11.sp)
                 }
-                val match = reference?.lookup(view)
-                if (match != null) {
-                    Text(t("匹配到外部声明的参考策略（未验证 GTO）：",
-                        "Matched declared reference (not verified GTO):"),
-                        color = Palette.Gold, fontSize = 11.sp)
-                    match.actions.forEach {
-                        Text(StudyPresentation.move(it.move, bb, zh) + "  " +
-                            "%.0f%%".format(Locale.US, it.frequency * 100),
-                            color = Palette.TextDim, fontSize = 11.sp)
-                    }
-                }
+                SolverReferencePanel(view, reference)
+                ExportSolverSpot(view)
                 Text(t("这里比较的是模型假设下的 EV，并非真实盈亏或求解器 GTO。",
                     "Model-assumption EV, not realised profit or verified solver GTO."),
                     color = Palette.TextDim, fontSize = 11.sp)

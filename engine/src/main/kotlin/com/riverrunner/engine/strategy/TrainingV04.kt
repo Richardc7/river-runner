@@ -70,11 +70,15 @@ data class ReferenceNode(val contextHash: String, val actions: List<ReferenceAct
 }
 data class ReferenceBook(val provenance: ReferenceProvenance, val nodes: List<ReferenceNode>) {
     init { require(nodes.size in 1..3000 && nodes.map { it.contextHash }.distinct().size == nodes.size) }
-    fun lookup(view: DecisionView) = nodes.firstOrNull { it.contextHash == DecisionFingerprint.of(view) }
+    fun lookup(view: DecisionView): ReferenceNode? {
+        val hash = DecisionFingerprint.of(view)
+        return nodes.firstOrNull { it.contextHash == hash && it.actions.all { a -> PolicyTools.legal(a.move, view.legal) } }
+    }
 }
 /** Bounded offline-only import. No solver claims and no approximate cross-context matching. */
 object ReferenceCodec {
     const val HEADER = "RR-REFERENCE-1"
+    const val MAX_TEXT_LENGTH = 1_000_000
     private fun quote(v: String) = Base64.getUrlEncoder().withoutPadding().encodeToString(v.toByteArray(Charsets.UTF_8))
     private fun unquote(v: String) = String(Base64.getUrlDecoder().decode(v), Charsets.UTF_8)
     fun encode(book: ReferenceBook): String = buildString {
@@ -89,7 +93,7 @@ object ReferenceCodec {
         }
     }
     fun decode(text: String): ReferenceBook {
-        require(text.length <= 1_000_000)
+        require(text.length <= MAX_TEXT_LENGTH)
         val lines = text.lineSequence().filter { it.isNotBlank() }.toList()
         require(lines.size in 5..200_000 && lines[0] == HEADER)
         val p = lines[1].split('\t').map { unquote(it) }

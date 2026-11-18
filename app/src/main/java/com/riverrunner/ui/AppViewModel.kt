@@ -121,9 +121,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun referenceForTraining(): ReferenceBook? = withContext(Dispatchers.IO) {
         TrainingReferenceStore(analysisRoot, profile.id).load()
     }
-    fun saveTrainingReference(book: ReferenceBook) {
+    suspend fun saveTrainingReference(book: ReferenceBook) {
         val id = profile.id
-        viewModelScope.launch(Dispatchers.IO) { TrainingReferenceStore(analysisRoot, id).save(book) }
+        withContext(Dispatchers.IO) { TrainingReferenceStore(analysisRoot, id).save(book) }
     }
     private val editionPrefs = EditionPrefs(app)
     var editionConfig by mutableStateOf(editionPrefs.load()); private set
