@@ -12,7 +12,7 @@ private fun trainingFile(root: File, profile: String, type: String): File {
 class TrainingProgressStore(private val root: File, private val profile: String) {
     private val file get() = trainingFile(root, profile, "training_progress")
     fun load(): TrainingProgress = runCatching {
-        if (!file.exists()) return TrainingProgress()
+        if (!file.exists()) return@runCatching TrainingProgress()
         val obj = JSONObject(file.readText())
         if (obj.optInt("version") != 1) return TrainingProgress()
         val stats = obj.getJSONObject("categories")
@@ -23,7 +23,7 @@ class TrainingProgressStore(private val root: File, private val profile: String)
             val s = stats.getJSONObject(key)
             entries[key] = CategoryProgress(s.getInt("attempts"), s.getInt("exact"), s.getDouble("modelLossChips"))
         }
-        TrainingProgress(entries, obj.optString("last").ifBlank { null })
+        TrainingProgress(entries, obj.optString("last").takeIf { it.isNotBlank() })
     }.getOrDefault(TrainingProgress())
     fun save(progress: TrainingProgress) {
         val json = JSONObject().put("version", 1).put("last", progress.last ?: "")
