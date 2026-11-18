@@ -104,7 +104,7 @@ class TableGeometry(val w: Float, val h: Float, val n: Int) {
     val heroPod = Offset(cx, h - podH / 2 - 2f)
     val heroPodTop = heroPod.y - podH / 2
     val heroCardsTop = heroPodTop + 10f - heroCardH
-    /** the pot pill sits just under the board (the result banner takes its place at the end) */
+    /** The pot sits under the board. In replay the result banner takes its place. */
     val potCenter = Offset(cx, boardBottom + 14f)
     val bannerCenter = Offset(cx, boardBottom + 16f)
     /** hero's action badge (right of the cards, on the pod's top edge) and winnings badge (left) */
@@ -224,6 +224,7 @@ fun PokerTable(
     potLabel: String,
     modifier: Modifier = Modifier,
     animateDeal: Boolean = true,
+    showTotalPot: Boolean = false,
 ) {
     BoxWithConstraints(modifier) {
         val n = t.seats.size
@@ -244,16 +245,19 @@ fun PokerTable(
             }
         }
 
-        // pot
-        val potShown by animateIntAsState(t.pot, tween(450), label = "pot")
         Box(Modifier.fillMaxSize().centerAt(g.potCenter)) {
-            AnimatedVisibility(t.pot > 0, enter = fadeIn() + scaleIn(), exit = fadeOut()) {
-                ChipLabel("$potLabel ${fmt(potShown)}")
+            if (showTotalPot) {
+                ChipLabel("$potLabel ${fmt(t.totalPot)}")
+            } else {
+                val potShown by animateIntAsState(t.pot, tween(450), label = "pot")
+                AnimatedVisibility(t.pot > 0, enter = fadeIn() + scaleIn(), exit = fadeOut()) {
+                    ChipLabel("$potLabel ${fmt(potShown)}")
+                }
             }
         }
 
-        // result banner
-        Box(Modifier.fillMaxSize().centerAt(g.bannerCenter)) {
+        val bannerCenter = if (showTotalPot) Offset(g.cx, g.boardTop - 14f) else g.bannerCenter
+        Box(Modifier.fillMaxSize().centerAt(bannerCenter)) {
             AnimatedVisibility(
                 t.banner != null,
                 enter = fadeIn(tween(300, 350)) + slideInVertically(tween(300, 350)) { it / 2 },

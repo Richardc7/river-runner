@@ -15,10 +15,10 @@ import com.riverrunner.engine.*
 import com.riverrunner.engine.strategy.*
 
 @Composable
-fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
+fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boolean = false) {
     var record by remember(initial.id) { mutableStateOf(initial) }
     var report by remember(initial.id) { mutableStateOf(false) }
-    var coachTab by remember(initial.id) { mutableIntStateOf(0) }
+    var coachTab by remember(initial.id, startBlind) { mutableIntStateOf(if (startBlind) 1 else 0) }
     var startIndex by remember(initial.id) { mutableIntStateOf(0) }
     var analysis by remember(initial.id) { mutableStateOf<HandAnalysis?>(null) }
     var loaded by remember(initial.id) { mutableStateOf(false) }
@@ -42,7 +42,11 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (coachTab == 1 && vm.blindReviewEnabled) {
-                BlindReplayCoach(vm, record, nodes)
+                if (loaded) BlindReplayCoach(vm, record, nodes)
+                else Text(
+                    if (zh) "正在读取盲测决策…" else "Loading blind replay decisions…",
+                    color = Palette.TextDim, modifier = Modifier.padding(12.dp),
+                )
             } else if (coachTab == 2 && vm.weaknessReportEnabled) {
                 WeaknessReportCoach(vm)
             } else if (coachTab == 3 && vm.preflopCoachEnabled) {

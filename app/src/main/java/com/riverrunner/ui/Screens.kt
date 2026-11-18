@@ -175,12 +175,14 @@ private fun NavItem(text: String, modifier: Modifier, onClick: () -> Unit) {
 // ============================================================================ New game setup
 
 @Composable
-fun SetupScreen(vm: AppViewModel) {
-    BackHandler { vm.screen = Screen.Home }
+fun SetupScreen(vm: AppViewModel, forTraining: Boolean = false) {
+    val onBack = { vm.screen = if (forTraining) Screen.Training else Screen.Home }
+    BackHandler(onBack = onBack)
     val p = vm.prefs
+    val initial = if (forTraining) SessionConfig(GameMode.CASH, 2, 100, p.lastTableType) else lastConfig(p)
     SetupContent(
-        initial = lastConfig(p),
-        onBack = { vm.screen = Screen.Home },
+        initial = initial,
+        onBack = onBack,
         onCustomize = vm::openEditionSettings,
         selectedEdition = editionSummary(vm.editionConfig, vm.prefs.chinese),
         liveStrategyEnabled = vm.realtimeGtoEnabled,
@@ -373,6 +375,7 @@ fun HistoryScreen(vm: AppViewModel) {
     val st = LocalStrings.current
     BackHandler { vm.screen = Screen.Home }
     var favOnly by remember { mutableStateOf(false) }
+    var showResults by remember(vm.blindReviewEnabled) { mutableStateOf(!vm.blindReviewEnabled) }
     val records = remember { mutableStateListOf<HandRecord>() }
     var loaded by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -388,6 +391,14 @@ fun HistoryScreen(vm: AppViewModel) {
             SmallButton("← " + st.back, { vm.screen = Screen.Home })
             Text(st.history, color = Palette.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
+            if (vm.blindReviewEnabled) {
+                Pill(
+                    if (showResults) {
+                        if (st.isZh) "隐藏结果" else "Hide results"
+                    } else if (st.isZh) "显示结果" else "Show results",
+                    showResults, { showResults = !showResults },
+                )
+            }
             Pill(st.all, !favOnly, { favOnly = false })
             Pill("★ " + st.favorites, favOnly, { favOnly = true })
         }
@@ -419,13 +430,19 @@ fun HistoryScreen(vm: AppViewModel) {
                         PlayingCard(hero.hole[0], 26.dp); PlayingCard(hero.hole[1], 26.dp)
                     }
                     Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        for (c in r.board) PlayingCard(c, 22.dp)
+                        if (showResults) for (c in r.board) PlayingCard(c, 22.dp)
                     }
-                    Text(
-                        (if (net > 0) "+" else "") + "%.1f BB".format(net),
-                        color = if (net > 0) Palette.Green else if (net < 0) Palette.Red else Palette.TextDim,
-                        fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(80.dp),
-                    )
+                    if (showResults) {
+                        Text(
+                            (if (net > 0) "+" else "") + "%.1f BB".format(net),
+                            color = if (net > 0) Palette.Green else if (net < 0) Palette.Red else Palette.TextDim,
+                            fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(80.dp),
+                        )
+                    }
+                    if (vm.blindReviewEnabled) {
+                        SmallButton(if (st.isZh) "盲测" else "Blind quiz", { vm.openReplay(r, blind = true) })
+                        SmallButton(if (st.isZh) "回放" else "Replay", { vm.openReplay(r) })
+                    }
                     Text(
                         if (r.favorite) "★" else "☆", color = Palette.Gold, fontSize = 22.sp,
                         modifier = Modifier.clickable {

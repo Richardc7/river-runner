@@ -84,10 +84,7 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
                     val current = TrainingCurriculum.next(items.map { it.drill }, progress)
                     val item = items.firstOrNull { it.drill.id == current?.id }
                     if (loading) TrainingEmpty(t("正在准备练习…", "Preparing questions…"))
-                    else if (item == null) TrainingEmpty(t(
-                        "还没有可以可靠评分的河牌练习。请先在「自定义 AI」中开启决策证据记录，完成一些受支持的现金局河牌决策。",
-                        "No model-valued river drills yet. Enable decision evidence and play supported cash river decisions."
-                    ))
+                    else if (item == null) RiverTrainingEmpty(vm)
                     else DecisionQuestion(vm, item, reference, answer, onSelect = { answer = it }, onNext = {
                         val selected = answer ?: return@DecisionQuestion
                         progress = progress.record(item.drill.grade(selected))
@@ -140,6 +137,43 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RiverTrainingEmpty(vm: AppViewModel) {
+    val zh = LocalStrings.current.isZh
+    fun t(cn: String, en: String) = if (zh) cn else en
+    val config = vm.editionConfig
+    val (guidance, action) = when {
+        !config.recordAdvice -> t(
+            "请在「自定义对手及规则」中打开「保存决策时的证据与双轨建议」并保存。",
+            "Open Customize opponents / rules, enable recording of decision evidence, and save.",
+        ) to t("去开启记录", "Enable recording")
+        config.cashRules.hasRake -> t(
+            "决策记录已开启。河牌题需要无抽水的筹码局，请在规则中将抽水设为 0 并保存。",
+            "Recording is on. River drills need an unraked cash game. Set rake to 0 in the rules and save.",
+        ) to t("前往规则设置", "Open rules")
+        else -> t(
+            "决策记录已开启。建议开一桌无抽水的单挑筹码局，打到河牌并完成一手。" +
+                "面对下注或在有利位置作出河牌决策更容易生成可评分的题目。牌局保存后回到这里练习。",
+            "Recording is on. Play an unraked heads-up cash hand through the river. Acting in position " +
+                "or facing a bet is more likely to yield a scored question. Return here after the hand is saved.",
+        ) to t("配置单挑筹码局", "Set up heads-up cash")
+    }
+    Column(
+        Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(Palette.Panel)
+            .verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(t("还没有河牌练习", "No river drills yet"), color = Palette.Text,
+            fontWeight = FontWeight.Bold, fontSize = 17.sp)
+        Text(guidance, color = Palette.TextDim, fontSize = 13.sp, modifier = Modifier.widthIn(max = 490.dp))
+        Button(onClick = {
+            if (!config.recordAdvice || config.cashRules.hasRake) vm.openEditionSettings()
+            else vm.screen = Screen.TrainingSetup
+        }) { Text(action) }
     }
 }
 

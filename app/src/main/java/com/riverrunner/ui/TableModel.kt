@@ -23,6 +23,7 @@ data class TableUi(
     val seats: List<SeatUi>, val board: List<Int>, val pot: Int, val bigBlind: Int,
     val handKey: Long, val actionSeq: Int = 0, val highlight: Set<Int> = emptySet(),
     val banner: String? = null, val thinkingMs: Long = 0,
+    val totalPot: Int = pot + seats.sumOf { it.streetBet },
 )
 enum class LogKind { STREET, ACTION, RESULT }
 data class LogLine(val kind: LogKind, val text: String, val seat: Int = -1, val cards: List<Int> = emptyList())
@@ -110,7 +111,8 @@ object TableMapper {
             Stage.COLLECT -> e.players.sumOf { it.committed }
             Stage.FINAL -> 0
         }
-        return TableUi(views, e.board.toList(), pot, e.bigBlind, handKey, actionSeq, highlight, banner, thinkingMs)
+        val totalPot = res?.pots?.sumOf { it.amount } ?: e.pot
+        return TableUi(views, e.board.toList(), pot, e.bigBlind, handKey, actionSeq, highlight, banner, thinkingMs, totalPot)
     }
     fun resultBanner(st: Strings, e: HandEngine, seats: List<SeatInfo>, fmt: (Int) -> String): String? {
         val res = e.result ?: return null; val names = seats.associate { it.seat to it.name }

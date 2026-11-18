@@ -15,6 +15,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -64,6 +65,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,8 +78,10 @@ import androidx.compose.ui.window.DialogProperties
 import com.riverrunner.engine.Cards
 import com.riverrunner.engine.LegalActions
 import com.riverrunner.engine.Move
+import com.riverrunner.engine.strategy.PolicyChoice
 import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.i18n.Strings
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /** Live game screen, wired to the view model. */
@@ -142,7 +146,7 @@ fun TableContent(
     Row(Modifier.fillMaxSize().background(Palette.Bg)) {
         Box(Modifier.weight(1f).fillMaxHeight().padding(start = 4.dp, top = 4.dp, bottom = 2.dp)) {
             val t = ui.table
-            if (t != null) PokerTable(t, fmt, st.pot, Modifier.fillMaxSize(), animateDeal = animate)
+            if (t != null) PokerTable(t, fmt, st.pot, Modifier.fillMaxSize(), animateDeal = animate, showTotalPot = true)
             androidx.compose.animation.AnimatedVisibility(
                 ui.notice != null,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 64.dp),
@@ -179,6 +183,7 @@ private fun SidePanel(
     val st = LocalStrings.current
     val heroTurn = ui.legal != null
     val glow = if (heroTurn) pulse() else 0f
+    var liveExpanded by remember(ui.table?.handKey) { mutableStateOf(false) }
     Column(
         Modifier.width(212.dp).fillMaxHeight().background(Palette.Panel)
             .border(if (heroTurn) 2.dp else 0.dp, Palette.Accent.copy(alpha = 0.25f + 0.6f * glow), RoundedCornerShape(0.dp))
@@ -234,28 +239,8 @@ private fun SidePanel(
                                 .verticalScroll(rememberScrollState()),
                                 verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 if (live != null) {
-                                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                                        .background(Palette.PanelHi).padding(6.dp),
-                                        verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                        val heading = when (live.label) {
-                                            "declared-reference" -> if (st.isZh)
-                                                "外部参考（来源声明，非已验证GTO）"
-                                            else "External reference (unverified GTO)"
-                                            else -> if (st.isZh) "启发式策略参考（非GTO）"
-                                                else "Heuristic policy (NOT GTO)"
-                                        }
-                                        Text(heading, color = Palette.Gold, fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold)
-                                        for (option in live.choices.sortedByDescending { it.probability }.take(4)) {
-                                            Text(StudyPresentation.move(option.move,
-                                                ui.table?.bigBlind ?: 100, st.isZh) + "  " +
-                                                "%.0f%%".format(java.util.Locale.US, option.probability * 100),
-                                                color = Palette.Text, fontSize = 10.sp)
-                                        }
-                                        Text(if (live.source == "decision-time") {
-                                            if (st.isZh) "仅基于决策时信息" else "Decision-time information only"
-                                        } else live.source, color = Palette.TextDim, fontSize = 9.sp,
-                                            maxLines = 2)
+                                    LiveStrategyCard(live, ui.table?.bigBlind ?: 100, liveExpanded) {
+                                        liveExpanded = !liveExpanded
                                     }
                                 }
                                 if (ui.practice && info != null) PracticeHud(info, fmt)
@@ -264,6 +249,15 @@ private fun SidePanel(
                         ActionLog(ui.log, Modifier.weight(1f))
                     }
                 }
+            }
+        }
+        if (ui.table != null) {
+            val latestAction = ui.log.lastOrNull { it.kind == LogKind.ACTION }
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                .background(Palette.PanelHi).padding(horizontal = 6.dp, vertical = 4.dp)) {
+                Text(if (st.isZh) "最近行动" else "Latest action", color = Palette.TextDim, fontSize = 10.sp)
+                Text(latestAction?.text ?: "—", color = Palette.Text, fontSize = 12.sp,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         // bottom: controls
@@ -285,6 +279,47 @@ private fun SidePanel(
                     modifier = Modifier.fillMaxWidth().height(46.dp), onClick = onNext,
                 )
                 else -> WaitingBar(ui, onFastForward)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveStrategyCard(live: LiveStrategyHint, bb: Int, expanded: Boolean, onToggle: () -> Unit) {
+    val zh = LocalStrings.current.isZh
+    val external = live.label == "declared-reference"
+    val heading = if (external) {
+        if (zh) "外部参考（未验证 GTO）" else "External reference (unverified GTO)"
+    } else if (zh) "启发式参考（非 GTO）" else "Heuristic reference (not GTO)"
+    val shortHeading = if (external) {
+        if (zh) "外部参考" else "External reference"
+    } else if (zh) "模型参考" else "Model reference"
+    val choices = live.choices.sortedByDescending { it.probability }.take(4)
+    fun choiceText(choice: PolicyChoice): String =
+        StudyPresentation.move(choice.move, bb, zh) + "  " +
+            "%.0f%%".format(Locale.US, choice.probability * 100)
+
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Palette.PanelHi)) {
+        Row(
+            Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onToggle)
+                .padding(horizontal = 6.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val summary = if (expanded) heading else choices.firstOrNull()?.let {
+                "$shortHeading · ${choiceText(it)}"
+            } ?: heading
+            Text(summary, color = Palette.Gold, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(if (expanded) "▴" else "▾", color = Palette.TextDim, fontSize = 12.sp)
+        }
+        if (expanded) {
+            Column(Modifier.padding(start = 6.dp, end = 6.dp, bottom = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                for (choice in choices) Text(choiceText(choice), color = Palette.Text, fontSize = 10.sp)
+                Text(if (live.source == "decision-time") {
+                    if (zh) "仅基于决策时信息" else "Decision-time information only"
+                } else live.source, color = Palette.TextDim, fontSize = 9.sp, maxLines = 2)
             }
         }
     }
@@ -314,7 +349,7 @@ private fun PracticeHud(info: PracticeInfo, fmt: (Int) -> String) {
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
-        HudRow(st.pot, fmt(info.pot), st.toCall, if (info.toCall > 0) fmt(info.toCall) else "0")
+        HudRow(st.toCall, fmt(info.toCall), null, null)
         if (info.toCall > 0) {
             HudRow(st.potOdds, "1 : %.1f".format(info.pot.toDouble() / info.toCall), st.needEquity, Format.pct(info.potOdds))
         }
