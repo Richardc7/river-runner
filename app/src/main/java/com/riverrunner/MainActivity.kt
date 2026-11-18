@@ -2,36 +2,20 @@ package com.riverrunner
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.riverrunner.ui.AppViewModel
-import com.riverrunner.ui.GuideScreen
-import com.riverrunner.ui.SavesScreen
-import com.riverrunner.ui.SetupScreen
-import com.riverrunner.ui.AchievementsScreen
-import com.riverrunner.ui.UnlockToast
-import com.riverrunner.ui.WhatsNewDialog
-import androidx.compose.ui.Alignment
-import com.riverrunner.ui.HistoryScreen
-import com.riverrunner.ui.HomeScreen
-import com.riverrunner.ui.Palette
-import com.riverrunner.ui.ReplayScreen
-import com.riverrunner.ui.ResultScreen
-import com.riverrunner.ui.RiverTheme
-import com.riverrunner.ui.Screen
-import com.riverrunner.ui.SettingsScreen
-import com.riverrunner.ui.StatsScreen
-import com.riverrunner.ui.TableScreen
+import com.riverrunner.ui.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,30 +27,38 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val vm: AppViewModel = viewModel()
+            var editionOpen by remember { mutableStateOf(false) }
+            BackHandler(enabled = editionOpen) { editionOpen = false }
             RiverTheme(vm.strings, vm.deckStyle) {
-                run {
-                    Box(Modifier.fillMaxSize().background(Palette.Bg).windowInsetsPadding(WindowInsets.displayCutout)) {
-                        when (val s = vm.screen) {
-                            Screen.Home -> HomeScreen(vm)
-                            Screen.Table -> TableScreen(vm)
-                            is Screen.Result -> ResultScreen(vm, s.summary)
-                            Screen.History -> HistoryScreen(vm)
-                            is Screen.Replay -> ReplayScreen(vm, s.record)
-                            Screen.Stats -> StatsScreen(vm)
-                            Screen.Settings -> SettingsScreen(vm)
-                            Screen.Guide -> GuideScreen(vm)
-                            Screen.Saves -> SavesScreen(vm)
-                            Screen.Achievements -> AchievementsScreen(vm)
-                            Screen.Setup -> SetupScreen(vm)
+                Box(Modifier.fillMaxSize().background(Palette.Bg).windowInsetsPadding(WindowInsets.displayCutout)) {
+                    if (editionOpen) {
+                        EditionScreen(vm.editionConfig, vm.prefs.chinese, vm::saveEdition) { editionOpen = false }
+                    } else Column(Modifier.fillMaxSize()) {
+                        if (vm.screen == Screen.Home || vm.screen == Screen.Setup || vm.screen == Screen.Settings) {
+                            TextButton(onClick = { editionOpen = true }) {
+                                Text(if (vm.prefs.chinese) "Exploit Edition \u7b56\u7565\u8bbe\u7f6e" else "Exploit Edition strategy settings", color = Palette.Gold)
+                            }
                         }
-                        UnlockToast(vm.unlockToast, Modifier.align(Alignment.TopCenter))
-                        vm.whatsNew?.let { shown ->
-                            WhatsNewDialog(
-                                shown,
-                                onDismiss = vm::dismissWhatsNew,
-                                onShowAll = if (shown.size < vm.changelog.size) vm::showChangelog else null,
-                            )
+                        Box(Modifier.weight(1f).fillMaxWidth()) {
+                            when (val s = vm.screen) {
+                                Screen.Home -> HomeScreen(vm)
+                                Screen.Table -> TableScreen(vm)
+                                is Screen.Result -> ResultScreen(vm, s.summary)
+                                Screen.History -> HistoryScreen(vm)
+                                is Screen.Replay -> ReplayScreen(vm, s.record)
+                                Screen.Stats -> StatsScreen(vm)
+                                Screen.Settings -> SettingsScreen(vm)
+                                Screen.Guide -> GuideScreen(vm)
+                                Screen.Saves -> SavesScreen(vm)
+                                Screen.Achievements -> AchievementsScreen(vm)
+                                Screen.Setup -> SetupScreen(vm)
+                            }
                         }
+                    }
+                    UnlockToast(vm.unlockToast, Modifier.align(Alignment.TopCenter))
+                    vm.whatsNew?.let { shown ->
+                        WhatsNewDialog(shown, onDismiss = vm::dismissWhatsNew,
+                            onShowAll = if (shown.size < vm.changelog.size) vm::showChangelog else null)
                     }
                 }
             }
