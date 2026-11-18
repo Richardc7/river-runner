@@ -211,7 +211,7 @@ fun ReplayContent(
 
     Row(Modifier.fillMaxSize().background(Palette.Bg)) {
         Box(Modifier.weight(1f).fillMaxHeight().padding(start = 4.dp, top = 4.dp, bottom = 2.dp)) {
-            PokerTable(table, fmt, st.pot, Modifier.fillMaxSize(), animateDeal = false)
+            PokerTable(table, fmt, st.pot, Modifier.fillMaxSize(), animateDeal = false, showTotalPot = !frame.isEnd)
         }
         Column(
             Modifier.width(240.dp).fillMaxHeight().background(Palette.Panel).padding(8.dp),
