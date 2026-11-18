@@ -98,9 +98,9 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                                     val actual = record.actions.filter { !it.type.isPost }.getOrNull(trace.actionIndex)
                                     actual?.let { Text((if (zh) "\u4f60\u7684\u884c\u52a8\uff1a" else "Your action: ") + vm.actionLabel(it, record.bigBlind)) }
                                     Text((if (zh) "基准参考：" else "Baseline model: ") +
-                                        policyText(trace.baseline, record.bigBlind, zh), color = Palette.Text)
+                                        policyText(trace.baseline, record.bigBlind, zh, view.legal.isOpeningBet), color = Palette.Text)
                                     Text((if (zh) "针对性调整：" else "Exploit adjustment: ") +
-                                        policyText(trace.exploit, record.bigBlind, zh), color = Palette.Gold)
+                                        policyText(trace.exploit, record.bigBlind, zh, view.legal.isOpeningBet), color = Palette.Gold)
                                     Text(statusText(trace.status, zh))
                                     SolverReferencePanel(view, reference)
                                     ExportSolverSpot(view)
@@ -119,7 +119,7 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                                         if (zh) "各行动的条件模型 EV（非真实盈亏）" else "Conditional model EV per action (not realised profit)",
                                         color = Palette.Gold, style = MaterialTheme.typography.labelLarge)
                                     for (value in trace.actionValues) Text(
-                                        StudyPresentation.move(value.move, record.bigBlind, zh) +
+                                        StudyPresentation.move(value.move, record.bigBlind, zh, view.legal.isOpeningBet) +
                                             (if (zh) " · 估计 " else " · estimate ") +
                                             "%.2f".format(java.util.Locale.US, value.chips / record.bigBlind) +
                                             " BB [" + "%.2f".format(java.util.Locale.US, value.low / record.bigBlind) +
@@ -197,9 +197,9 @@ private fun ReplayNavigation(
 }
 
 private fun percent(value: Double): String = "%.0f%%".format(value * 100)
-private fun policyText(policy: PolicySnapshot, bb: Int, zh: Boolean): String =
+private fun policyText(policy: PolicySnapshot, bb: Int, zh: Boolean, openingBet: Boolean): String =
     policy.choices.joinToString(" / ") { choice ->
-        StudyPresentation.move(choice.move, bb, zh) + " " + percent(choice.probability)
+        StudyPresentation.move(choice.move, bb, zh, openingBet) + " " + percent(choice.probability)
     }
 private fun statusText(status: AdviceStatus, zh: Boolean): String = when (status) {
     AdviceStatus.ADJUSTED -> if (zh) "\u5df2\u6309\u8bc1\u636e\u4f5c\u6709\u9650\u8c03\u6574" else "Bounded evidence-based adjustment"

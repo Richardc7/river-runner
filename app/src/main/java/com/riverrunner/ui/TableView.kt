@@ -437,10 +437,12 @@ private fun HeroSeat(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Stri
             PodFrame(s, pulse, Modifier.size((g.podW + 16).dp, g.podH.dp)) {
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(s.name, color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Text(s.name, color = Palette.Text, fontSize = 12.sp, lineHeight = 14.sp,
+                            fontWeight = FontWeight.SemiBold, maxLines = 1)
                         if (s.position.isNotEmpty()) {
                             Spacer(Modifier.width(5.dp))
-                            Text(s.position, color = Palette.TextDim, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text(s.position, color = Palette.TextDim, fontSize = 10.sp, lineHeight = 12.sp,
+                                fontWeight = FontWeight.Bold)
                         }
                     }
                     Text(

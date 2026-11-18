@@ -48,8 +48,9 @@ enum class GuideTab { BASICS, RANKINGS, POSITIONS, GLOSSARY, TIPS, APP }
 
 @Composable
 fun GuideScreen(vm: AppViewModel) {
-    BackHandler { vm.screen = Screen.Home }
-    GuideContent(onClose = { vm.screen = Screen.Home })
+    val close = { vm.screen = vm.guideReturnScreen }
+    BackHandler(onBack = close)
+    GuideContent(onClose = close, startTab = vm.guideTab)
 }
 
 @Composable
@@ -318,7 +319,9 @@ private val TERMS = listOf(
     Term("SPR / 筹码底池比", "= 有效筹码 ÷ 底池。SPR 越小，越容易全下；SPR 很大时要更谨慎地用一对这样的牌投入全部筹码。", "SPR", "Effective stack ÷ pot. Low SPR means you are close to all-in.", "Stack-to-Pot Ratio"),
     Term("有效筹码", "两人中筹码较少的一方的筹码量，决定了最多能输赢多少。", "Effective stack", "The smaller of two stacks: the most either can win or lose."),
     Term("范围 Range", "对手在某种行动下可能持有的所有手牌集合。高手思考的是范围，而不是猜一手具体的牌。", "Range", "All the hands a player could have given their actions. Think in ranges, not single hands."),
-    Term("GTO / 博弈论最优", "一种无法被剥削的平衡打法。真正的 GTO 只在单挑有可靠解，多人桌使用近似解。", "GTO", "A balanced strategy that can't be exploited. Exact only heads-up; multi-way bots use approximations.", "Game Theory Optimal"),
+    Term("GTO / 博弈论最优", "在给定规则和筹码条件下达到均衡的策略。求解器参考依赖输入的范围和下注尺寸。", "GTO", "An equilibrium strategy for the specified game. Solver references depend on the input ranges and bet sizes.", "Game Theory Optimal"),
+    Term("EV / 期望值", "在指定假设下，重复使用某个行动的平均结果。复盘常用大盲（BB）衡量。", "EV", "The average result of an action under the stated assumptions, often measured in big blinds.", "Expected Value"),
+    Term("弃牌、过牌、跟注、加注", "弃牌是退出本手。无人下注时可过牌。跟注补齐当前下注，加注提高当前下注。", "Fold, check, call, raise", "Fold to leave the hand, check if there is no bet to face, call to match the bet or raise to increase it."),
     Term("剥削 Exploit", "针对对手的漏洞调整打法，比如对跟注站少诈唬、多价值下注。", "Exploit", "Deviating to attack an opponent's leaks, e.g. bluff less and value-bet more against a calling station."),
     Term("RFI / 开池加注", "前面的人都弃牌时第一个加注入池，也叫 Open。", "RFI / Open", "The first raise when everyone before you folded.", "Raise First In"),
     Term("溜入 Limp", "翻牌前只跟注大盲而不加注入池，通常不推荐。", "Limp", "Just calling the big blind preflop instead of raising; usually not recommended."),

@@ -6,6 +6,10 @@ import com.riverrunner.engine.Cards
 import com.riverrunner.data.Prefs
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.offset
@@ -38,9 +42,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,18 +55,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.riverrunner.engine.GameMode
 import com.riverrunner.engine.GameSession
-import com.riverrunner.engine.HandRecord
 import com.riverrunner.engine.SessionConfig
-import com.riverrunner.engine.Stats
 import com.riverrunner.engine.Progress
 import com.riverrunner.engine.TableType
 import com.riverrunner.i18n.LocalStrings
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.text.DecimalFormat
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import kotlinx.coroutines.launch
 
 // ============================================================================ Home
 
@@ -83,7 +81,7 @@ fun HomeScreen(vm: AppViewModel) {
             val tiles = listOf(
                 st.guide to { vm.openGuide() },
                 st.achievements to { vm.screen = Screen.Achievements },
-                st.history to { vm.screen = Screen.History },
+                st.history to { vm.openHistory() },
                 st.stats to { vm.screen = Screen.Stats },
                 st.saves to { vm.screen = Screen.Saves },
                 st.settings to { vm.screen = Screen.Settings },
@@ -398,97 +396,6 @@ fun ResultScreen(vm: AppViewModel, summary: com.riverrunner.engine.SessionSummar
     }
 }
 
-// ============================================================================ History
-
-@Composable
-fun HistoryScreen(vm: AppViewModel) {
-    val st = LocalStrings.current
-    BackHandler { vm.screen = Screen.Home }
-    var favOnly by remember { mutableStateOf(false) }
-    var showResults by remember(vm.blindReviewEnabled) { mutableStateOf(!vm.blindReviewEnabled) }
-    val records = remember { mutableStateListOf<HandRecord>() }
-    var loaded by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        val all = withContext(Dispatchers.IO) { vm.history.all() }
-        records.clear(); records.addAll(all.asReversed())
-        loaded = true
-    }
-    val shown = if (favOnly) records.filter { it.favorite } else records
-    val df = remember { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
-
-    Column(Modifier.fillMaxSize().background(Palette.Bg).padding(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallButton("← " + st.back, { vm.screen = Screen.Home })
-            Text(st.history, color = Palette.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.weight(1f))
-            if (vm.blindReviewEnabled) {
-                Pill(
-                    if (showResults) {
-                        if (st.isZh) "隐藏结果" else "Hide results"
-                    } else if (st.isZh) "显示结果" else "Show results",
-                    showResults, { showResults = !showResults },
-                )
-            }
-            Pill(st.all, !favOnly, { favOnly = false })
-            Pill("★ " + st.favorites, favOnly, { favOnly = true })
-        }
-        Text(st.keepHandsNote, color = Palette.TextDim, fontSize = 11.sp, modifier = Modifier.padding(vertical = 6.dp))
-        if (loaded && shown.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(st.noHandsHint, color = Palette.TextDim, fontSize = 14.sp, modifier = Modifier.width(360.dp))
-            }
-        }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(shown, key = { it.id }) { r ->
-                val hero = r.hero
-                val net = r.heroNet.toDouble() / r.bigBlind
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Palette.Panel)
-                        .clickable { vm.openReplay(r) }.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Column(Modifier.width(92.dp)) {
-                        Text(df.format(Date(r.time)), color = Palette.TextDim, fontSize = 11.sp)
-                        Text(
-                            (if (r.mode == GameMode.CASH) st.cash else st.tournament) + " #${r.handNumber}",
-                            color = Palette.Text, fontSize = 12.sp,
-                        )
-                        Text(Stats.positionOf(r), color = Palette.TextDim, fontSize = 11.sp)
-                    }
-                    if (hero != null) Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        PlayingCard(hero.hole[0], 26.dp); PlayingCard(hero.hole[1], 26.dp)
-                    }
-                    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        if (showResults) for (c in r.board) PlayingCard(c, 22.dp)
-                    }
-                    if (showResults) {
-                        Text(
-                            (if (net > 0) "+" else "") + "%.1f BB".format(net),
-                            color = if (net > 0) Palette.Green else if (net < 0) Palette.Red else Palette.TextDim,
-                            fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(80.dp),
-                        )
-                    }
-                    if (vm.blindReviewEnabled) {
-                        SmallButton(if (st.isZh) "盲测" else "Blind quiz", { vm.openReplay(r, blind = true) })
-                        SmallButton(if (st.isZh) "回放" else "Replay", { vm.openReplay(r) })
-                    }
-                    Text(
-                        if (r.favorite) "★" else "☆", color = Palette.Gold, fontSize = 22.sp,
-                        modifier = Modifier.clickable {
-                            val upd = vm.toggleFavorite(r.id)
-                            if (upd != null) {
-                                val i = records.indexOfFirst { it.id == r.id }
-                                if (i >= 0) records[i] = upd
-                            }
-                        }.padding(6.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
 // ============================================================================ Settings
 
 @Composable
@@ -497,7 +404,12 @@ fun SettingsScreen(vm: AppViewModel) {
     BackHandler { vm.screen = Screen.Home }
     var practice by remember { mutableStateOf(vm.prefs.practiceDefault) }
     var speed by remember { mutableIntStateOf(vm.prefs.speed) }
-    var confirmClear by remember { mutableStateOf(false) }
+    var haptics by remember { mutableStateOf(vm.prefs.actionHaptics) }
+    var showAbout by remember { mutableStateOf(false) }
+    var confirmReset by remember { mutableStateOf(false) }
+    var resetting by remember { mutableStateOf(false) }
+    var resetStatus by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     Column(Modifier.fillMaxSize().background(Palette.Bg).padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SmallButton("← " + st.back, { vm.screen = Screen.Home })
@@ -530,14 +442,27 @@ fun SettingsScreen(vm: AppViewModel) {
                 ToggleRow(st.practiceDefault, practice) { practice = it; vm.prefs.practiceDefault = it }
                 ToggleRow(st.showInBB, vm.showInBB) { vm.setShowBB(it) }
                 ToggleRow(st.sound, vm.soundOn) { vm.setSound(it) }
-                ActionButton(st.clearHistory, Palette.FoldBtn, modifier = Modifier.fillMaxWidth()) { confirmClear = true }
+                ToggleRow(if (st.isZh) "行动时震动反馈" else "Haptic feedback on actions", haptics) {
+                    haptics = it
+                    vm.prefs.actionHaptics = it
+                }
+                ActionButton(if (st.isZh) "管理牌谱与导出" else "Manage and export hands", Palette.PanelHi,
+                    modifier = Modifier.fillMaxWidth()) { vm.openHistory() }
+                TextButton(enabled = !resetting, onClick = { confirmReset = true }) {
+                    Text(if (st.isZh) "重置练习进度" else "Reset practice progress")
+                }
+                resetStatus?.let { Text(it, color = Palette.TextDim, fontSize = 12.sp) }
             }
             Column(
                 Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp))
                     .background(Palette.Panel).padding(14.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                SectionTitle("Exploit Edition V0.5.1")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SmallButton(if (st.isZh) "扑克术语表" else "Poker glossary", { vm.openGuide(GuideTab.GLOSSARY) })
+                    SmallButton(if (st.isZh) "关于与隐私" else "About & privacy", { showAbout = true })
+                }
+                SectionTitle("Exploit Edition")
                 Text(if (st.isZh) "AI、对手、抽水与筹码设置已集成；保存后从新牌桌开始生效。" else
                     "AI, opponents, rake and stacks are configurable. Saved settings apply to the next table.",
                     color = Palette.TextDim, fontSize = 12.sp)
@@ -576,35 +501,83 @@ fun SettingsScreen(vm: AppViewModel) {
                 Text(if (st.isZh) "也可在「开始游戏」的牌局配置中选择开启或关闭。未匹配已验证的求解器数据时，只显示「启发式基准」；仅你的回合出现。"
                     else "Choose ON/OFF directly in New Game as well. Without verified solver data, advice is heuristic only, shown on your turn.",
                     color = Palette.TextDim, fontSize = 10.sp)
-                ActionButton(if (st.isZh) "打开历史复盘与盲测" else "Open history & blind replay",
-                    Palette.PanelHi, modifier = Modifier.fillMaxWidth().height(38.dp)) { vm.screen = Screen.History }
                 ActionButton(if (st.isZh) "打开错题间隔训练" else "Open spaced training",
                     Palette.PanelHi, modifier = Modifier.fillMaxWidth().height(38.dp)) { vm.openTraining() }
-                Spacer(Modifier.height(6.dp))
-                SectionTitle(st.about)
-                Text(st.aboutText, color = Palette.Text, fontSize = 13.sp, lineHeight = 19.sp)
-                Spacer(Modifier.height(8.dp))
-                Text("github.com/Richardc7/river-runner (Fork of shunzhe1121/river-runner)",
-                    color = Palette.TextDim, fontSize = 12.sp)
-                Spacer(Modifier.height(14.dp))
-                val ctx = androidx.compose.ui.platform.LocalContext.current
-                val version = remember {
-                    runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
-                }
-                Text(st.currentVersion(version), color = Palette.TextDim, fontSize = 12.sp, fontFamily = Numeric)
-                Spacer(Modifier.height(6.dp))
                 SmallButton(st.whatsNew, { vm.showChangelog() })
             }
         }
     }
-    if (confirmClear) {
+    if (showAbout) {
+        AboutDialog { showAbout = false }
+    }
+    if (confirmReset) {
         AlertDialog(
-            onDismissRequest = { confirmClear = false },
-            confirmButton = { TextButton({ confirmClear = false; vm.history.clearNonFavorites() }) { Text(st.clearAction, color = Palette.Red) } },
-            dismissButton = { TextButton({ confirmClear = false }) { Text(st.keep) } },
-            text = { Text(st.clearHistoryConfirm) },
+            onDismissRequest = { confirmReset = false },
+            title = { Text(if (st.isZh) "重置练习进度？" else "Reset practice progress?") },
+            text = { Text(if (st.isZh) "将清除当前存档的答题统计和错题复习计划。"
+                else "This clears quiz statistics and the spaced-review schedule for the active save.") },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text(st.keep) } },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmReset = false
+                    resetting = true
+                    scope.launch {
+                        resetStatus = try {
+                            vm.resetPracticeProgress()
+                            if (st.isZh) "练习进度已重置" else "Practice progress reset"
+                        } catch (_: java.io.IOException) {
+                            if (st.isZh) "重置未完成" else "Could not finish resetting progress"
+                        } catch (_: IllegalStateException) {
+                            if (st.isZh) "重置未完成" else "Could not finish resetting progress"
+                        } finally {
+                            resetting = false
+                        }
+                    }
+                }) { Text(if (st.isZh) "重置" else "Reset", color = Palette.Red) }
+            },
         )
     }
+}
+
+@Composable
+private fun AboutDialog(onClose: () -> Unit) {
+    val st = LocalStrings.current
+    val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val clipboard = LocalClipboardManager.current
+    val repository = "https://github.com/Richardc7/river-runner"
+    val version = remember {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?"
+    }
+    var status by remember { mutableStateOf<String?>(null) }
+    fun open(link: String) {
+        status = runCatching { uriHandler.openUri(link) }.exceptionOrNull()?.let {
+            if (st.isZh) "设备无法打开链接" else "This device could not open the link"
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(if (st.isZh) "关于与隐私" else "About & privacy") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("River Runner · " + st.currentVersion(version))
+                Text(if (st.isZh) "牌局、练习进度和导入的策略保存在设备上。应用本身离线运行。Android 可能按照设备备份设置备份应用数据。导出时，由你在系统文件选择器中指定保存位置。"
+                    else "Hands, practice progress, and imported strategies are stored on the device. The app runs offline. Android may back up app data according to your device settings. Exports go to the location you select in the system file picker.")
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    TextButton(onClick = { open(repository) }) { Text("GitHub") }
+                    TextButton(onClick = { open("$repository/blob/exploit-edition/LICENSE") }) {
+                        Text(if (st.isZh) "MIT 协议" else "MIT license")
+                    }
+                    TextButton(onClick = {
+                        clipboard.setText(AnnotatedString(repository))
+                        status = if (st.isZh) "已复制 GitHub 链接" else "GitHub link copied"
+                    }) { Text(if (st.isZh) "复制地址" else "Copy URL") }
+                }
+                status?.let { Text(it, color = Palette.TextDim, fontSize = 11.sp) }
+            }
+        },
+        confirmButton = { TextButton(onClick = onClose) { Text(st.back) } },
+    )
 }
 
 @Composable

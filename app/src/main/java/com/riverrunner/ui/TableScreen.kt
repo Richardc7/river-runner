@@ -1,5 +1,7 @@
 package com.riverrunner.ui
 
+import android.view.HapticFeedbackConstants
+import androidx.compose.ui.platform.LocalView
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.LinearEasing
@@ -93,10 +95,15 @@ fun TableScreen(vm: AppViewModel) {
     val st = LocalStrings.current
     val ui = vm.tableScreen
     val bb = ui.table?.bigBlind ?: 100
+    val view = LocalView.current
     TableContent(
         ui = ui,
         fmt = { vm.fmt(it, bb) },
-        onMove = vm::heroAct,
+        onMove = { move ->
+            if (vm.heroAct(move) && vm.prefs.actionHaptics) {
+                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            }
+        },
         onNext = vm::continueToNextHand,
         onFastForward = { vm.fastForward = true },
         onPractice = { vm.practice = it },
@@ -240,7 +247,7 @@ private fun SidePanel(
                                 .verticalScroll(rememberScrollState()),
                                 verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 if (live != null) {
-                                    LiveStrategyCard(live, ui.table?.bigBlind ?: 100, liveExpanded) {
+                                    LiveStrategyCard(live, ui.table?.bigBlind ?: 100, ui.legal?.isOpeningBet == true, liveExpanded) {
                                         liveExpanded = !liveExpanded
                                     }
                                 }
@@ -286,7 +293,7 @@ private fun SidePanel(
 }
 
 @Composable
-private fun LiveStrategyCard(live: LiveStrategyHint, bb: Int, expanded: Boolean, onToggle: () -> Unit) {
+private fun LiveStrategyCard(live: LiveStrategyHint, bb: Int, openingBet: Boolean, expanded: Boolean, onToggle: () -> Unit) {
     val zh = LocalStrings.current.isZh
     val external = live.label == "declared-reference"
     val heading = if (external) {
@@ -297,7 +304,7 @@ private fun LiveStrategyCard(live: LiveStrategyHint, bb: Int, expanded: Boolean,
     } else if (zh) "模型参考" else "Model reference"
     val choices = live.choices.sortedByDescending { it.probability }.take(4)
     fun choiceText(choice: PolicyChoice): String =
-        StudyPresentation.move(choice.move, bb, zh) + "  " +
+        StudyPresentation.move(choice.move, bb, zh, openingBet) + "  " +
             "%.0f%%".format(Locale.US, choice.probability * 100)
 
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Palette.PanelHi)) {

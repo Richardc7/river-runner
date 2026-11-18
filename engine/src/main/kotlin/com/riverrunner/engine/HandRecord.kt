@@ -4,7 +4,8 @@ data class RecordPlayer(val seat: Int, val name: String, val style: BotStyle, va
 data class HandRecord(val id: Long, val time: Long, val mode: GameMode, val handNumber: Int,
     val smallBlind: Int, val bigBlind: Int, val ante: Int, val buttonSeat: Int, val heroSeat: Int,
     val tableSize: Int, val players: List<RecordPlayer>, val board: IntArray, val actions: List<Action>,
-    val won: Map<Int, Int>, val favorite: Boolean = false, val cashRules: CashRules = CashRules(), val rake: Int = 0) {
+    val won: Map<Int, Int>, val favorite: Boolean = false, val cashRules: CashRules = CashRules(), val rake: Int = 0,
+    val autoFoldedOnExit: Boolean = false, val reviewed: Boolean = false) {
     val hero: RecordPlayer? get() = players.firstOrNull { it.seat == heroSeat }
     val heroNet: Int get() { val committed = actions.filter { it.seat == heroSeat }.sumOf { it.amount }; return (won[heroSeat] ?: 0) - committed }
     fun encode(): String {
@@ -22,6 +23,11 @@ data class HandRecord(val id: Long, val time: Long, val mode: GameMode, val hand
                 .append(cashRules.rakeBasisPoints).append(',').append(cashRules.rakeCapBB).append(',')
                 .append(if (cashRules.noFlopNoDrop) 1 else 0).append(',').append(rake)
         }
+        if (autoFoldedOnExit || reviewed) {
+            sb.append('|')
+            if (autoFoldedOnExit) sb.append('F')
+            if (reviewed) sb.append('R')
+        }
         return sb.toString()
     }
     companion object {
@@ -34,6 +40,7 @@ data class HandRecord(val id: Long, val time: Long, val mode: GameMode, val hand
             if (extra.isNotEmpty()) require(extra[0] in listOf("0", "1") && extra[3] in listOf("0", "1"))
             val rules = if (extra.isEmpty()) CashRules() else CashRules(extra[0] == "1", extra[1].toInt(), extra[2].toInt(), extra[3] == "1")
             val rake = if (extra.isEmpty()) 0 else extra[4].toInt().also { require(it >= 0) }
+            val historyFlags = f.getOrNull(if (f[0] == "H2") 17 else 16).orEmpty()
             val players = f[12].split(';').filter { it.isNotEmpty() }.map {
                 val p = it.split(','); RecordPlayer(p[0].toInt(), p[1], BotStyle.fromCode(p[2]), p[3].toInt(), Cards.parseMany(p[4]))
             }
@@ -43,7 +50,9 @@ data class HandRecord(val id: Long, val time: Long, val mode: GameMode, val hand
             val won = if (f.size <= 15 || f[15].isEmpty()) emptyMap() else f[15].split(';').associate { val w = it.split(','); w[0].toInt() to w[1].toInt() }
             HandRecord(f[1].toLong(), f[2].toLong(), GameMode.fromCode(f[3]), f[4].toInt(),
                 f[5].toInt(), f[6].toInt(), f[7].toInt(), f[8].toInt(), f[9].toInt(), f[10].toInt(),
-                players, if (f[13].isEmpty()) IntArray(0) else Cards.parseMany(f[13]), actions, won, f[11] == "1", rules, rake).also { record ->
+                players, if (f[13].isEmpty()) IntArray(0) else Cards.parseMany(f[13]), actions, won, f[11] == "1", rules, rake,
+                autoFoldedOnExit = historyFlags == "F" || historyFlags == "FR",
+                reviewed = historyFlags == "R" || historyFlags == "FR").also { record ->
                 require(record.players.size in 2..9 && record.tableSize in record.players.size..9)
                 require(record.players.map { it.seat }.distinct().size == record.players.size)
                 require(record.players.all { it.seat in 0..8 && it.startStack in 1..100000000 && it.hole.size == 2 })
@@ -71,7 +80,8 @@ data class HandRecord(val id: Long, val time: Long, val mode: GameMode, val hand
                 cashRules = engine.setup.cashRules, rake = engine.result?.rake ?: 0)
         }
     }
-    override fun equals(other: Any?): Boolean = other is HandRecord && other.id == id && other.favorite == favorite
+    override fun equals(other: Any?): Boolean = other is HandRecord && other.id == id &&
+        other.favorite == favorite && other.reviewed == reviewed
     override fun hashCode(): Int = id.hashCode()
 }
 data class ReplayFrame(val index: Int, val action: Action?, val street: Street, val players: List<PlayerState>, val board: List<Int>, val pot: Int, val toAct: Int, val isEnd: Boolean)
