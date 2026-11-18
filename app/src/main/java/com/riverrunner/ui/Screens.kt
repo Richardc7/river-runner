@@ -208,7 +208,7 @@ fun SetupContent(
                     Pill(st.tournament, mode == GameMode.TOURNAMENT, { mode = GameMode.TOURNAMENT; if (stackBB !in tourneyStacks) stackBB = 50 })
                 }
                 OptionRow(st.players) {
-                    for (n in listOf(2, 5, 6, 7, 8)) Pill("$n", size == n, { size = n }, Modifier.width(52.dp))
+                    for (n in listOf(2, 5, 6, 7, 8, 9)) Pill("$n", size == n, { size = n }, Modifier.width(52.dp))
                 }
                 OptionRow(st.stackLabelBB) {
                     for (b in stackOptions) Pill("$b", stackBB == b, { stackBB = b }, Modifier.width(60.dp))

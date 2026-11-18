@@ -48,7 +48,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-private val NAMES = listOf("You", "Echo", "Flint", "Ghost", "Jade", "Blaze", "Maverick", "Nova")
+private val NAMES = listOf("You", "Echo", "Flint", "Ghost", "Jade", "Blaze", "Maverick", "Nova", "Pike")
 private const val BB = 100
 
 /** Small scripted-hand helper. */
@@ -354,6 +354,36 @@ class ScreenshotTest {
                 contentAlignment = androidx.compose.ui.Alignment.Center,
             ) {
                 com.riverrunner.ui.ChangelogPanel(vm.changelog.take(1), {}, onShowAll = {})
+            }
+        }
+    }
+
+    /** 9-handed cash table: all seats are mapped, including the eighth opponent. */
+    @Test fun t29_nine_player_table() {
+        val s = Scenario(ZH, 9, 3,
+            listOf("AsKs", "QhJh", "Td9d", "8c7c", "6s5s", "4h3h", "2dAc", "KdQc", "JsTs"),
+            "Ah9c8s3d2h")
+        org.junit.Assert.assertEquals(9, s.ui().table?.seats?.size)
+        table("29_nine_player_table", s.ui())
+    }
+
+    @Test fun t30_nine_player_setup() = shot("30_nine_player_setup") {
+        com.riverrunner.ui.SetupContent(
+            com.riverrunner.engine.SessionConfig(GameMode.CASH, 9, 100, com.riverrunner.engine.TableType.MIXED),
+            {}, {}
+        )
+    }
+
+    /** Seat frames should not collide at reference landscape widths. */
+    @Test fun t31_nine_geometry_no_pod_overlap() {
+        for ((w, h) in listOf(568f to 360f, 508f to 360f, 468f to 320f, 420f to 300f)) {
+            val geometry = com.riverrunner.ui.TableGeometry(w, h, 9)
+            val centers = (0 until 9).map { geometry.seatCenter(it) }
+            for (a in centers.indices) for (b in a + 1 until centers.size) {
+                val horizontal = kotlin.math.abs(centers[a].x - centers[b].x)
+                val vertical = kotlin.math.abs(centers[a].y - centers[b].y)
+                org.junit.Assert.assertTrue("Nine-seat overlap at ${w}x${h}: seat ${a} / ${b}",
+                    horizontal >= geometry.podW || vertical >= geometry.podH)
             }
         }
     }
