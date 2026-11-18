@@ -24,6 +24,30 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("practice", true)
         set(v) = sp.edit().putBoolean("practice", v).apply()
 
+    var blindReview: Boolean
+        get() = sp.getBoolean("study_blind_review", true)
+        set(v) = sp.edit().putBoolean("study_blind_review", v).apply()
+
+    var weaknessReport: Boolean
+        get() = sp.getBoolean("study_weakness_report", true)
+        set(v) = sp.edit().putBoolean("study_weakness_report", v).apply()
+
+    var spacedDrills: Boolean
+        get() = sp.getBoolean("study_spaced_drills", true)
+        set(v) = sp.edit().putBoolean("study_spaced_drills", v).apply()
+
+    var preflopCoach: Boolean
+        get() = sp.getBoolean("study_preflop_coach", true)
+        set(v) = sp.edit().putBoolean("study_preflop_coach", v).apply()
+
+    var riverWhatIf: Boolean
+        get() = sp.getBoolean("study_river_what_if", true)
+        set(v) = sp.edit().putBoolean("study_river_what_if", v).apply()
+
+    var realtimeGto: Boolean
+        get() = sp.getBoolean("study_realtime_gto", false)
+        set(v) = sp.edit().putBoolean("study_realtime_gto", v).apply()
+
     /** 0 slow, 1 normal, 2 fast */
     var speed: Int
         get() = sp.getInt("speed", 1)

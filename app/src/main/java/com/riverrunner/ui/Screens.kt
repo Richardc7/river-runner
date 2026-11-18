@@ -534,6 +534,35 @@ fun SettingsScreen(vm: AppViewModel) {
                 Text(if (st.isZh) "说明：默认是原版 AI；动态剥削需主动开启，且证据不足时会保留基准策略。" else
                     "Default AI is Legacy. Enable Adaptive explicitly; sparse evidence retains the baseline.",
                     color = Palette.TextDim, fontSize = 11.sp)
+                SectionTitle(if (st.isZh) "复盘训练功能" else "Replay coach settings")
+                Text(if (st.isZh) "全部设置独立保存；只分析当时可见的信息。"
+                    else "Settings persist independently. No future cards or hidden opponent hands are used.",
+                    color = Palette.TextDim, fontSize = 11.sp)
+                ToggleRow(if (st.isZh) "1. 盲测复盘" else "1. Blind replay", vm.blindReviewEnabled) {
+                    vm.setStudyToggle("blind", it)
+                }
+                ToggleRow(if (st.isZh) "2. 弱点分类报告" else "2. Weakness report", vm.weaknessReportEnabled) {
+                    vm.setStudyToggle("weak", it)
+                }
+                ToggleRow(if (st.isZh) "3. 错题与间隔复习" else "3. Spaced error drills", vm.spacedDrillsEnabled) {
+                    vm.setStudyToggle("spaced", it)
+                }
+                ToggleRow(if (st.isZh) "4. 翻前范围矩阵教练" else "4. Preflop range coach", vm.preflopCoachEnabled) {
+                    vm.setStudyToggle("preflop", it)
+                }
+                ToggleRow(if (st.isZh) "5. 河牌 What-if 情景比较" else "5. River what-if scenarios", vm.riverWhatIfEnabled) {
+                    vm.setStudyToggle("whatif", it)
+                }
+                ToggleRow(if (st.isZh) "实时 GTO/参考策略显示" else "Live GTO / strategy reference", vm.realtimeGtoEnabled) {
+                    vm.setStudyToggle("live", it)
+                }
+                Text(if (st.isZh) "没有已验证的求解器资料时，实时显示只标记为「启发式基准」，绝不冒充 GTO。实时提示只在你的行动回合出现。"
+                    else "Without verified solver data, live advice is explicitly labelled heuristic, NOT GTO; only visible on hero turns.",
+                    color = Palette.TextDim, fontSize = 10.sp)
+                ActionButton(if (st.isZh) "打开历史复盘与盲测" else "Open history & blind replay",
+                    Palette.PanelHi, modifier = Modifier.fillMaxWidth().height(38.dp)) { vm.screen = Screen.History }
+                ActionButton(if (st.isZh) "打开错题间隔训练" else "Open spaced training",
+                    Palette.PanelHi, modifier = Modifier.fillMaxWidth().height(38.dp)) { vm.openTraining() }
                 Spacer(Modifier.height(6.dp))
                 SectionTitle(st.about)
                 Text(st.aboutText, color = Palette.Text, fontSize = 13.sp, lineHeight = 19.sp)
