@@ -520,7 +520,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     .background(Palette.Panel).padding(14.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                SectionTitle("Exploit Edition V0.4")
+                SectionTitle("Exploit Edition V0.5")
                 Text(if (st.isZh) "AI、对手、抽水与筹码设置已集成；保存后从新牌桌开始生效。" else
                     "AI, opponents, rake and stacks are configurable. Saved settings apply to the next table.",
                     color = Palette.TextDim, fontSize = 12.sp)
