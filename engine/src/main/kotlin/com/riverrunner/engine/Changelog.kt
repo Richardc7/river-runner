@@ -18,7 +18,7 @@ object Changelog {
 
     data class Release(val version: String, val date: String, val sections: List<Section>)
 
-    private val HEADING = Regex("""^##\s+([0-9][0-9A-Za-z.\-]*)\s*(?:·\s*(.*))?$""")
+    private val HEADING = Regex("""^##\s+([0-9][0-9A-Za-z.\-]*)\s*(?:[·-]\s*(.*))?$""")
 
     private fun split(s: String): Item {
         val i = s.indexOf(" | ")
