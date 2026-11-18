@@ -15,7 +15,9 @@ data class DecisionAssessment(
     val stackGroup: String, val sizeGroup: String, val oddsGroup: String,
     val actual: Move?, val preferred: MoveType, val actualFrequency: Double?,
     val preferredFrequency: Double, val modelGapBB: Double?,
-    val needsStudy: Boolean
+    val needsStudy: Boolean,
+    val ownHole: List<Int>, val board: List<Int>, val potBB: Double, val toCallBB: Double,
+    val legalTypes: List<MoveType>
 )
 data class StudyCategory(val key: String, val hands: Int, val marked: Int, val measuredEv: Int, val meanModelGapBB: Double) {
     val reviewRate: Double get() = if (hands == 0) 0.0 else marked.toDouble() / hands
@@ -61,9 +63,16 @@ object StudyCoach {
             max(0.0, trace.actionValues.maxOf { it.chips } - exact.chips) / view.bigBlind else null
         val mismatch = actualFreq != null && actualFreq < .2 && byType.getValue(preferred) >= .45
         val marked = mismatch || modelGap != null && modelGap >= 1.0
+        val legalTypes = buildList {
+            if (view.legal.canCheck) add(MoveType.CHECK) else add(MoveType.FOLD)
+            if (view.legal.canCall) add(MoveType.CALL)
+            if (view.legal.canRaise) add(MoveType.RAISE)
+        }
         return DecisionAssessment(
             "h" + handId + "a" + trace.actionIndex, topic, pos, view.street,
-            depth, size, odds, answer, preferred, actualFreq, byType.getValue(preferred), modelGap, marked
+            depth, size, odds, answer, preferred, actualFreq, byType.getValue(preferred), modelGap, marked,
+            view.ownHole.toList(), view.board.toList(),
+            view.pot.toDouble() / view.bigBlind, view.legal.toCall.toDouble() / view.bigBlind, legalTypes
         )
     }
     fun categories(assessments: List<DecisionAssessment>): List<StudyCategory> {
