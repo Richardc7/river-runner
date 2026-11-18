@@ -23,6 +23,7 @@ class GameSession(val config: SessionConfig) {
     var buttonSeat: Int; private set
     var current: HandEngine? = null; private set
     private var finished: SessionSummary? = null
+    var lastAnalysis: HandAnalysis? = null; private set
     companion object {
         const val HERO_SEAT = 0
         const val BASE_BB = 100
@@ -69,7 +70,7 @@ class GameSession(val config: SessionConfig) {
         val deckRandom = if (config.edition.aiMode == AiMode.ADAPTIVE)
             StrategyRandom.forDecision(config.seed, handNumber, -1, -1, 0) else random
         val engine = HandEngine(setup, RandomCardSource(deckRandom))
-        strategy.beginHand(engine, handNumber); current = engine; return engine
+        strategy.beginHand(engine, handNumber); lastAnalysis = null; current = engine; return engine
     }
     /** All live actions go through this gate so opportunities cannot be skipped. */
     fun applyMove(move: Move): Action {
@@ -93,6 +94,7 @@ class GameSession(val config: SessionConfig) {
         for (b in busted) { players[b.seat].place = place; place-- }
         handNumber++
         val record = HandRecord.from(engine, config.mode, handNumber, HERO_SEAT, config.tableSize, styles = players.associate { it.seat to it.style })
+        lastAnalysis = strategy.finishAnalysis(record.id)
         current = null
         return record.copy(won = result.won)
     }

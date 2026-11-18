@@ -14,7 +14,8 @@ import com.riverrunner.data.ProfileStore
 import com.riverrunner.data.Prefs
 import com.riverrunner.data.EditionPrefs
 import com.riverrunner.engine.*
-import com.riverrunner.engine.strategy.EditionConfig
+import com.riverrunner.engine.strategy.*
+import java.io.File
 import com.riverrunner.i18n.EN
 import com.riverrunner.i18n.ZH
 import kotlinx.coroutines.CompletableDeferred
@@ -40,6 +41,12 @@ sealed class Screen {
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     val prefs = Prefs(app)
+    private val analysisRoot: File = app.filesDir
+    private fun analysisStore(id: String = profile.id) = StrategyTraceStore(analysisRoot, id)
+    suspend fun analysisFor(record: HandRecord): HandAnalysis? {
+        val id = profile.id; val retained = history.all().map { it.id }.toSet()
+        return withContext(Dispatchers.IO) { analysisStore(id).also { it.retain(retained) }.load(record.id) }
+    }
     private val editionPrefs = EditionPrefs(app)
     var editionConfig by mutableStateOf(editionPrefs.load()); private set
     fun saveEdition(config: EditionConfig) { editionPrefs.save(config); editionConfig = config }
@@ -65,7 +72,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (name.isBlank()) return
         profiles.rename(id, name.trim()); if (id == profile.id) profile = profiles.active(); profileList = profiles.all()
     }
-    fun deleteProfile(id: String) { profiles.delete(id); switchProfile(profiles.active().id) }
+    fun deleteProfile(id: String) {
+        if (screen == Screen.Table || reviewing) return
+        analysisStore(id).deleteAll(); profiles.delete(id); switchProfile(profiles.active().id)
+    }
     fun nextProfileName(): String = profiles.nextDefaultName()
     val maxSlots: Int get() = ProfileStore.MAX_SLOTS
 
@@ -235,6 +245,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         if (seat == GameSession.HERO_SEAT) {
                             if (quitRequested) { apply(e, s, Move.FOLD); continue }
                             fastForward = false; actingName = null
+                            withContext(Dispatchers.Default) { s.strategy.capture(e, s.tournamentContext()) }
                             val la = e.legalActions(); val me = e.player(seat)
                             practiceInfo = PracticeInfo(la.toCall, la.pot,
                                 if (la.toCall > 0) la.toCall.toDouble() / (la.pot + la.toCall) else 0.0,
@@ -258,7 +269,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             legal = null; actingName = null
             val infosBefore = seatInfos(s); val built = s.completeHand(e)
             val rec = if (starHand) built.copy(favorite = true) else built
-            val store = history; withContext(Dispatchers.IO) { store.add(rec) }
+            val store = history; val traces = analysisStore(); val analysis = s.lastAnalysis
+            val analysisSaved = withContext(Dispatchers.IO) {
+                store.add(rec) // the hand is authoritative; optional analysis must never destroy it
+                try {
+                    if (analysis != null) traces.save(analysis)
+                    traces.retain(store.all().map { it.id }.toSet()); true
+                } catch (e: java.io.IOException) { false } catch (e: IllegalStateException) { false }
+            }
+            if (!analysisSaved) notice = if (prefs.chinese) "\u724c\u8c31\u5df2\u4fdd\u5b58\uff0c\u7b56\u7565\u5206\u6790\u4fdd\u5b58\u5931\u8d25" else "Hand saved; strategy analysis could not be saved"
             lastRecordId = rec.id
             record(withContext(Dispatchers.Default) { runCatching { Facts.forHand(rec) }.getOrDefault(emptyMap()) })
             if (rec.favorite) record(mapOf(Progress.STARS to 1L))

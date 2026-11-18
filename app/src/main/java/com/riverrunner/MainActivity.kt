@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
                                 Screen.Table -> TableScreen(vm)
                                 is Screen.Result -> ResultScreen(vm, s.summary)
                                 Screen.History -> HistoryScreen(vm)
-                                is Screen.Replay -> ReplayScreen(vm, s.record)
+                                is Screen.Replay -> EditionReplayScreen(vm, s.record)
                                 Screen.Stats -> StatsScreen(vm)
                                 Screen.Settings -> SettingsScreen(vm)
                                 Screen.Guide -> GuideScreen(vm)
