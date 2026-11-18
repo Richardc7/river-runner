@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -113,6 +114,7 @@ internal fun SolverReferencePanel(view: DecisionView, reference: ReferenceBook?)
     val node = remember(book, view) { book.lookup(view) } ?: return
     val zh = LocalStrings.current.isZh
     val choices = node.actions.filter { it.frequency > 0 }.sortedByDescending { it.frequency }
+    var details by remember(book, view) { mutableStateOf(false) }
     fun choiceColor(type: MoveType) = when (type) {
         MoveType.FOLD -> Palette.Red
         MoveType.CHECK -> Palette.Blue
@@ -126,7 +128,10 @@ internal fun SolverReferencePanel(view: DecisionView, reference: ReferenceBook?)
         Text(if (zh) "外部策略参考" else "External strategy reference",
             color = Palette.Gold, style = MaterialTheme.typography.titleMedium)
         Text(book.provenance.source + " · " + book.provenance.author, color = Palette.Text, fontSize = 12.sp)
-        Row(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(4.dp))) {
+        Row(
+            Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(4.dp)),
+            horizontalArrangement = Arrangement.spacedBy(1.dp),
+        ) {
             for (choice in choices) {
                 Box(Modifier.weight(choice.frequency.toFloat().coerceAtLeast(Float.MIN_VALUE))
                     .height(6.dp).background(choiceColor(choice.move.type)))
@@ -142,7 +147,13 @@ internal fun SolverReferencePanel(view: DecisionView, reference: ReferenceBook?)
                     color = choiceColor(choice.move.type), fontSize = 12.sp)
             }
         }
-        Text(book.provenance.context, color = Palette.TextDim, fontSize = 11.sp)
+        TextButton(onClick = { details = !details }) {
+            Text(if (zh) "求解条件" else "Solve details")
+        }
+        if (details) {
+            Text(book.provenance.context, color = Palette.TextDim, fontSize = 11.sp)
+            Text(book.provenance.licence, color = Palette.TextDim, fontSize = 11.sp)
+        }
     }
 }
 
@@ -168,7 +179,7 @@ internal fun SolverReferenceLibrary(vm: AppViewModel, reference: ReferenceBook?,
                 vm.saveTrainingReference(book)
                 onImported(book)
                 raw = ""
-                status = t("已保存 ${book.nodes.size} 个决策场景。", "Saved ${book.nodes.size} decision spots.")
+                status = t("策略库已更新。", "Reference library updated.")
                 failed = false
             } catch (e: CancellationException) {
                 throw e

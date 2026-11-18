@@ -88,6 +88,8 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                                     Text((if (zh) "针对性调整：" else "Exploit adjustment: ") +
                                         policyText(trace.exploit, record.bigBlind, zh), color = Palette.Gold)
                                     Text(statusText(trace.status, zh))
+                                    SolverReferencePanel(view, reference)
+                                    ExportSolverSpot(view)
                                     for (evidence in trace.evidence) {
                                         Text(reasonText(evidence.code, zh) +
                                             (if (zh) " · 对手座位 " else " · Seat ") + evidence.seat +
@@ -112,8 +114,6 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                                     trace.notes.forEach {
                                         Text(StudyPresentation.modelNote(it, zh), color = Palette.TextDim)
                                     }
-                                    SolverReferencePanel(view, reference)
-                                    ExportSolverSpot(view)
                                     TextButton(onClick = {
                                         startIndex = replayer.frames.indexOfFirst { replayer.actionIndexOf(it) == trace.actionIndex }.coerceAtLeast(0)
                                         report = false

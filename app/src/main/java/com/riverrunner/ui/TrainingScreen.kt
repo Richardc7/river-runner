@@ -234,6 +234,8 @@ internal fun DecisionQuestion(
                 Text(t("条件模型 EV 差距：", "Conditional model EV gap: ") +
                     "%.2f".format(Locale.US, score.modelLossChips / bb) + " BB",
                     color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                SolverReferencePanel(view, reference)
+                ExportSolverSpot(view)
                 HorizontalDivider(color = Palette.Line)
                 for (option in options.sortedByDescending { it.chips }) {
                     Text(StudyPresentation.move(option.move, bb, zh) + "  ·  " +
@@ -244,8 +246,6 @@ internal fun DecisionQuestion(
                 for (note in item.notes.take(3)) {
                     Text(StudyPresentation.modelNote(note, zh), color = Palette.TextDim, fontSize = 11.sp)
                 }
-                SolverReferencePanel(view, reference)
-                ExportSolverSpot(view)
                 Text(t("这里比较的是模型假设下的 EV，并非真实盈亏或求解器 GTO。",
                     "Model-assumption EV, not realised profit or verified solver GTO."),
                     color = Palette.TextDim, fontSize = 11.sp)
