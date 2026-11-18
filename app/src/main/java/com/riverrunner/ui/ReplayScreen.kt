@@ -255,7 +255,6 @@ fun ReplayContent(
 }
 
 @Composable
-@Composable
 private fun OpponentInsightCard(
     action: Action, player: com.riverrunner.engine.RecordPlayer,
     st: Strings, fmt: (Int) -> String,

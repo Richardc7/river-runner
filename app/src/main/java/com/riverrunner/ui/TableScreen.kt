@@ -227,9 +227,10 @@ private fun SidePanel(
                 androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
                     val info = ui.practiceInfo
                     val live = if (heroTurn) ui.liveStrategy else null
+                    val infoMaxHeight = maxHeight * .55f
                     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         if (live != null || (ui.practice && info != null)) {
-                            Column(Modifier.fillMaxWidth().heightIn(max = maxHeight * .55f)
+                            Column(Modifier.fillMaxWidth().heightIn(max = infoMaxHeight)
                                 .verticalScroll(rememberScrollState()),
                                 verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 if (live != null) {
