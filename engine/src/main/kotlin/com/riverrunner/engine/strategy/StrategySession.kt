@@ -32,17 +32,28 @@ class StrategySession(private val seed: Long, private val mode: GameMode, val co
         if (view.actionIndex in pending) return
         val advice = advise(engine, BotStyle.GTO, tournament)
         val snapshot = opponents.snapshots()
-        val river = if (view.street == Street.RIVER && view.mode == GameMode.CASH && view.opponents.size == 1) {
-            val seat = view.opponents.single().seat
-            RiverEv.analyze(view, RangeModel.infer(view, seat, snapshot[seat]), snapshot[seat],
-                (advice.baseline.options + advice.policy.options).map { it.first })
+        val river = if (view.street == Street.RIVER && view.mode == GameMode.CASH) {
+            when (view.opponents.size) {
+                1 -> {
+                    val seat = view.opponents.single().seat
+                    RiverEv.analyze(view, RangeModel.infer(view, seat, snapshot[seat]), snapshot[seat],
+                        (advice.baseline.options + advice.policy.options).map { it.first })
+                }
+                in 2..8 -> if (MultiwayRiverEv.isTerminal(view)) {
+                    val ranges = view.opponents.associate { it.seat to RangeModel.infer(view, it.seat, snapshot[it.seat]) }
+                    MultiwayRiverEv.analyze(view, ranges,
+                        StrategyRandom.forDecision(seed, handNumber, view.actionIndex, view.actorSeat, 3))
+                } else RiverAnalysis(false, emptyList(), null, emptyMap(),
+                    listOf("Multiway river continuation is not yet evaluated: a later opponent can still act."))
+                else -> null
+            }
         } else null
         val notes = buildList {
             if (advice.note.isNotBlank()) add(advice.note)
             if (river != null) {
                 addAll(river.assumptions)
                 if (river.supported) {
-                    add("Top model range classes: " + river.rangeClasses.entries.take(12).joinToString(", ") { "${it.key}: ${"%.1f".format(java.util.Locale.US, it.value * 100)}%" })
+                    if (river.rangeClasses.isNotEmpty()) add("Top model range classes: " + river.rangeClasses.entries.take(12).joinToString(", ") { "${it.key}: ${"%.1f".format(java.util.Locale.US, it.value * 100)}%" })
                     add("River EV is coaching-only in this version; it does not override the bounded live policy.")
                 }
             }
