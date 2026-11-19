@@ -62,22 +62,21 @@ internal class StudyRepository(private val analysisRoot: File) {
             analysisStore(profileId).also { it.retain(retainedIds) }.load(recordId)
         }
 
-    /** V0.4 drills: derive only from saved, contemporaneously modelled river choices. */
-    suspend fun trainingItems(profileId: String, records: List<HandRecord>): List<TrainingItem> =
-        withContext(Dispatchers.IO) {
+    /** V0.4 drills: derive only from saved, contemporaneously modelled river/turn/flop choices. */
+    suspend fun trainingItems(profileId: String, records: List<HandRecord>): List<TrainingItem> {
+        val idxStore = indexStore(profileId)
+        val indexSnapshot = withContext(practiceStorage) { idxStore.load() }
+        val newEntries = ArrayList<StudyIndexEntry>()
+        val out = withContext(Dispatchers.IO) {
             val store = analysisStore(profileId)
-            val idxStore = indexStore(profileId)
-            val index = idxStore.load()
-            var indexDirty = false
-            val out = ArrayList<TrainingItem>()
+            val items = ArrayList<TrainingItem>()
             for (record in records.takeLast(300)) {
                 currentCoroutineContext().ensureActive()
-                val cached = index[record.id]
+                val cached = indexSnapshot[record.id]
                 if (cached != null && !cached.hasDrill) continue
                 val analysis = runCatching { store.load(record.id) }.getOrNull()
                 if (cached == null) {
-                    index[record.id] = computeIndexEntry(record, analysis)
-                    indexDirty = true
+                    newEntries += computeIndexEntry(record, analysis)
                 }
                 if (analysis == null) continue
                 val replayer = Replayer(record)
@@ -90,7 +89,7 @@ internal class StudyRepository(private val analysisRoot: File) {
                     val exercise = TrainingCurriculum.fromHistory(listOf(analysis)).firstOrNull {
                         it.id == "h" + record.id + "a" + trace.actionIndex
                     } ?: continue
-                    out += TrainingItem(
+                    items += TrainingItem(
                         exercise,
                         record,
                         view,
@@ -100,21 +99,24 @@ internal class StudyRepository(private val analysisRoot: File) {
                     )
                 }
             }
-            if (indexDirty) runCatching { idxStore.save(index) }
-            out
+            items
         }
+        if (newEntries.isNotEmpty()) {
+            withContext(practiceStorage) { runCatching { idxStore.upsertAll(newEntries) } }
+        }
+        return out
+    }
 
-    suspend fun hasBlindDecisions(profileId: String, record: HandRecord): Boolean =
-        withContext(Dispatchers.IO) {
-            val idxStore = indexStore(profileId)
-            val index = idxStore.load()
-            index[record.id]?.let { return@withContext it.hasBlind }
+    suspend fun hasBlindDecisions(profileId: String, record: HandRecord): Boolean {
+        val idxStore = indexStore(profileId)
+        withContext(practiceStorage) { idxStore.load()[record.id] }?.let { return it.hasBlind }
+        val entry = withContext(Dispatchers.IO) {
             val analysis = analysisStore(profileId).load(record.id)
-            val entry = computeIndexEntry(record, analysis)
-            index[record.id] = entry
-            runCatching { idxStore.save(index) }
-            entry.hasBlind
+            computeIndexEntry(record, analysis)
         }
+        withContext(practiceStorage) { runCatching { idxStore.upsert(entry) } }
+        return entry.hasBlind
+    }
 
     /** Aggregates only fingerprint-matched historical hero decision-time records. */
     suspend fun studyAssessments(profileId: String, records: List<HandRecord>): List<DecisionAssessment> =
@@ -126,30 +128,32 @@ internal class StudyRepository(private val analysisRoot: File) {
             }
         }
 
-    suspend fun handsWithModelDeviations(profileId: String, records: List<HandRecord>): Set<Long> =
-        withContext(Dispatchers.IO) {
+    suspend fun handsWithModelDeviations(profileId: String, records: List<HandRecord>): Set<Long> {
+        val idxStore = indexStore(profileId)
+        val indexSnapshot = withContext(practiceStorage) { idxStore.load() }
+        val newEntries = ArrayList<StudyIndexEntry>()
+        val result = withContext(Dispatchers.IO) {
             val store = analysisStore(profileId)
-            val idxStore = indexStore(profileId)
-            val index = idxStore.load()
-            var indexDirty = false
-            val result = buildSet {
+            buildSet {
                 for (record in records) {
                     currentCoroutineContext().ensureActive()
-                    val cached = index[record.id]
+                    val cached = indexSnapshot[record.id]
                     if (cached != null) {
                         if (cached.hasDeviation) add(record.id)
                     } else {
                         val analysis = runCatching { store.load(record.id) }.getOrNull()
                         val entry = computeIndexEntry(record, analysis)
-                        index[record.id] = entry
-                        indexDirty = true
+                        newEntries += entry
                         if (entry.hasDeviation) add(record.id)
                     }
                 }
             }
-            if (indexDirty) runCatching { idxStore.save(index) }
-            result
         }
+        if (newEntries.isNotEmpty()) {
+            withContext(practiceStorage) { runCatching { idxStore.upsertAll(newEntries) } }
+        }
+        return result
+    }
 
     /**
      * Collects recent eligible heads-up river spots for batch TexasSolver export,
@@ -159,27 +163,29 @@ internal class StudyRepository(private val analysisRoot: File) {
         profileId: String,
         records: List<HandRecord>,
         limit: Int = 50,
-    ): List<Pair<HandRecord, SolverSpot>> = withContext(Dispatchers.IO) {
-        val store = analysisStore(profileId)
-        val index = indexStore(profileId).load()
-        val recent = records.takeLast(300).asReversed()
-        val ordered = recent.sortedByDescending { index[it.id]?.hasDeviation == true }
-        val seenHashes = hashSetOf<String>()
-        val spots = ArrayList<Pair<HandRecord, SolverSpot>>()
-        for (record in ordered) {
-            currentCoroutineContext().ensureActive()
-            if (spots.size >= limit) break
-            val analysis = runCatching { store.load(record.id) }.getOrNull() ?: continue
-            val replayer = Replayer(record)
-            for ((view, trace, _) in historicalDecisions(record, analysis, replayer)) {
+    ): List<Pair<HandRecord, SolverSpot>> {
+        val index = withContext(practiceStorage) { indexStore(profileId).load() }
+        return withContext(Dispatchers.IO) {
+            val store = analysisStore(profileId)
+            val recent = records.takeLast(300).asReversed()
+            val ordered = recent.sortedByDescending { index[it.id]?.hasDeviation == true }
+            val seenHashes = hashSetOf<String>()
+            val spots = ArrayList<Pair<HandRecord, SolverSpot>>()
+            for (record in ordered) {
+                currentCoroutineContext().ensureActive()
                 if (spots.size >= limit) break
-                val spot = SolverSpot.from(view) ?: continue
-                if (seenHashes.add(trace.contextHash)) {
-                    spots += record to spot
+                val analysis = runCatching { store.load(record.id) }.getOrNull() ?: continue
+                val replayer = Replayer(record)
+                for ((view, trace, _) in historicalDecisions(record, analysis, replayer)) {
+                    if (spots.size >= limit) break
+                    val spot = SolverSpot.from(view) ?: continue
+                    if (seenHashes.add(trace.contextHash)) {
+                        spots += record to spot
+                    }
                 }
             }
+            spots
         }
-        spots
     }
 
     private fun assessmentsFor(record: HandRecord, store: StrategyTraceStore): Sequence<DecisionAssessment> = sequence {

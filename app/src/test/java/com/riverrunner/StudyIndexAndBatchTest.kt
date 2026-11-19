@@ -3,6 +3,7 @@ package com.riverrunner
 import com.riverrunner.engine.Move
 import com.riverrunner.engine.strategy.ReferenceAction
 import com.riverrunner.engine.strategy.ReferenceBook
+import com.riverrunner.engine.strategy.ReferenceCodec
 import com.riverrunner.engine.strategy.ReferenceNode
 import com.riverrunner.engine.strategy.ReferenceProvenance
 import com.riverrunner.ui.StudyIndexEntry
@@ -12,10 +13,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.nio.file.Files
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class StudyIndexAndBatchTest {
     private fun hash(ch: Char) = ch.toString().repeat(64)
+    private fun hexHash(index: Int): String = "%064x".format(index)
 
     @Test
     fun studyIndexRoundTripsAndRetainsValidIds() {
@@ -54,5 +61,24 @@ class StudyIndexAndBatchTest {
         assertEquals("Solver B", merged.provenance.source)
         val updated = merged.nodes.first { it.contextHash == hash('a') }
         assertEquals(0.4, updated.actions.first { it.move == Move.CHECK }.frequency, 1e-9)
+    }
+
+    @Test
+    fun mergeReferenceBooksRejectsOversizedEncodedOutputBeforeSaving() {
+        val prov = ReferenceProvenance("Solver", "User", "MIT", "HU river")
+        val actions = (1..20).map { i ->
+            ReferenceAction(Move.raiseTo(100 + i), 0.05)
+        }
+        val bookA = ReferenceBook(prov, (1..600).map { ReferenceNode(hexHash(it), actions) })
+        val bookB = ReferenceBook(prov, (601..1200).map { ReferenceNode(hexHash(it), actions) })
+        val bookC = ReferenceBook(prov, (1201..1800).map { ReferenceNode(hexHash(it), actions) })
+        assertTrue(ReferenceCodec.encode(bookA).length <= ReferenceCodec.MAX_TEXT_LENGTH)
+        var failed = false
+        try {
+            mergeReferenceBooks(bookA, listOf(bookB, bookC))
+        } catch (_: IllegalArgumentException) {
+            failed = true
+        }
+        assertTrue(failed)
     }
 }

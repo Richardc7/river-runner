@@ -126,7 +126,13 @@ internal fun mergeReferenceBooks(existing: ReferenceBook?, incoming: List<Refere
     val nodes = merged.values.toList().let { list ->
         if (list.size > 3000) list.takeLast(3000) else list
     }
-    return ReferenceBook(incoming.last().provenance, nodes)
+    val candidate = ReferenceBook(incoming.last().provenance, nodes)
+    val encoded = ReferenceCodec.encode(candidate)
+    require(encoded.length <= ReferenceCodec.MAX_TEXT_LENGTH) {
+        "Merged reference library exceeds ${ReferenceCodec.MAX_TEXT_LENGTH} characters"
+    }
+    ReferenceCodec.decode(encoded)
+    return candidate
 }
 
 @Composable

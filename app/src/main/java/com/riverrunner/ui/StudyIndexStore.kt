@@ -3,6 +3,7 @@ package com.riverrunner.ui
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 internal data class StudyIndexEntry(
     val handId: Long,
@@ -14,11 +15,18 @@ internal data class StudyIndexEntry(
 /**
  * Lightweight per-profile metadata index so History filtering, blind-quiz badges,
  * and River drill discovery avoid re-parsing hundreds of trace files on every open.
+ * All reads, read-modify-writes, and deletes are synchronized per index file and
+ * use unique temp files to prevent concurrent overwrites.
  */
 internal class StudyIndexStore(root: File, profileId: String) {
     private val file = File(root, "study_index_$profileId.json")
+    private val lock: Any = locks.computeIfAbsent(file.canonicalPath) { Any() }
 
-    fun load(): MutableMap<Long, StudyIndexEntry> {
+    fun load(): MutableMap<Long, StudyIndexEntry> = synchronized(lock) {
+        loadLocked()
+    }
+
+    private fun loadLocked(): MutableMap<Long, StudyIndexEntry> {
         if (!file.isFile) return linkedMapOf()
         return runCatching {
             val rootObj = JSONObject(file.readText(Charsets.UTF_8))
@@ -40,7 +48,11 @@ internal class StudyIndexStore(root: File, profileId: String) {
         }.getOrElse { linkedMapOf() }
     }
 
-    fun save(entries: Map<Long, StudyIndexEntry>) {
+    fun save(entries: Map<Long, StudyIndexEntry>) = synchronized(lock) {
+        saveLocked(entries)
+    }
+
+    private fun saveLocked(entries: Map<Long, StudyIndexEntry>) {
         val arr = JSONArray()
         for (entry in entries.values) {
             arr.put(
@@ -55,33 +67,46 @@ internal class StudyIndexStore(root: File, profileId: String) {
             .put("schema", 1)
             .put("entries", arr)
             .toString()
-        val tmp = File(file.parentFile, "${file.name}.tmp")
-        tmp.writeText(payload, Charsets.UTF_8)
-        if (!tmp.renameTo(file)) {
-            file.writeText(payload, Charsets.UTF_8)
+        val parent = file.parentFile ?: File(".")
+        val tmp = File.createTempFile(file.name, ".tmp", parent)
+        try {
+            tmp.writeText(payload, Charsets.UTF_8)
+            if (!tmp.renameTo(file)) {
+                file.writeText(payload, Charsets.UTF_8)
+            }
+        } finally {
             tmp.delete()
         }
     }
 
-    fun upsert(entry: StudyIndexEntry, retainedIds: Set<Long>? = null) {
-        val map = load()
-        map[entry.handId] = entry
+    fun upsert(entry: StudyIndexEntry, retainedIds: Set<Long>? = null) = upsertAll(listOf(entry), retainedIds)
+
+    fun upsertAll(entries: List<StudyIndexEntry>, retainedIds: Set<Long>? = null) = synchronized(lock) {
+        if (entries.isEmpty() && retainedIds == null) return@synchronized
+        val map = loadLocked()
+        for (entry in entries) {
+            map[entry.handId] = entry
+        }
         if (retainedIds != null) {
             map.keys.retainAll(retainedIds)
         }
-        save(map)
+        saveLocked(map)
     }
 
-    fun retain(retainedIds: Set<Long>) {
-        if (!file.isFile) return
-        val map = load()
+    fun retain(retainedIds: Set<Long>) = synchronized(lock) {
+        if (!file.isFile) return@synchronized
+        val map = loadLocked()
         if (map.keys.retainAll(retainedIds)) {
-            save(map)
+            saveLocked(map)
         }
     }
 
-    fun delete() {
+    fun delete() = synchronized(lock) {
         file.delete()
         File(file.parentFile, "${file.name}.tmp").delete()
+    }
+
+    companion object {
+        private val locks = ConcurrentHashMap<String, Any>()
     }
 }
