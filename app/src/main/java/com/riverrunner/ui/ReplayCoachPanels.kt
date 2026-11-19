@@ -93,7 +93,7 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
         Text(t("作答时只显示当时可见的牌面和行动。", "Answer using the cards and actions visible at the time."),
             color = Palette.TextDim)
         if (node == null) {
-            Text(t("这手牌没有可作答的决策。可以切换到逐街回放查看牌局。",
+            Text(t("这手牌没有可作答的决策。可以切换到牌局回放查看牌局。",
                 "This hand has no quiz decisions. Open the street replay to view it."), color = Palette.Text)
         } else {
             val view = node.view

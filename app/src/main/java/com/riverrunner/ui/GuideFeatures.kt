@@ -65,7 +65,7 @@ private enum class FeatureTopic(val title: GuideText, val lessons: List<FeatureL
             ),
         ),
     )),
-    REPLAY(GuideText("逐街回放与盲测", "Replays"), listOf(
+    REPLAY(GuideText("牌局回放与盲测", "Replays"), listOf(
         FeatureLesson(
             GuideText("牌局记录、筛选与收藏", "Hand history, filters and favourites"),
             GuideText(
@@ -74,10 +74,10 @@ private enum class FeatureTopic(val title: GuideText, val lessons: List<FeatureL
             ),
         ),
         FeatureLesson(
-            GuideText("逐街回放、摊牌权益与本步分析", "Street replay, showdown equity and step analysis"),
+            GuideText("牌局回放、摊牌权益与本步分析", "Hand replay, showdown equity and step analysis"),
             GuideText(
-                "牌桌下方可跳到开头、结尾或逐步前后移动，也可点行动记录跳转。蓝色百分比是当时牌面下的摊牌权益，平分也按份额计入。切到「本步分析」可查看该步策略频率或模拟对手行动解读。对手解读基于动作和风格推断。",
-                "Use the playback controls under the table or tap an action in the log to jump to it. Blue percentages show showdown equity at that step, including shares of split pots. Step analysis shows the strategy frequencies or a possible explanation of the bot's move inferred from its action and style.",
+                "牌桌下方可跳到开头、结尾或逐步前后移动，也可点行动记录跳转。蓝色百分比是当时牌面下的摊牌权益，平分也按份额计入。切到「本步分析」可查看行动前的位置、剩余筹码、有效后手、跟注价格和实际下注尺度。自己的决策还会显示可用的策略频率。",
+                "Use the playback controls under the table or tap an action in the log to jump to it. Blue percentages show showdown equity at that step, including shares of split pots. Step analysis shows the position, chips behind, effective stacks, call price and recorded bet sizing before each move. Your decisions also show available strategy frequencies.",
             ),
         ),
         FeatureLesson(

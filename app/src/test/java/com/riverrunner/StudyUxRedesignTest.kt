@@ -110,7 +110,7 @@ class StudyUxRedesignTest {
         compose.onNodeWithText("翻牌前 · 2 / 2").assertExists()
         compose.onNodeWithText("行动记录").performClick().assertIsSelected()
         compose.onNodeWithText("双轨分析").performClick()
-        compose.onNodeWithText("逐街回放").performClick()
+        compose.onNodeWithText("牌局回放").performClick()
         compose.onNodeWithText("翻牌前 · 2 / 2").assertExists()
         compose.onNodeWithText("开头").performClick()
         compose.onNodeWithText("翻牌前 · 1 / 2").assertExists()

@@ -522,12 +522,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                 if (match != null) LiveStrategyHint(
                                     "declared-reference",
                                     match.actions.map { PolicyChoice(it.move, it.frequency) },
-                                    savedReference.provenance.source
+                                    savedReference.provenance.source, view,
                                 ) else {
                                     val baseline = s.strategy.capturedBaseline(e)
                                         ?: PolicySnapshot.from(s.strategy.advise(e, BotStyle.GTO, s.tournamentContext()).baseline)
                                     LiveStrategyHint("heuristic",
-                                        baseline.choices, "decision-time")
+                                        baseline.choices, "decision-time", view, baseline.equity)
                                 }
                             } else null
                             val la = e.legalActions(); val me = e.player(seat)

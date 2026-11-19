@@ -17,7 +17,7 @@ import com.riverrunner.engine.*
 import com.riverrunner.engine.strategy.*
 
 private enum class ReplayPage(val zh: String, val en: String) {
-    TABLE("逐街回放", "Replay"),
+    TABLE("牌局回放", "Replay"),
     COMPARISON("双轨分析", "Policy comparison"),
     BLIND("盲测复盘", "Blind quiz"),
     WEAKNESSES("弱点报告", "Weaknesses"),
@@ -97,11 +97,21 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                                     DecisionCards(view)
                                     val actual = record.actions.filter { !it.type.isPost }.getOrNull(trace.actionIndex)
                                     actual?.let { Text((if (zh) "\u4f60\u7684\u884c\u52a8\uff1a" else "Your action: ") + vm.actionLabel(it, record.bigBlind)) }
-                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                        ReplayPolicyChart(if (zh) "基准参考" else "Baseline model", trace.baseline,
-                                            record.bigBlind, view.legal.isOpeningBet, Modifier.weight(1f))
-                                        ReplayPolicyChart(if (zh) "针对性调整" else "Exploit adjustment", trace.exploit,
-                                            record.bigBlind, view.legal.isOpeningBet, Modifier.weight(1f))
+                                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                                        if (maxWidth >= 640.dp) {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                                                Box(Modifier.weight(1.5f)) {
+                                                    DecisionContextDetails(view, actual, trace.baseline.equity)
+                                                }
+                                                ReplayPolicyComparison(trace, record.bigBlind, view.legal.isOpeningBet,
+                                                    Modifier.weight(1f))
+                                            }
+                                        } else {
+                                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                                DecisionContextDetails(view, actual, trace.baseline.equity)
+                                                ReplayPolicyComparison(trace, record.bigBlind, view.legal.isOpeningBet)
+                                            }
+                                        }
                                     }
                                     actual?.let {
                                         StudyCoach.assess(record.id, view, trace, it).modelGapBB?.let { gap ->
@@ -214,6 +224,17 @@ private fun ReplayNavigation(
 }
 
 private fun percent(value: Double): String = "%.0f%%".format(value * 100)
+
+@Composable
+private fun ReplayPolicyComparison(
+    trace: DecisionTrace, bb: Int, openingBet: Boolean, modifier: Modifier = Modifier,
+) {
+    val zh = LocalStrings.current.isZh
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        ReplayPolicyChart(if (zh) "基准参考" else "Baseline model", trace.baseline, bb, openingBet, Modifier.weight(1f))
+        ReplayPolicyChart(if (zh) "针对性调整" else "Exploit adjustment", trace.exploit, bb, openingBet, Modifier.weight(1f))
+    }
+}
 
 @Composable
 private fun ReplayPolicyChart(label: String, policy: PolicySnapshot, bb: Int, openingBet: Boolean, modifier: Modifier) {
