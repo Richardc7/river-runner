@@ -12,11 +12,11 @@ import java.util.Locale
 
 /** One-language-only captions. Technical card ranks, position abbreviations and BB remain conventional. */
 object StudyPresentation {
-    fun moveType(type: MoveType, zh: Boolean): String = when (type) {
+    fun moveType(type: MoveType, zh: Boolean, openingBet: Boolean = false): String = when (type) {
         MoveType.FOLD -> if (zh) "弃牌" else "Fold"
         MoveType.CHECK -> if (zh) "过牌" else "Check"
         MoveType.CALL -> if (zh) "跟注" else "Call"
-        MoveType.RAISE -> if (zh) "加注" else "Raise"
+        MoveType.RAISE -> actionType(if (openingBet) ActionType.BET else ActionType.RAISE, zh)
     }
 
     fun actionType(type: ActionType, zh: Boolean): String = when (type) {
@@ -38,8 +38,8 @@ object StudyPresentation {
         Street.RIVER -> if (zh) "河牌圈" else "River"
     }
 
-    fun move(move: Move, bb: Int, zh: Boolean): String =
-        moveType(move.type, zh) + if (move.type == MoveType.RAISE) {
+    fun move(move: Move, bb: Int, zh: Boolean, openingBet: Boolean = false): String =
+        moveType(move.type, zh, openingBet) + if (move.type == MoveType.RAISE) {
             " " + "%.1f".format(Locale.US, move.raiseTo.toDouble() / bb.coerceAtLeast(1)) + " BB"
         } else ""
 

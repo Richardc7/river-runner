@@ -91,7 +91,7 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (move in studyChoices(view)) {
                     OutlinedButton(onClick = { answer = move }, enabled = chosen == null) {
-                        Text(studyMoveLabel(move, view.bigBlind, zh))
+                        Text(StudyPresentation.move(move, view.bigBlind, zh, view.legal.isOpeningBet))
                     }
                 }
             }
@@ -101,15 +101,15 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
                     .maxBy { it.value }.key
                 val score = if (chosen.type == best) 1.0 else 0.0
                 Text(t("模型偏好的行动：", "Model-favoured move: ") +
-                    StudyPresentation.moveType(best, zh) +
-                    t("；你选：", "; your pick: ") + StudyPresentation.moveType(chosen.type, zh),
+                    StudyPresentation.moveType(best, zh, view.legal.isOpeningBet) +
+                    t("；你选：", "; your pick: ") + StudyPresentation.moveType(chosen.type, zh, view.legal.isOpeningBet),
                     color = Palette.Text)
                 Text(t("模型混合频率：", "Model mixed action frequencies: ") + policy.choices.joinToString(" / ") {
-                    StudyPresentation.moveType(it.move.type, zh) + " " + number(it.probability * 100) + "%"
+                    StudyPresentation.moveType(it.move.type, zh, view.legal.isOpeningBet) + " " + number(it.probability * 100) + "%"
                 }, color = Palette.TextDim)
                 node.action?.let {
                     Text(t("实际历史行动：", "Original recorded move: ") +
-                        studyMoveLabel(StudyCoach.moveOf(it) ?: Move.FOLD, view.bigBlind, zh),
+                        StudyPresentation.move(StudyCoach.moveOf(it) ?: Move.FOLD, view.bigBlind, zh, view.legal.isOpeningBet),
                         color = Palette.TextDim)
                 }
                 val modeled = trace.actionValues.firstOrNull { it.move == chosen }

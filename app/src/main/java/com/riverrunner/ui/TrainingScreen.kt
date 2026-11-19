@@ -26,6 +26,7 @@ data class TrainingItem(
     val view: DecisionView,
     val baseline: PolicySnapshot,
     val notes: List<String>,
+    val modelVersion: String? = null,
 )
 
 /** Separate questions, answers and offline data management. Never show unseen cards. */
@@ -173,27 +174,12 @@ internal fun DecisionQuestion(
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.weight(.95f).fillMaxHeight().verticalScroll(rememberScrollState())
             .clip(RoundedCornerShape(14.dp)).background(Palette.Panel).padding(13.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(if (explanation) t("本题回顾", "Question review") else t("决策情景", "Decision scenario"),
                 color = Palette.Gold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Text(t("历史牌局", "Saved hand") + " #" + item.record.handNumber +
                 "  ·  " + StudyPresentation.street(view.street, zh),
                 color = Palette.TextDim, fontSize = 12.sp)
-            HorizontalDivider(color = Palette.Line)
-            Text(t("你的底牌", "Your cards"), color = Palette.TextDim, fontSize = 12.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                view.ownHole.forEach { PlayingCard(it, 32.dp) }
-            }
-            Text(t("当时可见的公共牌", "Board at decision time"),
-                color = Palette.TextDim, fontSize = 12.sp)
-            if (view.board.isEmpty()) Text(t("翻牌前尚无公共牌", "No public cards yet"), color = Palette.Text)
-            else Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                view.board.forEach { PlayingCard(it, 27.dp) }
-            }
-            val position = HandEngine.positionName(view.order.indexOf(view.actorSeat), view.order.size)
-            Text(t("位置：", "Position: ") + position +
-                "  ·  " + t("有效人数：", "Players: ") + view.seats.size,
-                color = Palette.Text, fontSize = 12.sp)
             HorizontalDivider(color = Palette.Line)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 QuestionMetric(t("底池", "Pot"), "%.1f BB".format(Locale.US, view.pot.toDouble() / bb), Modifier.weight(1f))
@@ -202,67 +188,94 @@ internal fun DecisionQuestion(
                     QuestionMetric(t("跟注所需胜率", "Equity needed"), "%.0f%%".format(Locale.US, 100 * potOdds), Modifier.weight(1f))
                 }
             }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(t("你的底牌", "Your cards"), color = Palette.TextDim, fontSize = 12.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        view.ownHole.forEach { PlayingCard(it, 30.dp) }
+                    }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(t("当时可见的公共牌", "Board at decision time"), color = Palette.TextDim, fontSize = 12.sp)
+                    if (view.board.isEmpty()) Text(t("翻牌前尚无公共牌", "No public cards yet"),
+                        color = Palette.Text, fontSize = 11.sp)
+                    else Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        view.board.forEach { PlayingCard(it, 25.dp) }
+                    }
+                }
+            }
+            val position = HandEngine.positionName(view.order.indexOf(view.actorSeat), view.order.size)
+            Text(t("位置：", "Position: ") + position +
+                "  ·  " + t("有效人数：", "Players: ") + view.seats.size,
+                color = Palette.Text, fontSize = 12.sp)
             Text(t("选题依据：优先练习尚未尝试或与模型首选一致率较低的决策类型。",
                 "Why this spot: the trainer prioritizes new categories and those with lower model agreement."),
                 color = Palette.TextDim, fontSize = 11.sp)
         }
-        Column(Modifier.weight(1.05f).fillMaxHeight().verticalScroll(rememberScrollState())
+        val answerScroll = key(d.id, explanation) { rememberScrollState() }
+        Column(Modifier.weight(1.05f).fillMaxHeight()
             .clip(RoundedCornerShape(14.dp)).background(Palette.Panel).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            if (!explanation) {
-                Text(t("你会选择哪个行动？", "What would you do?"),
-                    color = Palette.Text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                for (option in options) {
-                    Button(
-                        onClick = { onSelect(option.move) },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(contentColor = Palette.Text,
-                            containerColor = Palette.PanelHi),
-                    ) {
-                        Text(StudyPresentation.move(option.move, bb, zh), fontSize = 14.sp)
+            Column(Modifier.weight(1f).verticalScroll(answerScroll),
+                verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                if (!explanation) {
+                    Text(t("你会选择哪个行动？", "What would you do?"),
+                        color = Palette.Text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    for (option in options) {
+                        Button(
+                            onClick = { onSelect(option.move) },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(contentColor = Palette.Text,
+                                containerColor = Palette.PanelHi),
+                        ) {
+                            Text(StudyPresentation.move(option.move, bb, zh, view.legal.isOpeningBet), fontSize = 14.sp)
+                        }
                     }
-                }
-                Text(t("此题有 ", "Available answers: ") + options.size +
-                    t(" 个已建模的行动", " model-valued moves"), color = Palette.TextDim, fontSize = 11.sp)
-            } else {
-                val selected = requireNotNull(picked)
-                val score = d.grade(selected)
-                val best = d.best
-                Text(t("答案解析", "Answer explanation"),
-                    color = Palette.Gold, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text(if (score.exact) t("✓ 与模型首选一致", "✓ Matches model favourite")
-                     else t("△ 可进一步研究的行动", "△ Review this decision"),
-                    color = if (score.exact) Palette.Green else Palette.Gold,
-                    fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(t("你的选择：", "Your answer: ") + StudyPresentation.move(selected, bb, zh),
-                    color = Palette.Text, fontSize = 12.sp)
-                Text(t("模型首选：", "Model-favoured: ") + StudyPresentation.move(best.move, bb, zh),
-                    color = Palette.Text, fontSize = 12.sp)
-                Text(t("条件模型 EV 差距：", "Conditional model EV gap: ") +
-                    "%.2f".format(Locale.US, score.modelLossChips / bb) + " BB",
-                    color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                SolverReferencePanel(view, reference)
-                ExportSolverSpot(view)
-                HorizontalDivider(color = Palette.Line)
-                for (option in options.sortedByDescending { it.chips }) {
-                    Text(StudyPresentation.move(option.move, bb, zh) + "  ·  " +
-                        "%.2f".format(Locale.US, option.chips / bb) + " BB",
-                        color = if (option.move == best.move) Palette.Green else Palette.TextDim,
-                        fontSize = 12.sp)
-                }
-                TextButton(onClick = { showDetails = !showDetails }) {
-                    Text(if (showDetails) t("收起详情", "Hide details") else t("模型与牌谱详情", "Model and hand details"))
-                }
-                if (showDetails) {
-                    Text(t("牌谱 ID", "Hand ID") + " · " + item.record.id, color = Palette.TextDim, fontSize = 11.sp)
-                    for (note in item.notes) {
-                        Text(StudyPresentation.modelNote(note, zh), color = Palette.TextDim, fontSize = 11.sp)
+                    Text(t("此题有 ", "Available answers: ") + options.size +
+                        t(" 个已建模的行动", " model-valued moves"), color = Palette.TextDim, fontSize = 11.sp)
+                } else {
+                    val selected = requireNotNull(picked)
+                    val score = d.grade(selected)
+                    val best = d.best
+                    Text(t("答案解析", "Answer explanation"),
+                        color = Palette.Gold, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(if (score.exact) t("✓ 与模型首选一致", "✓ Matches model favourite")
+                         else t("△ 可进一步研究的行动", "△ Review this decision"),
+                        color = if (score.exact) Palette.Green else Palette.Gold,
+                        fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(t("你的选择：", "Your answer: ") + StudyPresentation.move(selected, bb, zh, view.legal.isOpeningBet),
+                        color = Palette.Text, fontSize = 12.sp)
+                    Text(t("模型首选：", "Model-favoured: ") + StudyPresentation.move(best.move, bb, zh, view.legal.isOpeningBet),
+                        color = Palette.Text, fontSize = 12.sp)
+                    Text(t("条件模型 EV 差距：", "Conditional model EV gap: ") +
+                        "%.2f".format(Locale.US, score.modelLossChips / bb) + " BB",
+                        color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    SolverReferencePanel(view, reference)
+                    ExportSolverSpot(view)
+                    HorizontalDivider(color = Palette.Line)
+                    for (option in options.sortedByDescending { it.chips }) {
+                        Text(StudyPresentation.move(option.move, bb, zh, view.legal.isOpeningBet) + "  ·  " +
+                            "%.2f".format(Locale.US, option.chips / bb) + " BB",
+                            color = if (option.move == best.move) Palette.Green else Palette.TextDim,
+                            fontSize = 12.sp)
                     }
+                    TextButton(onClick = { showDetails = !showDetails }) {
+                        Text(if (showDetails) t("收起详情", "Hide details") else t("模型与牌谱详情", "Model and hand details"))
+                    }
+                    if (showDetails) {
+                        Text(t("牌谱 ID", "Hand ID") + " · " + item.record.id, color = Palette.TextDim, fontSize = 11.sp)
+                        item.modelVersion?.let { Text(it, color = Palette.TextDim, fontSize = 11.sp) }
+                        for (note in item.notes) {
+                            Text(StudyPresentation.modelNote(note, zh), color = Palette.TextDim, fontSize = 11.sp)
+                        }
+                    }
+                    Text(t("这里比较的是模型假设下的 EV，并非真实盈亏或求解器 GTO。",
+                        "Model-assumption EV, not realised profit or verified solver GTO."),
+                        color = Palette.TextDim, fontSize = 11.sp)
                 }
-                Text(t("这里比较的是模型假设下的 EV，并非真实盈亏或求解器 GTO。",
-                    "Model-assumption EV, not realised profit or verified solver GTO."),
-                    color = Palette.TextDim, fontSize = 11.sp)
+            }
+            if (explanation) {
                 Button(onClick = onNext, modifier = Modifier.fillMaxWidth().height(44.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Palette.Gold,
                         contentColor = Palette.Ink)) {

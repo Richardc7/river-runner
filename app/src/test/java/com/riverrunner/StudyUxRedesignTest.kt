@@ -9,7 +9,6 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.riverrunner.engine.*
@@ -210,7 +209,7 @@ class StudyUxRedesignTest {
         compose.onNodeWithText("你会选择哪个行动？").assertExists()
         compose.onNodeWithText("弃牌").performClick()
         compose.onNodeWithText("答案解析").assertExists()
-        compose.onNodeWithText("保存练习记录 · 下一题 →").performScrollTo().performClick()
+        compose.onNodeWithText("保存练习记录 · 下一题 →").performClick()
         compose.runOnIdle { assertEquals(1, advanced) }
         compose.onNodeWithText("你会选择哪个行动？").assertExists()
     }

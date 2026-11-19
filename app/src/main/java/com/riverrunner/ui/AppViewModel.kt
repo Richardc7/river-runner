@@ -21,7 +21,9 @@ import com.riverrunner.i18n.ZH
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -45,6 +47,7 @@ sealed class Screen {
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     val prefs = Prefs(app)
     private val analysisRoot: File = app.filesDir
+    private val practiceStorage = Dispatchers.IO.limitedParallelism(1)
     private fun analysisStore(id: String = profile.id) = StrategyTraceStore(analysisRoot, id)
     suspend fun analysisFor(record: HandRecord): HandAnalysis? {
         val id = profile.id; val retained = history.all().map { it.id }.toSet()
@@ -68,41 +71,45 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val exercise = TrainingCurriculum.fromHistory(listOf(analysis)).firstOrNull {
                     it.id == "h" + record.id + "a" + trace.actionIndex
                 } ?: continue
-                out += TrainingItem(exercise, record, view, trace.baseline, trace.notes.toList())
+                out += TrainingItem(exercise, record, view, trace.baseline, trace.notes.toList(),
+                    "${analysis.algorithmVersion} / ${analysis.randomVersion}")
             }
         }
         out
     }
     /** Aggregates only fingerprint-matched historical hero decision-time records. */
     suspend fun studyAssessments(): List<DecisionAssessment> = withContext(Dispatchers.IO) {
-        val id = profile.id
-        val store = analysisStore(id)
-        val output = ArrayList<DecisionAssessment>()
-        for (record in history.all().takeLast(300)) {
-            val analysis = runCatching { store.load(record.id) }.getOrNull() ?: continue
-            val replay = Replayer(record)
-            val voluntary = record.actions.filter { !it.type.isPost }
-            for (trace in analysis.decisions) {
-                if (trace.seat != record.heroSeat) continue
-                val view = runCatching {
-                    ObservationFactory.forActor(replay.engineBeforeAction(trace.actionIndex), record.mode)
-                }.getOrNull() ?: continue
-                if (view.actorSeat != record.heroSeat || DecisionFingerprint.of(view) != trace.contextHash) continue
-                val assessed = runCatching {
-                    StudyCoach.assess(record.id, view, trace, voluntary.getOrNull(trace.actionIndex))
-                }.getOrNull() ?: continue
-                output += assessed
-            }
+        val store = analysisStore()
+        history.all().takeLast(300).flatMap { record ->
+            currentCoroutineContext().ensureActive()
+            assessmentsFor(record, store).toList()
         }
-        output
     }
 
-    suspend fun loadSpacedProgress(): ReviewProgress = withContext(Dispatchers.IO) {
+    suspend fun handsWithModelDeviations(records: List<HandRecord>): Set<Long> = withContext(Dispatchers.IO) {
+        val store = analysisStore()
+        buildSet {
+            for (record in records) {
+                currentCoroutineContext().ensureActive()
+                if (assessmentsFor(record, store).any { it.needsStudy }) add(record.id)
+            }
+        }
+    }
+
+    private fun assessmentsFor(record: HandRecord, store: StrategyTraceStore): Sequence<DecisionAssessment> = sequence {
+        val analysis = runCatching { store.load(record.id) }.getOrNull() ?: return@sequence
+        for ((view, trace, action) in historicalDecisions(record, analysis, Replayer(record))) {
+            val assessment = runCatching { StudyCoach.assess(record.id, view, trace, action) }.getOrNull() ?: continue
+            yield(assessment)
+        }
+    }
+
+    suspend fun loadSpacedProgress(): ReviewProgress = withContext(practiceStorage) {
         SpacedReviewStore(analysisRoot, profile.id).load()
     }
     fun saveSpacedProgress(value: ReviewProgress) {
         val id = profile.id
-        viewModelScope.launch(Dispatchers.IO) { SpacedReviewStore(analysisRoot, id).save(value) }
+        viewModelScope.launch(practiceStorage) { SpacedReviewStore(analysisRoot, id).save(value) }
     }
     suspend fun getStudyRecord(id: Long): HandRecord? = withContext(Dispatchers.IO) {
         history.all().firstOrNull { it.id == id }
@@ -111,12 +118,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { analysisStore().load(id) }.getOrNull()
     }
 
-    suspend fun loadTrainingProgress(): TrainingProgress = withContext(Dispatchers.IO) {
+    suspend fun loadTrainingProgress(): TrainingProgress = withContext(practiceStorage) {
         TrainingProgressStore(analysisRoot, profile.id).load()
     }
     fun saveTrainingProgress(progress: TrainingProgress) {
         val id = profile.id
-        viewModelScope.launch(Dispatchers.IO) { TrainingProgressStore(analysisRoot, id).save(progress) }
+        viewModelScope.launch(practiceStorage) { TrainingProgressStore(analysisRoot, id).save(progress) }
+    }
+    suspend fun resetPracticeProgress() {
+        val id = profile.id
+        withContext(practiceStorage) {
+            TrainingProgressStore(analysisRoot, id).save(TrainingProgress())
+            SpacedReviewStore(analysisRoot, id).save(ReviewProgress())
+        }
     }
     suspend fun referenceForTraining(): ReferenceBook? = withContext(Dispatchers.IO) {
         TrainingReferenceStore(analysisRoot, profile.id).load()
@@ -218,11 +232,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
-    fun openGuide() { record(mapOf(Progress.GUIDE_OPENED to 1L)); screen = Screen.Guide }
+    var guideTab = GuideTab.BASICS
+        private set
+    var guideReturnScreen: Screen = Screen.Home
+        private set
+    fun openGuide(tab: GuideTab = GuideTab.BASICS) {
+        record(mapOf(Progress.GUIDE_OPENED to 1L))
+        guideTab = tab
+        guideReturnScreen = screen
+        screen = Screen.Guide
+    }
     fun guideOpenedInGame() { record(mapOf(Progress.GUIDE_OPENED to 1L)) }
+    var historyReturnScreen: Screen = Screen.Home
+        private set
+    fun openHistory() {
+        historyReturnScreen = screen
+        screen = Screen.History
+    }
     fun openReplay(r: HandRecord, blind: Boolean = false) {
         record(mapOf(Progress.REPLAYS to 1L))
+        markHandReviewed(r.id)
         screen = Screen.Replay(r, blind && blindReviewEnabled)
+    }
+
+    private fun markHandReviewed(id: Long) {
+        val store = history
+        viewModelScope.launch(Dispatchers.IO) { runCatching { store.markReviewed(id) } }
     }
 
     val changelog: List<Changelog.Release> = runCatching {
@@ -299,13 +334,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         screen = Screen.Table; gameJob = viewModelScope.launch { runGame(s) }
     }
     fun playAgain() { val c = lastConfig ?: return; startGame(c.copy(seed = System.nanoTime())) }
-    fun heroAct(move: Move) { heroMove?.complete(move) }
+    fun heroAct(move: Move): Boolean {
+        val pending = heroMove ?: return false
+        return pending.isActive && pending.complete(move)
+    }
     fun continueToNextHand() { nextHandSignal?.complete(Unit) }
     fun continueFromReview() {
         if (!reviewing) return
         reviewing = false; screen = Screen.Table; nextHandSignal?.complete(Unit)
     }
-    fun requestQuit() { quitRequested = true; fastForward = true; heroMove?.complete(Move.FOLD); nextHandSignal?.complete(Unit) }
+    private var exitMoveIssued = false
+    fun requestQuit() {
+        quitRequested = true
+        fastForward = true
+        val pending = heroMove
+        if (pending?.isActive == true) {
+            exitMoveIssued = true
+            pending.complete(Move.FOLD)
+        }
+        nextHandSignal?.complete(Unit)
+    }
     private suspend fun pause(ms: Long) { if (!fastForward && ms > 0) delay(ms) }
     fun fmt(chips: Int, bb: Int): String = Format.amount(chips, bb, showInBB)
     private fun seatInfos(s: GameSession): List<SeatInfo> = s.players.map {
@@ -343,6 +391,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             topUpAvailable = false; liveStrategyHint = null
             val buyInsBefore = s.buyIns.size
             val e = s.startHand()
+            exitMoveIssued = false
             handKey = System.nanoTime(); actionSeq = 0; handNumber = s.handNumber + 1
             updateBlinds(s); log.clear(); handOver = null; starHand = false; lastRecordId = null
             heroInHand = true; fastForward = false; legal = null; practiceInfo = null; actingName = null
@@ -373,7 +422,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     Phase.BETTING -> {
                         val seat = e.toAct
                         if (seat == GameSession.HERO_SEAT) {
-                            if (quitRequested) { apply(e, s, Move.FOLD); continue }
+                            if (quitRequested) {
+                                exitMoveIssued = true
+                                apply(e, s, Move.FOLD)
+                                continue
+                            }
                             fastForward = false; actingName = null
                             withContext(Dispatchers.Default) { s.strategy.capture(e, s.tournamentContext()) }
                             liveStrategyHint = if (prefs.realtimeGto) withContext(Dispatchers.Default) {
@@ -395,7 +448,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                 if (la.toCall > 0) la.toCall.toDouble() / (la.pot + la.toCall) else 0.0,
                                 me.stack.toDouble() / maxOf(1, la.pot), TableMapper.handText(strings, me.hole, e.board))
                             legal = la; publish(s, e, TableMapper.Stage.LIVE); sound.play(Sound.TURN, 0.55f, varyPitch = false)
-                            val d = CompletableDeferred<Move>(); heroMove = d
+                            val d = CompletableDeferred<Move>()
+                            heroMove = d
+                            // Leaving during model computation can predate the pending move.
+                            if (quitRequested) {
+                                exitMoveIssued = true
+                                d.complete(Move.FOLD)
+                            }
                             val move = d.await(); heroMove = null; legal = null; practiceInfo = null; liveStrategyHint = null
                             apply(e, s, move); if (e.player(seat).folded) heroInHand = false
                         } else {
@@ -412,7 +471,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             legal = null; actingName = null; liveStrategyHint = null
             val infosBefore = seatInfos(s); val built = s.completeHand(e)
-            val rec = if (starHand) built.copy(favorite = true) else built
+            val lastHeroAction = built.actions.lastOrNull { it.seat == built.heroSeat && !it.type.isPost }
+            val rec = built.copy(favorite = starHand,
+                autoFoldedOnExit = exitMoveIssued && lastHeroAction?.type == ActionType.FOLD)
             val store = history; val traces = analysisStore(); val analysis = s.lastAnalysis
             val analysisSaved = withContext(Dispatchers.IO) {
                 store.add(rec)
@@ -441,7 +502,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             sessionOver = s.isOver; fastForward = false
             if (!quitRequested) {
                 val sig = CompletableDeferred<Unit>(); nextHandSignal = sig
-                if (reviewEachHand) { record(mapOf(Progress.REPLAYS to 1L)); reviewing = true; screen = Screen.Replay(rec) }
+                if (reviewEachHand) {
+                    record(mapOf(Progress.REPLAYS to 1L))
+                    markHandReviewed(rec.id)
+                    reviewing = true
+                    screen = Screen.Replay(rec)
+                }
                 sig.await(); nextHandSignal = null
             }
         }

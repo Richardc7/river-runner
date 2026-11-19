@@ -60,7 +60,7 @@ object TableMapper {
         ActionType.SMALL_BLIND -> "${st.smallBlindShort} ${fmt(a.amount)}"
         ActionType.BIG_BLIND -> "${st.bigBlindShort} ${fmt(a.amount)}"
         ActionType.ANTE -> "${st.ante} ${fmt(a.amount)}"
-        ActionType.STRADDLE -> "Straddle ${fmt(a.amount)}"
+        ActionType.STRADDLE -> "${StudyPresentation.actionType(a.type, st.isZh)} ${fmt(a.amount)}"
     }
     fun lastActions(e: HandEngine): Map<Int, Action> {
         val m = HashMap<Int, Action>()

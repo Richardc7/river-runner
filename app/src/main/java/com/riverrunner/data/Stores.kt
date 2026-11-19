@@ -57,6 +57,10 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("sound", true)
         set(v) = sp.edit().putBoolean("sound", v).apply()
 
+    var actionHaptics: Boolean
+        get() = sp.getBoolean("action_haptics", false)
+        set(v) = sp.edit().putBoolean("action_haptics", v).apply()
+
     var deckStyle: String
         get() = sp.getString("deck", "4") ?: "4"
         set(v) = sp.edit().putString("deck", v).apply()
@@ -301,15 +305,29 @@ class HistoryStore(private val file: File) {
     }
 
     @Synchronized fun clearNonFavorites() {
-        records.removeAll { !it.favorite }
-        rewrite()
+        val retained = records.filter { it.favorite }
+        if (!rewrite(retained)) throw java.io.IOException("Could not replace hand history")
+        records.retainAll { it.favorite }
+    }
+
+    @Synchronized fun markReviewed(id: Long) {
+        val i = records.indexOfFirst { it.id == id }
+        if (i < 0 || records[i].reviewed) return
+        val updated = records.toMutableList()
+        updated[i] = records[i].copy(reviewed = true)
+        if (rewrite(updated)) records[i] = updated[i]
     }
 
     @Synchronized fun count(): Int = records.size
 
-    private fun rewrite() {
+    private fun rewrite(hands: List<HandRecord> = records): Boolean {
         val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(records.joinToString("") { it.encode() + "\n" })
-        tmp.renameTo(file)
+        tmp.bufferedWriter().use { output ->
+            for (hand in hands) {
+                output.write(hand.encode())
+                output.newLine()
+            }
+        }
+        return tmp.renameTo(file)
     }
 }

@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.riverrunner.engine.Action
+import com.riverrunner.engine.ActionType
 import com.riverrunner.engine.Bot
 import com.riverrunner.engine.BotStyle
 import com.riverrunner.engine.Cards
@@ -47,6 +48,7 @@ import com.riverrunner.engine.HandRecord
 import com.riverrunner.engine.MoveType
 import com.riverrunner.engine.ReplayFrame
 import com.riverrunner.engine.Replayer
+import com.riverrunner.engine.Street
 import com.riverrunner.engine.strategy.PolicySnapshot
 import com.riverrunner.engine.strategy.StudyCoach
 import com.riverrunner.i18n.LocalStrings
@@ -209,7 +211,7 @@ fun ReplayContent(
 
     Row(Modifier.fillMaxSize().background(Palette.Bg)) {
         Box(Modifier.weight(1f).fillMaxHeight().padding(start = 4.dp, top = 4.dp, bottom = 2.dp)) {
-            PokerTable(table, fmt, st.pot, Modifier.fillMaxSize(), animateDeal = false)
+            PokerTable(table, fmt, st.pot, Modifier.fillMaxSize(), animateDeal = false, showTotalPot = !frame.isEnd)
         }
         Column(
             Modifier.width(240.dp).fillMaxHeight().background(Palette.Panel).padding(8.dp),
@@ -254,7 +256,9 @@ fun ReplayContent(
                 Column(Modifier.weight(.54f).fillMaxWidth().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     if (heroAction != null) {
-                        AnalysisCard(heroAction, wasHeroAction, policy, modelGap, fmt)
+                        val openingBet = savedDecision?.view?.legal?.isOpeningBet
+                            ?: (heroAction.type == ActionType.BET || heroAction.type == ActionType.CHECK && frame.street != Street.PREFLOP)
+                        AnalysisCard(heroAction, wasHeroAction, policy, modelGap, openingBet, fmt)
                     }
                     if (opponentAction != null && opponent != null) {
                         OpponentInsightCard(opponentAction, opponent, frame.board, st, fmt)
@@ -327,7 +331,7 @@ private fun OpponentInsightCard(
 
 @Composable
 private fun AnalysisCard(
-    heroAction: Action, decided: Boolean, policy: PolicySnapshot?, modelGapBB: Double?, fmt: (Int) -> String,
+    heroAction: Action, decided: Boolean, policy: PolicySnapshot?, modelGapBB: Double?, openingBet: Boolean, fmt: (Int) -> String,
 ) {
     val st = LocalStrings.current
     Column(
@@ -346,7 +350,7 @@ private fun AnalysisCard(
         val frequencies = MoveType.entries.mapNotNull { type -> dist[type]?.takeIf { it > 0 }?.let { type to it } }
         StrategyFrequencyBar(frequencies)
         for ((type, frequency) in frequencies) {
-            Text(StudyPresentation.moveType(type, st.isZh) + " " + Format.pct(frequency),
+            Text(StudyPresentation.moveType(type, st.isZh, openingBet) + " " + Format.pct(frequency),
                 color = strategyActionColor(type), fontSize = 11.sp)
         }
         val bets = policy.choices.filter { it.move.type == MoveType.RAISE && it.probability > 0 }
