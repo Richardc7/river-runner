@@ -76,6 +76,9 @@ object StudyPresentation {
             "RIVER facing bet" -> "河牌圈面对下注"
             "RIVER initiative" -> "河牌圈主动行动"
             "river-model" -> "河牌模型"
+            "turn-model" -> "转牌模型"
+            "flop-cbet-dry" -> "翻牌干燥面 C-Bet"
+            "flop-cbet-wet" -> "翻牌湿润面 C-Bet"
             else -> if (topic.startsWith("exploit-")) "剥削策略情景" else "决策训练情景"
         }
     }
@@ -109,6 +112,15 @@ object StudyPresentation {
                 val count = Regex(""";\s*(\d+)\s+unblocked combinations""").find(note)?.groupValues?.get(1)
                 "河牌模型按假设的对手范围枚举" + (count?.let { " $it 种有效手牌组合" } ?: "有效组合") + "；不代表已知对手底牌。"
             }
+            note.contains("turn runout enumeration conditional on") -> {
+                "转牌模型按主要加权组合枚举河牌发出后的权益与弃牌率；不代表已知对手底牌。"
+            }
+            note.contains("Board texture: dry") -> "翻牌质地：干燥面（C-Bet 弃牌率通常偏高）。"
+            note.contains("Board texture: wet") -> "翻牌质地：湿润面（听牌较多，C-Bet 弃牌率相对偏低）。"
+            normalized.contains("turn ev is coaching-only") ->
+                "转牌 EV 仅用于训练解释，按单街延续估算，不包含完整河牌树。"
+            normalized.contains("flop c-bet ev is coaching-only") ->
+                "翻牌 C-Bet EV 仅用于训练解释，综合估算弃牌权益与摊牌权益。"
             normalized.contains("cash heads-up postflop only") ->
                 "当前剥削模型仅支持单挑现金局的翻后情景；其他情况下保留基准策略。"
             normalized.contains("top model range") ->

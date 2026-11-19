@@ -32,25 +32,48 @@ class StrategySession(private val seed: Long, private val mode: GameMode, val co
         if (view.actionIndex in pending) return
         val advice = advise(engine, BotStyle.GTO, tournament)
         val snapshot = opponents.snapshots()
+        val candidateMoves = (advice.baseline.options + advice.policy.options).map { it.first }
+
         val river = if (view.street == Street.RIVER && view.mode == GameMode.CASH && view.opponents.size == 1) {
             val seat = view.opponents.single().seat
-            RiverEv.analyze(view, RangeModel.infer(view, seat, snapshot[seat]), snapshot[seat],
-                (advice.baseline.options + advice.policy.options).map { it.first })
+            RiverEv.analyze(view, RangeModel.infer(view, seat, snapshot[seat]), snapshot[seat], candidateMoves)
         } else null
+
+        val turnOrFlop = if (view.mode == GameMode.CASH && view.opponents.size == 1 && !view.cashRules.hasRake) {
+            val seat = view.opponents.single().seat
+            when (view.street) {
+                Street.TURN -> TurnEv.analyze(view, RangeModel.infer(view, seat, snapshot[seat]), snapshot[seat], candidateMoves)
+                Street.FLOP -> TurnEv.analyzeFlopCbet(view, RangeModel.infer(view, seat, snapshot[seat]), snapshot[seat], candidateMoves)
+                else -> null
+            }
+        } else null
+
+        val actionValues = when {
+            river != null && river.supported -> river.values
+            turnOrFlop != null && turnOrFlop.supported -> turnOrFlop.values
+            else -> emptyList()
+        }
+        val rangeClasses = river?.rangeClasses ?: turnOrFlop?.rangeClasses ?: emptyMap()
+
         val notes = buildList {
             if (advice.note.isNotBlank()) add(advice.note)
             if (river != null) {
                 addAll(river.assumptions)
                 if (river.supported) {
-                    add("Top model range classes: " + river.rangeClasses.entries.take(12).joinToString(", ") { "${it.key}: ${"%.1f".format(java.util.Locale.US, it.value * 100)}%" })
+                    add("Top model range classes: " + rangeClasses.entries.take(12).joinToString(", ") { "${it.key}: ${"%.1f".format(java.util.Locale.US, it.value * 100)}%" })
                     add("River EV is coaching-only in this version; it does not override the bounded live policy.")
+                }
+            } else if (turnOrFlop != null) {
+                addAll(turnOrFlop.assumptions)
+                if (turnOrFlop.supported && rangeClasses.isNotEmpty()) {
+                    add("Top model range classes: " + rangeClasses.entries.take(12).joinToString(", ") { "${it.key}: ${"%.1f".format(java.util.Locale.US, it.value * 100)}%" })
                 }
             }
         }
         pending[view.actionIndex] = DecisionTrace(view.actionIndex, view.actorSeat, view.street,
             DecisionFingerprint.of(view), PolicySnapshot.from(advice.baseline), PolicySnapshot.from(advice.policy),
             advice.status, advice.evidence.toList(), snapshot.values.sortedBy { it.seat },
-            actionValues = river?.values ?: emptyList(), notes = notes)
+            actionValues = actionValues, notes = notes)
     }
     fun capturedBaseline(engine: HandEngine): PolicySnapshot? {
         if (engine.phase != Phase.BETTING || engine.toAct != GameSession.HERO_SEAT) return null

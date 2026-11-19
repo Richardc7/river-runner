@@ -118,13 +118,12 @@ private fun RiverTrainingEmpty(vm: AppViewModel) {
             "Open Customize AI, opponents and rules, enable recording of decision evidence, and save.",
         ) to t("去开启记录", "Enable recording")
         config.cashRules.hasRake -> t(
-            "决策记录已开启。河牌题需要无抽水的筹码局，请在规则中将抽水设为 0 并保存。",
-            "Recording is on. River drills need an unraked cash game. Set rake to 0 in the rules and save.",
+            "决策记录已开启。专项题需要无抽水的筹码局，请在规则中将抽水设为 0 并保存。",
+            "Recording is on. Street drills need an unraked cash game. Set rake to 0 in the rules and save.",
         ) to t("前往规则设置", "Open rules")
         else -> t(
-            "已开启决策记录。开一桌无抽水的单挑筹码局，打完一手河牌再回来。面对下注或在有利位置行动，更容易生成题目。",
-            "Recording is on. Play an unraked heads-up cash hand through the river. Acting in position " +
-                "or facing a bet is more likely to yield a scored question. Return here after the hand is saved.",
+            "已开启决策记录。开一桌无抽水的单挑筹码局，打完翻牌 C-Bet、转牌或河牌后再回来，会自动生成对应题目。",
+            "Recording is on. Play an unraked heads-up cash hand through flop C-bet, turn or river spots to generate drills.",
         ) to t("配置单挑筹码局", "Set up heads-up cash")
     }
     Column(
@@ -133,7 +132,7 @@ private fun RiverTrainingEmpty(vm: AppViewModel) {
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(t("还没有河牌练习", "No river drills yet"), color = Palette.Text,
+        Text(t("还没有专项练习", "No drills yet"), color = Palette.Text,
             fontWeight = FontWeight.Bold, fontSize = 17.sp)
         Text(guidance, color = Palette.TextDim, fontSize = 13.sp, modifier = Modifier.widthIn(max = 490.dp))
         Button(onClick = {
@@ -197,8 +196,12 @@ internal fun DecisionQuestion(
                 "  ·  " + t("有效人数：", "Players: ") + view.seats.size,
                 color = Palette.Text, fontSize = 12.sp, lineHeight = 16.sp)
 
-            val scenario = if (toCall > 0) t("河牌面对下注", "facing a river bet")
-                else t("河牌可过牌或下注", "checking or betting the river")
+            val streetLabel = StudyPresentation.street(view.street, zh)
+            val scenario = when {
+                view.street == Street.FLOP -> t("翻牌 C-Bet 决策", "flop C-bet spot")
+                toCall > 0 -> t("${streetLabel}面对下注", "facing a bet on the ${streetLabel.lowercase(Locale.US)}")
+                else -> t("${streetLabel}可过牌或下注", "checking or betting on the ${streetLabel.lowercase(Locale.US)}")
+            }
             val attempts = categoryProgress?.attempts ?: 0
             Text(if (attempts == 0) t("选中这手：$scenario，你还没练过这类题。",
                 "Why this hand: $scenario, from a category you haven’t practised.")

@@ -29,11 +29,20 @@ object TrainingCurriculum {
     fun fromHistory(hands: Iterable<HandAnalysis>): List<TrainingDrill> =
         hands.flatMap { hand ->
             hand.decisions.mapNotNull { decision ->
-                if (decision.actionValues.size < 2) null else TrainingDrill(
-                    "h" + hand.handId + "a" + decision.actionIndex,
-                    if (decision.evidence.isEmpty()) "river-model" else "exploit-" + decision.evidence.first().code.name,
-                    decision.actionValues.toList()
-                )
+                if (decision.actionValues.size < 2) null else {
+                    val category = when {
+                        decision.evidence.isNotEmpty() -> "exploit-" + decision.evidence.first().code.name
+                        decision.street == Street.FLOP ->
+                            if (decision.notes.any { it.contains("Board texture: wet") }) "flop-cbet-wet" else "flop-cbet-dry"
+                        decision.street == Street.TURN -> "turn-model"
+                        else -> "river-model"
+                    }
+                    TrainingDrill(
+                        "h" + hand.handId + "a" + decision.actionIndex,
+                        category,
+                        decision.actionValues.toList(),
+                    )
+                }
             }
         }.distinctBy { it.id }.sortedBy { it.id }
     fun next(drills: List<TrainingDrill>, progress: TrainingProgress): TrainingDrill? {
