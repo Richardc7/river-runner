@@ -17,7 +17,10 @@ enum class DeckStyle(val code: String) {
     /** whole card face tinted by suit, white symbols */
     FOUR_COLOR_FILLED("F"),
     /** traditional red / black */
-    CLASSIC("2");
+    CLASSIC("2"),
+    CYBERPUNK("cyberpunk"),
+    WESTERN("western"),
+    TAROT("tarot");
 
     companion object { fun fromCode(c: String?) = entries.firstOrNull { it.code == c } ?: FOUR_COLOR }
 }

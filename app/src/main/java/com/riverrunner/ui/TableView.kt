@@ -49,16 +49,24 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -137,7 +145,7 @@ fun PokerTable(
         val heroIndex = t.seats.indexOfFirst { it.isHero }.coerceAtLeast(0)
         fun rel(i: Int) = (i - heroIndex + n) % n
 
-        Felt(g)
+        TableSurface(LocalTableStyle.current, Modifier.fillMaxSize())
 
         // board
         Row(
@@ -201,23 +209,41 @@ fun PokerTable(
 }
 
 @Composable
-private fun Felt(g: TableGeometry) {
-    Canvas(Modifier.fillMaxSize()) {
+internal fun TableSurface(style: TableStyle, modifier: Modifier, centerY: Float = .43f) {
+    val art = style.art?.let { ImageBitmap.imageResource(it) }
+    Canvas(modifier) {
         val d = density
-        val c = Offset(g.cx * d, g.cy * d)
-        val rx = g.w * 0.43f * d
-        val ry = g.h * 0.39f * d
-        val rail = 12f * d
-        drawOval(
-            Brush.verticalGradient(listOf(Palette.RailHi, Palette.Rail), startY = c.y - ry - rail, endY = c.y + ry + rail),
-            topLeft = Offset(c.x - rx - rail, c.y - ry - rail), size = Size((rx + rail) * 2, (ry + rail) * 2),
+        val c = Offset(size.width * .5f, size.height * centerY)
+        val rx = size.width * .43f
+        val ry = size.height * .39f
+        val rail = minOf(12f * d, size.height * .075f)
+        val outer = Rect(c.x - rx - rail, c.y - ry - rail, c.x + rx + rail, c.y + ry + rail)
+        val surface = Rect(c.x - rx, c.y - ry, c.x + rx, c.y + ry)
+        val railColors = if (art == null) listOf(Palette.RailHi, Palette.Rail) else listOf(
+            lerp(Palette.Ink, style.trim, .58f),
+            lerp(Palette.Ink, style.trim, .16f),
+            lerp(Palette.Ink, style.trim, .36f),
         )
         drawOval(
-            Brush.radialGradient(listOf(Palette.FeltCenter, Palette.FeltEdge), center = c, radius = rx * 1.05f),
-            topLeft = Offset(c.x - rx, c.y - ry), size = Size(rx * 2, ry * 2),
+            Brush.verticalGradient(railColors, startY = outer.top, endY = outer.bottom),
+            topLeft = outer.topLeft, size = outer.size,
         )
+        if (art == null) {
+            drawOval(
+                Brush.radialGradient(listOf(Palette.FeltCenter, Palette.FeltEdge), center = c, radius = rx * 1.05f),
+                topLeft = surface.topLeft, size = surface.size,
+            )
+        } else {
+            clipPath(Path().apply { addOval(surface) }) {
+                drawImage(art,
+                    dstOffset = IntOffset(surface.left.roundToInt(), surface.top.roundToInt()),
+                    dstSize = IntSize(surface.width.roundToInt(), surface.height.roundToInt()))
+            }
+            drawOval(style.trim.copy(alpha = .68f), surface.topLeft, surface.size, style = Stroke(1.5f * d))
+        }
         drawOval(
-            Color(0x1FFFFFFF), topLeft = Offset(c.x - rx * 0.80f, c.y - ry * 0.74f),
+            if (art == null) Color(0x1FFFFFFF) else style.trim.copy(alpha = .22f),
+            topLeft = Offset(c.x - rx * 0.80f, c.y - ry * 0.74f),
             size = Size(rx * 1.6f, ry * 1.48f), style = Stroke(1.5f * d),
         )
     }
@@ -227,9 +253,11 @@ private fun Felt(g: TableGeometry) {
 @Composable
 private fun BoardCard(card: Int?, width: Dp, delayMs: Int, dim: Boolean) {
     if (card == null) {
+        val theme = LocalTableStyle.current
+        val outline = if (theme == TableStyle.CLASSIC) Color(0x26FFFFFF) else theme.trim.copy(alpha = .4f)
         Box(
             Modifier.size(width, width * 1.4f).clip(RoundedCornerShape(width * 0.12f))
-                .background(Color(0x14000000)).border(1.dp, Color(0x26FFFFFF), RoundedCornerShape(width * 0.12f))
+                .background(Color(0x14000000)).border(1.dp, outline, RoundedCornerShape(width * 0.12f))
         )
         return
     }

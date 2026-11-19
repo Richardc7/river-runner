@@ -30,7 +30,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vm: AppViewModel = viewModel()
             val pageState = rememberSaveableStateHolder()
-            RiverTheme(vm.strings, vm.deckStyle) {
+            val appearance = vm.appearance
+            RiverTheme(vm.strings, appearance.face, appearance.back, appearance.table) {
                 Box(Modifier.fillMaxSize().background(Palette.Bg).windowInsetsPadding(WindowInsets.displayCutout)) {
                     when (val screen = vm.screen) {
                         Screen.Home -> HomeScreen(vm)
@@ -45,6 +46,7 @@ class MainActivity : ComponentActivity() {
                         is Screen.Replay -> EditionReplayScreen(vm, screen.record, screen.blind)
                         Screen.Stats -> StatsScreen(vm)
                         Screen.Settings -> SettingsScreen(vm)
+                        Screen.Appearance -> AppearanceScreen(vm)
                         Screen.EditionSettings -> EditionScreen(
                             vm.editionConfig, vm.prefs.chinese, vm::saveEdition, vm::closeEditionSettings
                         )

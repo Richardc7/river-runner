@@ -61,9 +61,17 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("action_haptics", false)
         set(v) = sp.edit().putBoolean("action_haptics", v).apply()
 
-    var deckStyle: String
+    val deckStyle: String
         get() = sp.getString("deck", "4") ?: "4"
-        set(v) = sp.edit().putString("deck", v).apply()
+    val cardBackStyle: String?
+        get() = sp.getString("card_back_style", null)
+    val tableStyle: String?
+        get() = sp.getString("table_style", null)
+
+    fun saveAppearance(face: String, back: String, table: String) {
+        sp.edit().putString("deck", face).putString("card_back_style", back)
+            .putString("table_style", table).apply()
+    }
 
     /** Newest changelog version the player has already seen in "What's new" ("" = never shown). */
     var seenChangelog: String
