@@ -47,8 +47,9 @@ class MainActivity : ComponentActivity() {
                         Screen.Stats -> StatsScreen(vm)
                         Screen.Settings -> SettingsScreen(vm)
                         Screen.Appearance -> AppearanceScreen(vm)
-                        Screen.EditionSettings -> EditionScreen(
-                            vm.editionConfig, vm.prefs.chinese, vm::saveEdition, vm::closeEditionSettings
+                        is Screen.EditionSettings -> EditionScreen(
+                            vm.editionConfig, vm.prefs.chinese, vm::saveEdition, vm::closeEditionSettings,
+                            showCashRules = screen.showCashRules,
                         )
                         Screen.Training -> TrainingScreen(vm, vm::closeTraining)
                         Screen.Guide -> GuideScreen(vm)

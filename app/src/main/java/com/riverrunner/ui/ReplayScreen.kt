@@ -392,10 +392,6 @@ private fun OpponentInsightCard(
         }
         Text(StudyPresentation.opponentReason(action, player.style, st.isZh),
             color = Palette.Text, fontSize = 14.sp, lineHeight = 20.sp)
-        Text(if (st.isZh)
-            "对手底牌只供赛后回看；上述可能原因来自行动与预设类型，并非 AI 当时的内部推理或真实 GTO 判断。"
-            else "A plausible explanation from the public action and preset, not a recorded internal bot rationale or verified GTO.",
-            color = Palette.TextDim, fontSize = 10.sp)
     }
 }
 

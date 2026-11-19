@@ -92,8 +92,7 @@ fun SpacedErrorCoach(vm: AppViewModel) {
                     if (choice == null) {
                         Text(t("这一步你会怎么选？", "What is your move?"),
                             color = Palette.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        Text(t("答完才显示模型偏好；这里只比较模型行为，不判定真实 GTO 正误。",
-                            "The model preference appears after answering; this is not verified GTO."),
+                        Text(t("答完后显示模型偏好。", "See the model preference after answering."),
                             color = Palette.TextDim, fontSize = 11.sp)
                         for ((index, type) in a.legalTypes.take(6).withIndex()) {
                             OutlinedButton(onClick = { choice = type }, modifier = Modifier.fillMaxWidth()

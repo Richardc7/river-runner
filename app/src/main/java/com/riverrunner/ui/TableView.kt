@@ -227,6 +227,12 @@ internal fun TableSurface(style: TableStyle, modifier: Modifier, centerY: Float 
             Brush.verticalGradient(railColors, startY = outer.top, endY = outer.bottom),
             topLeft = outer.topLeft, size = outer.size,
         )
+        val railBevel = outer.deflate(2f * d)
+        drawOval(
+            Brush.verticalGradient(listOf(style.trim.copy(alpha = .55f), Color.Transparent,
+                style.trim.copy(alpha = .24f)), startY = outer.top, endY = outer.bottom),
+            topLeft = railBevel.topLeft, size = railBevel.size, style = Stroke(1.3f * d),
+        )
         if (art == null) {
             drawOval(
                 Brush.radialGradient(listOf(Palette.FeltCenter, Palette.FeltEdge), center = c, radius = rx * 1.05f),
@@ -353,17 +359,23 @@ private fun DealerButton() {
 @Composable
 private fun PodFrame(s: SeatUi, pulse: Float, modifier: Modifier, content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) {
     val shape = RoundedCornerShape(12.dp)
+    val accent = LocalTableStyle.current.controlAccent
     val borderColor = when {
         s.won > 0 -> Palette.Gold
-        s.isActing -> Palette.Accent.copy(alpha = pulse)
-        else -> Color(0x33FFFFFF)
+        s.isActing -> accent.copy(alpha = .42f + pulse * .58f)
+        else -> accent.copy(alpha = .31f)
     }
     val borderW = if (s.isActing || s.won > 0) 2.dp else 1.dp
     Box(
         modifier
-            .shadow(if (s.isActing || s.won > 0) 10.dp else 3.dp, shape, ambientColor = if (s.won > 0) Palette.Gold else Palette.Accent, spotColor = if (s.won > 0) Palette.Gold else if (s.isActing) Palette.Accent else Color.Black)
+            .shadow(if (s.isActing || s.won > 0) 8.dp else 3.dp, shape,
+                ambientColor = if (s.won > 0) Palette.Gold else accent,
+                spotColor = if (s.won > 0) Palette.Gold else if (s.isActing) accent else Color.Black)
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(Color(0xF2223129), Color(0xF2141D18))))
+            .background(Brush.verticalGradient(listOf(
+                lerp(Palette.PanelHi, accent, if (s.isActing) .15f else .08f),
+                lerp(Palette.Bg, accent, .022f),
+            )))
             .border(borderW, borderColor, shape),
     ) { content() }
 }

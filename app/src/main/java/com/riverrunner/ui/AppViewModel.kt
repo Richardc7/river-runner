@@ -36,7 +36,7 @@ sealed class Screen {
     data object Stats : Screen()
     data object Settings : Screen()
     data object Appearance : Screen()
-    data object EditionSettings : Screen()
+    data class EditionSettings(val showCashRules: Boolean = false) : Screen()
     data object Training : Screen()
     data object Guide : Screen()
     data object Saves : Screen()
@@ -164,10 +164,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var editionReturnScreen: Screen = Screen.Home
     private var trainingReturnScreen: Screen = Screen.Home
 
-    fun openEditionSettings() {
-        if (screen == Screen.EditionSettings) return
+    fun openEditionSettings(showCashRules: Boolean = false) {
+        if (screen is Screen.EditionSettings) return
         editionReturnScreen = screen
-        screen = Screen.EditionSettings
+        screen = Screen.EditionSettings(showCashRules)
     }
     fun closeEditionSettings() { screen = editionReturnScreen }
 
@@ -334,7 +334,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startGame(config: SessionConfig) {
         gameJob?.cancel(); topUpAvailable = false; liveStrategyHint = null
-        val selected = config.copy(edition = editionConfig.copy(opponents = editionConfig.opponents.toMap()))
+        val selected = config.copy(
+            edition = editionConfig.copy(opponents = editionConfig.opponents.toMap()),
+            opponentNaming = OpponentNaming(prefs.chinese, prefs.opponentNamesFollowStyle),
+        )
         lastConfig = selected
         val s = GameSession(selected); session = s
         quitRequested = false; reviewing = false; starHand = false; lastRecordId = null

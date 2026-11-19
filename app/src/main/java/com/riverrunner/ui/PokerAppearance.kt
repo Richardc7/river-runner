@@ -11,6 +11,8 @@ enum class TableStyle(val code: String, @DrawableRes val art: Int?, val trim: Co
     WESTERN("western", R.drawable.table_western, Color(0xFFD89658)),
     TAROT("tarot", R.drawable.table_tarot, Color(0xFFE1BC6B));
 
+    val controlAccent: Color get() = if (this == CLASSIC) Palette.Gold else trim
+
     fun title(zh: Boolean) = when (this) {
         CLASSIC -> if (zh) "经典" else "Classic"
         CYBERPUNK -> if (zh) "赛博朋克" else "Cyberpunk"

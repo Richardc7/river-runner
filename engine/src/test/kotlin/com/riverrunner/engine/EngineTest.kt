@@ -1,5 +1,7 @@
 package com.riverrunner.engine
 
+import com.riverrunner.engine.strategy.EditionConfig
+import com.riverrunner.engine.strategy.OpponentPreset
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -333,6 +335,29 @@ class StatsTest {
 }
 
 class SessionTest {
+    @Test fun opponentNamesFollowLanguageAndOptionalStyleWithoutChangingTheDeal() {
+        val config = SessionConfig(
+            GameMode.CASH, 9, 100, TableType.MIXED, seed = 19,
+            edition = EditionConfig(opponents = mapOf(1 to OpponentPreset.LAG, 2 to OpponentPreset.LOOSE_PASSIVE)),
+        )
+        val english = GameSession(config)
+        val neutral = GameSession(config.copy(opponentNaming = OpponentNaming(chinese = true)))
+        val styled = GameSession(config.copy(opponentNaming = OpponentNaming(chinese = true, followsStyle = true)))
+        assertTrue(neutral.players.drop(1).all { player -> player.name.all { it in '\u4e00'..'\u9fff' } })
+        assertTrue(styled.players[1].name.endsWith("逐风"))
+        assertTrue(styled.players[2].name.endsWith("随舟"))
+        assertEquals(8, styled.players.drop(1).map { it.name }.distinct().size)
+        assertEquals(english.players.map { it.style }, styled.players.map { it.style })
+        assertEquals(english.buttonSeat, styled.buttonSeat)
+        assertEquals(english.startHand().players.map { it.hole.toList() }, styled.startHand().players.map { it.hole.toList() })
+        val baseline = GameSession(config.copy(
+            tableType = TableType.GTO,
+            edition = EditionConfig(),
+            opponentNaming = OpponentNaming(chinese = true, followsStyle = true),
+        ))
+        assertEquals(8, baseline.players.drop(1).map { it.name.drop(1) }.distinct().size)
+    }
+
     private fun playOut(cfg: SessionConfig, maxHands: Int): GameSession {
         val s = GameSession(cfg)
         val rnd = Random(cfg.seed)

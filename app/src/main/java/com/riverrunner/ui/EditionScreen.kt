@@ -24,9 +24,11 @@ import androidx.compose.ui.window.DialogProperties
 import com.riverrunner.engine.strategy.*
 
 @Composable
-fun EditionScreen(initial: EditionConfig, chinese: Boolean, onSave: (EditionConfig) -> Unit, onBack: () -> Unit) {
+fun EditionScreen(initial: EditionConfig, chinese: Boolean, onSave: (EditionConfig) -> Unit, onBack: () -> Unit,
+    showCashRules: Boolean = false,
+) {
     var config by remember(initial) { mutableStateOf(initial) }
-    var cashSelected by rememberSaveable { mutableStateOf(false) }
+    var cashSelected by rememberSaveable(showCashRules) { mutableStateOf(showCashRules) }
     var editingSeat by rememberSaveable { mutableStateOf<Int?>(null) }
     fun t(zh: String, en: String) = if (chinese) zh else en
 

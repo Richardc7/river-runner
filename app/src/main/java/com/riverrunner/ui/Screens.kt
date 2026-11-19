@@ -1,6 +1,7 @@
 package com.riverrunner.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import com.riverrunner.engine.Cards
 import com.riverrunner.data.Prefs
@@ -50,6 +51,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,13 +72,15 @@ import kotlinx.coroutines.launch
 fun HomeScreen(vm: AppViewModel) {
     val st = LocalStrings.current
     val p = vm.prefs
+    val style = LocalTableStyle.current
+    val accent = style.controlAccent
     Row(Modifier.fillMaxSize().background(Palette.Bg).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.width(270.dp).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text("River Runner", color = Palette.Text, fontSize = 30.sp, lineHeight = 30.sp, fontFamily = Numeric, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(10.dp))
                 Text("Exploit " + (vm.changelog.firstOrNull()?.version ?: "Edition"),
-                    color = Palette.Gold, fontSize = 12.sp, maxLines = 1,
+                    color = accent, fontSize = 12.sp, maxLines = 1,
                     modifier = Modifier.padding(bottom = 3.dp))
             }
             PlayerCard(vm.profile, vm.profileList.size, vm.maxSlots, onSwitch = { vm.screen = Screen.Saves }, modifier = Modifier.fillMaxWidth())
@@ -88,20 +94,30 @@ fun HomeScreen(vm: AppViewModel) {
             )
             tiles.chunked(3).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { (label, go) -> NavItem(label, Modifier.weight(1f), onClick = go) }
+                    row.forEach { (label, go) -> NavItem(label, accent, Modifier.weight(1f), onClick = go) }
                 }
             }
         }
-        // the "table" side of the lobby: the one place with felt
+        val lobbyShape = RoundedCornerShape(20.dp)
         Box(
-            Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(20.dp))
-                .background(Brush.radialGradient(listOf(Palette.FeltCenter, Palette.FeltEdge), radius = 900f))
-                .border(6.dp, Palette.Rail, RoundedCornerShape(20.dp))
-                .padding(18.dp),
+            Modifier.weight(1f).fillMaxHeight().clip(lobbyShape)
+                .background(Brush.horizontalGradient(listOf(Palette.Bg, Palette.FeltEdge))),
             contentAlignment = Alignment.Center,
         ) {
+            style.art?.let {
+                Image(painterResource(it), contentDescription = null, modifier = Modifier.matchParentSize(),
+                    contentScale = ContentScale.Crop)
+            }
+            Box(Modifier.matchParentSize()
+                .background(Brush.horizontalGradient(listOf(Palette.Bg.copy(alpha = .95f),
+                    Palette.Bg.copy(alpha = .78f), Palette.Bg.copy(alpha = .25f))))
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Palette.Bg.copy(alpha = .72f))))
+                .border(1.dp, accent.copy(alpha = .38f), lobbyShape))
+            Box(Modifier.matchParentSize().padding(5.dp)
+                .border(1.dp, accent.copy(alpha = .16f), RoundedCornerShape(15.dp)))
             Column(
-                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -123,7 +139,7 @@ fun HomeScreen(vm: AppViewModel) {
                             color = Palette.TextDim, fontSize = 11.sp, maxLines = 2)
                     }
                 }
-                ActionButton(st.startGame, Palette.Gold, textColor = Palette.Ink,
+                ActionButton(st.startGame, accent, textColor = Palette.Ink,
                     modifier = Modifier.fillMaxWidth().height(48.dp)) { vm.screen = Screen.Setup }
                 val summary = st.setupSummary(
                     p.lastMode == GameMode.TOURNAMENT, p.lastSize, p.lastStackBB,
@@ -138,8 +154,11 @@ fun HomeScreen(vm: AppViewModel) {
                         color = Palette.TextDim, fontSize = 11.sp, modifier = Modifier.weight(1f),
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
+                val trainingShape = RoundedCornerShape(12.dp)
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x66000000))
+                    Modifier.fillMaxWidth().clip(trainingShape)
+                        .background(Brush.horizontalGradient(listOf(lerp(Palette.Panel, accent, .1f), Palette.Bg)))
+                        .border(1.dp, accent.copy(alpha = .34f), trainingShape)
                         .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = vm::openTraining)
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -152,7 +171,7 @@ fun HomeScreen(vm: AppViewModel) {
                             else "Practise river decisions from your own hands",
                             color = Palette.TextDim, fontSize = 11.sp)
                     }
-                    Text("›", color = Palette.Gold, fontSize = 24.sp, lineHeight = 24.sp)
+                    Text("›", color = accent, fontSize = 24.sp, lineHeight = 24.sp)
                 }
             }
         }
@@ -165,10 +184,14 @@ private fun lastConfig(p: Prefs) = SessionConfig(
 )
 
 @Composable
-private fun NavItem(text: String, modifier: Modifier, onClick: () -> Unit) {
+private fun NavItem(text: String, accent: Color, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(10.dp)
     Box(
-        modifier.pressable(onClick = onClick).height(48.dp).clip(RoundedCornerShape(10.dp))
-            .background(Palette.Panel).padding(horizontal = 6.dp),
+        modifier.height(48.dp).clip(shape)
+            .background(Brush.verticalGradient(listOf(lerp(Palette.Panel, accent, .06f), Palette.Bg)))
+            .border(1.dp, accent.copy(alpha = .2f), shape)
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center,
     ) { Text(text, color = Palette.Text, fontSize = 14.sp, maxLines = 1) }
 }
@@ -184,7 +207,7 @@ fun SetupScreen(vm: AppViewModel, forTraining: Boolean = false) {
     SetupContent(
         initial = initial,
         onBack = onBack,
-        onCustomize = vm::openEditionSettings,
+        onCustomize = { vm.openEditionSettings() },
         selectedEdition = editionSummary(vm.editionConfig, vm.prefs.chinese),
         liveStrategyEnabled = vm.realtimeGtoEnabled,
         onLiveStrategyChange = { vm.setStudyToggle("live", it) },
@@ -251,8 +274,7 @@ fun SetupContent(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(if (st.isZh) "本局显示实时策略参考" else "Show live strategy during this game",
                                 color = Palette.Text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(if (st.isZh) "只在你行动时显示；默认是启发式模型，非已验证 GTO"
-                                else "Only on your turn; heuristic model, not verified GTO",
+                            Text(if (st.isZh) "在你行动时可查看" else "Available on your turn",
                                 color = Palette.TextDim, fontSize = 11.sp)
                         }
                         Switch(checked = liveStrategyEnabled, onCheckedChange = onLiveStrategyChange,
@@ -287,7 +309,7 @@ fun SetupContent(
             }
             if (onLiveStrategyChange != null) {
                 Text(if (liveStrategyEnabled) {
-                    if (st.isZh) "实时参考：开启（非已验证 GTO）" else "Live reference: ON (not verified GTO)"
+                    if (st.isZh) "实时参考：开启" else "Live reference: ON"
                 } else {
                     if (st.isZh) "实时参考：关闭" else "Live reference: OFF"
                 }, color = if (liveStrategyEnabled) Palette.Gold else Palette.TextDim, fontSize = 11.sp)
@@ -405,6 +427,7 @@ fun SettingsScreen(vm: AppViewModel) {
     var practice by remember { mutableStateOf(vm.prefs.practiceDefault) }
     var speed by remember { mutableIntStateOf(vm.prefs.speed) }
     var haptics by remember { mutableStateOf(vm.prefs.actionHaptics) }
+    var namesFollowStyle by remember { mutableStateOf(vm.prefs.opponentNamesFollowStyle) }
     var showAbout by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
     var resetting by remember { mutableStateOf(false) }
@@ -425,6 +448,14 @@ fun SettingsScreen(vm: AppViewModel) {
                 OptionRow(st.language) {
                     Pill("中文", st.isZh, { vm.setChinese(true) })
                     Pill("English", !st.isZh, { vm.setChinese(false) })
+                }
+                SettingsSwitch(
+                    if (st.isZh) "对手姓名随打法风格" else "Match opponent names to play style",
+                    if (st.isZh) "关闭时随机取名。更改从下一局生效。" else "Off uses random names. Changes apply to the next game.",
+                    namesFollowStyle,
+                ) {
+                    namesFollowStyle = it
+                    vm.prefs.opponentNamesFollowStyle = it
                 }
                 ActionButton(if (st.isZh) "牌桌与扑克牌外观  ›" else "Table and card appearance  ›", Palette.PanelHi,
                     modifier = Modifier.fillMaxWidth().height(46.dp)) { vm.screen = Screen.Appearance }
@@ -492,9 +523,10 @@ fun SettingsScreen(vm: AppViewModel) {
                 ToggleRow(if (st.isZh) "新牌局默认显示策略参考" else "Default live strategy reference in new games", vm.realtimeGtoEnabled) {
                     vm.setStudyToggle("live", it)
                 }
-                Text(if (st.isZh) "也可在「开始游戏」的牌局配置中选择开启或关闭。未匹配已验证的求解器数据时，只显示「启发式基准」；仅你的回合出现。"
-                    else "Choose ON/OFF directly in New Game as well. Without verified solver data, advice is heuristic only, shown on your turn.",
-                    color = Palette.TextDim, fontSize = 10.sp)
+                SectionTitle(if (st.isZh) "策略来源说明" else "Strategy sources")
+                Text(if (st.isZh) "启发式模型和剥削建议是训练参考，并非 GTO 求解结果。导入的求解器策略仅匹配对应场景，解法依赖求解时使用的范围和下注尺寸。"
+                    else "Heuristic and exploit suggestions are study references, not GTO solutions. Imported solver strategies match only their own scenarios and depend on the ranges and bet sizes used to solve them.",
+                    color = Palette.TextDim, fontSize = 12.sp, lineHeight = 17.sp)
                 ActionButton(if (st.isZh) "打开错题间隔训练" else "Open spaced training",
                     Palette.PanelHi, modifier = Modifier.fillMaxWidth().height(38.dp)) { vm.openTraining() }
                 SmallButton(st.whatsNew, { vm.showChangelog() })
