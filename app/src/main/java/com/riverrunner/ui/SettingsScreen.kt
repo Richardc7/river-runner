@@ -2,7 +2,10 @@ package com.riverrunner.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,10 +14,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -22,6 +27,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -29,15 +35,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.riverrunner.i18n.LocalStrings
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+
+private enum class SettingsSection { GENERAL, APPEARANCE, AI_COACH, DATA_ABOUT }
 
 @Composable
 fun SettingsScreen(vm: AppViewModel) {
@@ -52,23 +66,134 @@ fun SettingsScreen(vm: AppViewModel) {
     var confirmReset by remember { mutableStateOf(false) }
     var resetting by remember { mutableStateOf(false) }
     var resetStatus by remember { mutableStateOf<String?>(null) }
+    var activeSection by remember { mutableStateOf(SettingsSection.GENERAL) }
+    val scrollState = rememberScrollState()
+    val sectionOffsets = remember { mutableStateMapOf<SettingsSection, Int>() }
     val scope = rememberCoroutineScope()
-    Column(Modifier.fillMaxSize().background(Palette.Bg).padding(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallButton("← " + st.back, { vm.screen = Screen.Home })
-            Text(st.settings, color = Palette.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(
-                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Palette.Panel).padding(14.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                OptionRow(st.language) {
-                    Pill("中文", st.isZh, { vm.setChinese(true) })
-                    Pill("English", !st.isZh, { vm.setChinese(false) })
+
+    fun sectionLabel(s: SettingsSection): String = when (s) {
+        SettingsSection.GENERAL -> if (st.isZh) "常规与显示" else "General & Display"
+        SettingsSection.APPEARANCE -> if (st.isZh) "外观与反馈" else "Appearance & Audio"
+        SettingsSection.AI_COACH -> if (st.isZh) "AI 与复盘训练" else "AI & Coaching"
+        SettingsSection.DATA_ABOUT -> if (st.isZh) "备份与关于" else "Backup & About"
+    }
+
+    Row(
+        Modifier.fillMaxSize().background(Palette.Bg).padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Left modern sidebar navigation rail
+        Column(
+            Modifier.width(176.dp).fillMaxHeight()
+                .studioCard(radius = 16.dp)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SmallButton("←", { vm.screen = Screen.Home })
+                Text(st.settings, color = Palette.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(4.dp))
+            for (section in SettingsSection.entries) {
+                val selected = activeSection == section
+                val shape = RoundedCornerShape(10.dp)
+                Row(
+                    Modifier.fillMaxWidth().clip(shape)
+                        .background(
+                            if (selected) Brush.horizontalGradient(listOf(Palette.Gold.copy(alpha = 0.22f), Palette.PanelHi))
+                            else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
+                        )
+                        .then(if (selected) Modifier.border(1.dp, Palette.Gold.copy(alpha = 0.45f), shape) else Modifier)
+                        .clickable(role = Role.Tab) {
+                            activeSection = section
+                            sectionOffsets[section]?.let { y ->
+                                scope.launch { scrollState.animateScrollTo(y) }
+                            }
+                        }
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(
+                        Modifier.width(3.dp).height(16.dp).clip(RoundedCornerShape(2.dp))
+                            .background(if (selected) Palette.Gold else Color.Transparent)
+                    )
+                    Text(
+                        sectionLabel(section),
+                        color = if (selected) Palette.Text else Palette.TextDim,
+                        fontSize = 13.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1,
+                    )
                 }
+            }
+            Spacer(Modifier.weight(1f))
+            SmallButton(st.whatsNew, { vm.showChangelog() }, modifier = Modifier.fillMaxWidth())
+        }
+
+        // Right grouped frosted-glass cards canvas (all sections stay mounted for smooth jump & test compatibility)
+        Column(
+            Modifier.weight(1f).fillMaxHeight().verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // Section 1: General & Display
+            Column(
+                Modifier.fillMaxWidth()
+                    .onGloballyPositioned { sectionOffsets[SettingsSection.GENERAL] = it.positionInParent().y.roundToInt() }
+                    .studioCard(radius = 16.dp)
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SectionTitle(if (st.isZh) "常规与显示" else "GENERAL & DISPLAY")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(st.language, color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        StudioSegmentedBar(
+                            options = listOf(true to "中文", false to "English"),
+                            selected = st.isZh,
+                            onSelect = { vm.setChinese(it) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(if (st.isZh) "字号" else "Text size", color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        StudioSegmentedBar(
+                            options = listOf(100 to "100%", 110 to "110%", 120 to "120%"),
+                            selected = vm.textSizePercent,
+                            onSelect = { vm.setTextSize(it) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(st.speed, color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    StudioSegmentedBar(
+                        options = listOf(0 to st.slow, 1 to st.normal, 2 to st.fast),
+                        selected = speed,
+                        onSelect = { speed = it; vm.prefs.speed = it },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                HorizontalDivider(color = Palette.Line.copy(alpha = 0.45f))
+                ToggleRow(if (st.isZh) "高对比度" else "High contrast", vm.highContrast, vm::updateHighContrast)
+                ToggleRow(st.practiceDefault, practice) { practice = it; vm.prefs.practiceDefault = it }
+                ToggleRow(st.showInBB, vm.showInBB) { vm.setShowBB(it) }
+            }
+
+            // Section 2: Appearance & Audio
+            Column(
+                Modifier.fillMaxWidth()
+                    .onGloballyPositioned { sectionOffsets[SettingsSection.APPEARANCE] = it.positionInParent().y.roundToInt() }
+                    .studioCard(radius = 16.dp)
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SectionTitle(if (st.isZh) "外观与反馈" else "APPEARANCE & AUDIO")
+                ActionButton(
+                    if (st.isZh) "牌桌与扑克牌外观  ›" else "Table and card appearance  ›",
+                    Palette.PanelHi,
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                ) { vm.screen = Screen.Appearance }
                 SettingsSwitch(
                     if (st.isZh) "对手姓名随打法风格" else "Match opponent names to play style",
                     if (st.isZh) "关闭时随机取名。更改从下一局生效。" else "Off uses random names. Changes apply to the next game.",
@@ -77,76 +202,35 @@ fun SettingsScreen(vm: AppViewModel) {
                     namesFollowStyle = it
                     vm.prefs.opponentNamesFollowStyle = it
                 }
-                ActionButton(
-                    if (st.isZh) "牌桌与扑克牌外观  ›" else "Table and card appearance  ›", Palette.PanelHi,
-                    modifier = Modifier.fillMaxWidth().height(46.dp),
-                ) { vm.screen = Screen.Appearance }
-                OptionRow(if (st.isZh) "字号" else "Text size") {
-                    for (size in listOf(100, 110, 120)) {
-                        Pill("$size%", vm.textSizePercent == size, { vm.setTextSize(size) })
-                    }
-                }
-                ToggleRow(if (st.isZh) "高对比度" else "High contrast", vm.highContrast, vm::updateHighContrast)
-                OptionRow(st.speed) {
-                    Pill(st.slow, speed == 0, { speed = 0; vm.prefs.speed = 0 })
-                    Pill(st.normal, speed == 1, { speed = 1; vm.prefs.speed = 1 })
-                    Pill(st.fast, speed == 2, { speed = 2; vm.prefs.speed = 2 })
-                }
-                ToggleRow(st.practiceDefault, practice) { practice = it; vm.prefs.practiceDefault = it }
-                ToggleRow(st.showInBB, vm.showInBB) { vm.setShowBB(it) }
                 ToggleRow(st.sound, vm.soundOn) { vm.setSound(it) }
                 ToggleRow(if (st.isZh) "行动时震动反馈" else "Haptic feedback on actions", haptics) {
                     haptics = it
                     vm.prefs.actionHaptics = it
                 }
-                ActionButton(
-                    if (st.isZh) "管理牌谱与导出" else "Manage and export hands", Palette.PanelHi,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { vm.openHistory() }
-                TextButton(enabled = !resetting, onClick = { confirmReset = true }) {
-                    Text(if (st.isZh) "重置练习进度" else "Reset practice progress")
-                }
-                resetStatus?.let { Text(it, color = Palette.TextDim, fontSize = 12.sp) }
             }
+
+            // Section 3: AI & Coaching
             Column(
-                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp))
-                    .background(Palette.Panel).padding(14.dp).verticalScroll(rememberScrollState()),
+                Modifier.fillMaxWidth()
+                    .onGloballyPositioned { sectionOffsets[SettingsSection.AI_COACH] = it.positionInParent().y.roundToInt() }
+                    .studioCard(accent = Palette.Gold, radius = 16.dp, highlighted = true)
+                    .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SmallButton(if (st.isZh) "扑克术语表" else "Poker glossary", { vm.openGuide(GuideTab.GLOSSARY) })
-                    SmallButton(if (st.isZh) "关于与隐私" else "About & privacy", { showAbout = true })
-                }
-                ActionButton(
-                    if (st.isZh) "存档备份与恢复" else "Save backup and restore", Palette.PanelHi,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { showBackup = true }
-                SectionTitle(if (st.isZh) "EE 版" else "EE settings")
-                Text(
-                    if (st.isZh) "AI、对手、抽水与筹码设置已集成；保存后从新牌桌开始生效。" else
-                        "AI, opponents, rake and stacks are configurable. Saved settings apply to the next table.",
-                    color = Palette.TextDim, fontSize = 12.sp,
-                )
-                Text(editionSummary(vm.editionConfig, st.isZh), color = Palette.Gold, fontSize = 13.sp)
+                SectionTitle(if (st.isZh) "AI 与复盘训练" else "AI & COACHING")
+                Text(editionSummary(vm.editionConfig, st.isZh), color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 ActionButton(
                     if (st.isZh) "⚙ 自定义 AI、对手与私人局" else "⚙ Customize AI, opponents & cash",
-                    Palette.Gold, textColor = Palette.Ink, modifier = Modifier.fillMaxWidth().height(48.dp),
+                    Palette.Gold,
+                    textColor = Palette.Ink,
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
                 ) { vm.openEditionSettings() }
-                ActionButton(
-                    if (st.isZh) "专项训练中心" else "Training centre",
-                    Palette.PanelHi, modifier = Modifier.fillMaxWidth().height(42.dp),
-                ) { vm.openTraining() }
                 Text(
-                    if (st.isZh) "说明：默认是原版 AI；动态剥削需主动开启，且证据不足时会保留基准策略。" else
-                        "Default AI is Legacy. Enable Adaptive explicitly; sparse evidence retains the baseline.",
+                    if (st.isZh) "说明：默认是原版 AI；动态剥削需主动开启，且证据不足时会保留基准策略。"
+                    else "Default AI is Legacy. Enable Adaptive explicitly; sparse evidence retains the baseline.",
                     color = Palette.TextDim, fontSize = 11.sp,
                 )
-                SectionTitle(if (st.isZh) "复盘训练功能" else "Replay coach settings")
-                Text(
-                    if (st.isZh) "全部设置独立保存；只分析当时可见的信息。"
-                    else "Settings persist independently. No future cards or hidden opponent hands are used.",
-                    color = Palette.TextDim, fontSize = 11.sp,
-                )
+                HorizontalDivider(color = Palette.Line.copy(alpha = 0.45f))
                 ToggleRow(if (st.isZh) "1. 盲测复盘" else "1. Blind replay", vm.blindReviewEnabled) {
                     vm.setStudyToggle("blind", it)
                 }
@@ -165,24 +249,57 @@ fun SettingsScreen(vm: AppViewModel) {
                 ToggleRow(if (st.isZh) "新牌局默认显示策略参考" else "Default live strategy reference in new games", vm.realtimeGtoEnabled) {
                     vm.setStudyToggle("live", it)
                 }
-                SectionTitle(if (st.isZh) "策略来源说明" else "Strategy sources")
                 Text(
-                    if (st.isZh) "启发式模型和剥削建议是训练参考，并非 GTO 求解结果。导入的求解器策略仅匹配对应场景，解法依赖求解时使用的范围和下注尺寸。"
-                    else "Heuristic and exploit suggestions are study references, not GTO solutions. Imported solver strategies match only their own scenarios and depend on the ranges and bet sizes used to solve them.",
-                    color = Palette.TextDim, fontSize = 12.sp, lineHeight = 17.sp,
+                    if (st.isZh) "启发式模型和剥削建议是训练参考，并非 GTO 求解结果。导入的求解器策略仅匹配对应场景。"
+                    else "Heuristic and exploit suggestions are study references, not GTO solutions. Imported solver strategies match only their own scenarios.",
+                    color = Palette.TextDim, fontSize = 11.sp, lineHeight = 16.sp,
                 )
-                ActionButton(
-                    if (st.isZh) "打开错题间隔训练" else "Open spaced training",
-                    Palette.PanelHi, modifier = Modifier.fillMaxWidth().height(38.dp),
-                ) { vm.openTraining() }
-                SmallButton(st.whatsNew, { vm.showChangelog() })
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ActionButton(
+                        if (st.isZh) "专项训练中心" else "Training centre",
+                        Palette.PanelHi, modifier = Modifier.weight(1f).height(40.dp),
+                    ) { vm.openTraining() }
+                    ActionButton(
+                        if (st.isZh) "打开错题间隔训练" else "Open spaced training",
+                        Palette.PanelHi, modifier = Modifier.weight(1f).height(40.dp),
+                    ) { vm.openTraining() }
+                }
+            }
+
+            // Section 4: Backup & About
+            Column(
+                Modifier.fillMaxWidth()
+                    .onGloballyPositioned { sectionOffsets[SettingsSection.DATA_ABOUT] = it.positionInParent().y.roundToInt() }
+                    .studioCard(radius = 16.dp)
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SectionTitle(if (st.isZh) "备份、牌谱与关于" else "BACKUP, DATA & ABOUT")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ActionButton(
+                        if (st.isZh) "存档备份与恢复" else "Save backup and restore",
+                        Palette.PanelHi, modifier = Modifier.weight(1f).height(42.dp),
+                    ) { showBackup = true }
+                    ActionButton(
+                        if (st.isZh) "管理牌谱与导出" else "Manage and export hands",
+                        Palette.PanelHi, modifier = Modifier.weight(1f).height(42.dp),
+                    ) { vm.openHistory() }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    SmallButton(if (st.isZh) "扑克术语表" else "Poker glossary", { vm.openGuide(GuideTab.GLOSSARY) })
+                    SmallButton(if (st.isZh) "关于与隐私" else "About & privacy", { showAbout = true })
+                    Spacer(Modifier.weight(1f))
+                    TextButton(enabled = !resetting, onClick = { confirmReset = true }) {
+                        Text(if (st.isZh) "重置练习进度" else "Reset practice progress", color = Palette.Red)
+                    }
+                }
+                resetStatus?.let { Text(it, color = Palette.TextDim, fontSize = 12.sp) }
             }
         }
     }
+
     if (showBackup) SaveBackupDialog(vm) { showBackup = false }
-    if (showAbout) {
-        AboutDialog { showAbout = false }
-    }
+    if (showAbout) AboutDialog { showAbout = false }
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
@@ -264,10 +381,11 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = Palette.Text, fontSize = 13.sp, modifier = Modifier.weight(1f))
         Switch(
-            checked = checked, onCheckedChange = onChange,
+            checked = checked,
+            onCheckedChange = onChange,
             colors = SwitchDefaults.colors(
-                checkedTrackColor = Palette.AccentDim,
-                checkedThumbColor = Palette.Accent,
+                checkedTrackColor = Palette.FeltCenter,
+                checkedThumbColor = Palette.Gold,
                 uncheckedTrackColor = Palette.PanelHi2,
             ),
         )

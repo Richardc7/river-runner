@@ -161,8 +161,7 @@ fun PlayerCard(profile: Profile, slots: Int, maxSlots: Int, onSwitch: () -> Unit
     val unlocked = profile.unlocked.size
     val cashBB = profile.counter(Progress.CASH_PROFIT_CENTI_BB) / 100.0
     Column(
-        modifier.clip(RoundedCornerShape(16.dp)).background(Palette.Panel)
-            .border(1.dp, Palette.PanelHi2, RoundedCornerShape(16.dp)).padding(14.dp),
+        modifier.studioCard(radius = 16.dp).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

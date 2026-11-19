@@ -17,12 +17,13 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -44,9 +45,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -56,36 +59,36 @@ import androidx.compose.ui.unit.sp
 import com.riverrunner.engine.Cards
 
 /**
- * Colour tokens: classic green felt and brass. Gold marks money, the primary action and the
- * current selection; Green/Red are results and the call/fold actions. See DESIGN.md.
+ * Obsidian & Emerald Studio colour tokens: deep matte obsidian surfaces,
+ * muted studio emerald felt, and champagne-gold accents.
  */
 object Palette {
     internal var highContrast by mutableStateOf(false)
 
-    val Bg: Color get() = Color(if (highContrast) 0xFF000000 else 0xFF0C1310)
-    val Panel: Color get() = Color(if (highContrast) 0xFF0E1110 else 0xFF141E19)
-    val PanelHi: Color get() = Color(if (highContrast) 0xFF191E1B else 0xFF1E2A24)
-    val PanelHi2: Color get() = Color(if (highContrast) 0xFF323C37 else 0xFF2B3A32)
-    val Line: Color get() = Color(if (highContrast) 0xFF89968E else 0xFF465C4F)
-    val FeltCenter = Color(0xFF248354) // studio-lit casino green
-    val FeltMid = Color(0xFF165A39)
-    val FeltEdge = Color(0xFF0B3320)
-    val Rail = Color(0xFF241810)      // walnut
-    val RailHi = Color(0xFF563B27)
-    val Gold: Color get() = Color(if (highContrast) 0xFFFFD76D else 0xFFE6B54F)
-    val GoldDim = Color(0xFF6E5525)
+    val Bg: Color get() = Color(if (highContrast) 0xFF000000 else 0xFF0B0F14)
+    val Panel: Color get() = Color(if (highContrast) 0xFF0E1110 else 0xFF121820)
+    val PanelHi: Color get() = Color(if (highContrast) 0xFF191E1B else 0xFF1A222C)
+    val PanelHi2: Color get() = Color(if (highContrast) 0xFF323C37 else 0xFF26313F)
+    val Line: Color get() = Color(if (highContrast) 0xFF89968E else 0xFF2D3B49)
+    val FeltCenter = Color(0xFF1F6E49) // studio-lit deep emerald
+    val FeltMid = Color(0xFF134E34)
+    val FeltEdge = Color(0xFF0A2C1D)
+    val Rail = Color(0xFF221A14)      // dark smoked walnut
+    val RailHi = Color(0xFF4B3829)
+    val Gold: Color get() = Color(if (highContrast) 0xFFFFD76D else 0xFFE5BC66)
+    val GoldDim = Color(0xFF665126)
     val Accent get() = Gold                 // selection, your turn, primary action
     val AccentDim = GoldDim
-    val Text: Color get() = Color(if (highContrast) 0xFFFFFFFF else 0xFFEEF1EA)
-    val TextDim: Color get() = Color(if (highContrast) 0xFFD9E1DC else 0xFF9DAAA2)
-    val Red: Color get() = Color(if (highContrast) 0xFFFF837D else 0xFFF06A63)
-    val Green: Color get() = Color(if (highContrast) 0xFF70E5AA else 0xFF4FC88A)
-    val Blue: Color get() = Color(if (highContrast) 0xFF90C6FF else 0xFF5B9BE6)
+    val Text: Color get() = Color(if (highContrast) 0xFFFFFFFF else 0xFFF0F4F8)
+    val TextDim: Color get() = Color(if (highContrast) 0xFFD9E1DC else 0xFF93A3B3)
+    val Red: Color get() = Color(if (highContrast) 0xFFFF837D else 0xFFEC6B64)
+    val Green: Color get() = Color(if (highContrast) 0xFF70E5AA else 0xFF42C78A)
+    val Blue: Color get() = Color(if (highContrast) 0xFF90C6FF else 0xFF60A5FA)
     val FoldBtn = Color(0xFFA83A33)
     val CallBtn = Color(0xFF1F7A50)
     val RaiseBtn get() = Gold
     val AllInBtn = Color(0xFFA82C22)
-    val Ink = Color(0xFF0C1310)
+    val Ink = Color(0xFF0B0F14)
 }
 
 /** Condensed numerals for chip amounts and scores (Barlow Condensed, SIL OFL). */
@@ -98,6 +101,72 @@ private val SUIT_SYMBOL = charArrayOf('♣', '♦', '♥', '♠')
 
 fun rankText(card: Int): String = Cards.RANKS[Cards.rank(card)].let { if (it == 'T') "10" else it.toString() }
 fun suitText(card: Int): String = SUIT_SYMBOL[Cards.suit(card)].toString()
+
+/** Frosted dark-glass studio container used across Home, Setup, and Settings. */
+internal fun Modifier.studioCard(
+    accent: Color = Palette.Line,
+    radius: Dp = 16.dp,
+    highlighted: Boolean = false,
+): Modifier {
+    val shape = RoundedCornerShape(radius)
+    val topColor = if (highlighted) lerp(Palette.PanelHi, accent, 0.14f) else lerp(Palette.PanelHi, Palette.Panel, 0.45f)
+    val bottomColor = lerp(Palette.Panel, Palette.Bg, 0.35f)
+    val borderColor = if (highlighted) accent.copy(alpha = 0.55f) else accent.copy(alpha = 0.45f)
+    return this
+        .clip(shape)
+        .background(Brush.verticalGradient(listOf(topColor, bottomColor)))
+        .border(1.dp, borderColor, shape)
+}
+
+/** Unified segmented control bar for compact mutually-exclusive choices. */
+@Composable
+internal fun <T> StudioSegmentedBar(
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(10.dp)
+    Row(
+        modifier
+            .clip(shape)
+            .background(Palette.Bg.copy(alpha = 0.78f))
+            .border(1.dp, Palette.Line.copy(alpha = 0.6f), shape)
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        for ((value, label) in options) {
+            val active = value == selected
+            val pillShape = RoundedCornerShape(7.dp)
+            Box(
+                Modifier
+                    .weight(1f)
+                    .heightIn(min = 34.dp)
+                    .clip(pillShape)
+                    .background(
+                        if (active) Brush.verticalGradient(listOf(Palette.FeltCenter, Palette.FeltMid))
+                        else Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+                    )
+                    .then(
+                        if (active) Modifier.border(1.dp, Palette.Green.copy(alpha = 0.55f), pillShape)
+                        else Modifier
+                    )
+                    .clickable(role = Role.RadioButton) { onSelect(value) }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    color = if (active) Color.White else Palette.TextDim,
+                    fontSize = 12.sp,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+        }
+    }
+}
 
 /** Card face (or back when [card] is null). Height = 1.4 x width. */
 @Composable
@@ -250,14 +319,29 @@ fun Modifier.pressable(enabled: Boolean = true, onClick: () -> Unit): Modifier {
 
 @Composable
 fun Pill(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(10.dp)
     Box(
-        modifier.pressable(onClick = onClick).heightIn(min = 38.dp).clip(RoundedCornerShape(50))
-            .background(if (selected) Palette.Accent else Palette.PanelHi)
-            .border(1.dp, if (selected) Color.White.copy(alpha = 0.35f) else Palette.Line.copy(alpha = 0.4f), RoundedCornerShape(50))
-            .padding(horizontal = 14.dp, vertical = 6.dp),
+        modifier.pressable(onClick = onClick).heightIn(min = 38.dp).clip(shape)
+            .background(
+                if (selected) Brush.verticalGradient(listOf(Palette.FeltCenter, Palette.FeltMid))
+                else Brush.verticalGradient(listOf(Palette.PanelHi, Palette.Panel))
+            )
+            .border(
+                1.dp,
+                if (selected) Palette.Green.copy(alpha = 0.65f) else Palette.Line.copy(alpha = 0.55f),
+                shape,
+            )
+            .padding(horizontal = 13.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = if (selected) Palette.Ink else Palette.Text, maxLines = 1, softWrap = false, fontSize = 14.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+        Text(
+            text,
+            color = if (selected) Color.White else Palette.TextDim,
+            maxLines = 1,
+            softWrap = false,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
     }
 }
 
@@ -297,13 +381,13 @@ fun ActionButton(
     onClick: () -> Unit,
 ) {
     Box(
-        modifier.pressable(enabled, onClick).clip(RoundedCornerShape(10.dp))
+        modifier.pressable(enabled, onClick).clip(RoundedCornerShape(12.dp))
             .background(
                 if (enabled) Brush.verticalGradient(listOf(color.copy(alpha = 1f), lerpDark(color)))
                 else Brush.verticalGradient(listOf(color.copy(alpha = 0.3f), color.copy(alpha = 0.3f)))
             )
-            .border(1.dp, Color(0x45FFFFFF), RoundedCornerShape(10.dp))
-            .padding(horizontal = 4.dp, vertical = 2.dp),
+            .border(1.dp, Color(0x45FFFFFF), RoundedCornerShape(12.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -317,10 +401,11 @@ private fun lerpDark(c: Color) = Color(c.red * 0.72f, c.green * 0.72f, c.blue * 
 
 @Composable
 fun SmallButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, highlight: Boolean = false) {
+    val shape = RoundedCornerShape(10.dp)
     Box(
-        modifier.pressable(onClick = onClick).heightIn(min = 40.dp).widthIn(min = 40.dp).clip(RoundedCornerShape(8.dp))
+        modifier.pressable(onClick = onClick).heightIn(min = 38.dp).widthIn(min = 38.dp).clip(shape)
             .background(if (highlight) Palette.AccentDim else Palette.PanelHi)
-            .border(1.dp, Palette.Line.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+            .border(1.dp, if (highlight) Palette.Gold.copy(alpha = 0.6f) else Palette.Line.copy(alpha = 0.55f), shape)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -330,5 +415,12 @@ fun SmallButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier
 
 @Composable
 fun SectionTitle(text: String) {
-    Text(text, color = Palette.Text, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 6.dp))
+    Text(
+        text,
+        color = Palette.TextDim,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 0.8.sp,
+        modifier = Modifier.padding(bottom = 4.dp),
+    )
 }
