@@ -74,7 +74,7 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
             listOf(
                 t("决策答题", "Decision quiz"),
                 t("错题复习", "Spaced review"),
-                t("GTO 策略参考", "GTO strategy reference"),
+                t("求解器参考", "Solver reference"),
             ).forEachIndexed { index, title ->
                 FilterChip(selected = tab == index, onClick = { tab = index },
                     label = { Text(title, fontSize = 12.sp) })
@@ -270,9 +270,6 @@ internal fun DecisionQuestion(
                             Text(StudyPresentation.modelNote(note, zh), color = Palette.TextDim, fontSize = 11.sp)
                         }
                     }
-                    Text(t("这里比较的是模型假设下的 EV，并非真实盈亏或求解器 GTO。",
-                        "Model-assumption EV, not realised profit or verified solver GTO."),
-                        color = Palette.TextDim, fontSize = 11.sp)
                 }
             }
             if (explanation) {

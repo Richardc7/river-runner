@@ -378,7 +378,7 @@ private val TIPS_ZH = listOf(
     "4. 重视位置" to "同样的牌，在按钮位比在前位好打得多。位置差时少玩边缘牌。",
     "5. 不要爱上一对" to "顶对在多人底池、湿润牌面、对手大额加注时经常已经落后。对手很被动却突然加注，通常代表强牌。",
     "6. 针对对手调整" to "在混合桌：对跟注站少诈唬、多价值下注；对紧弱玩家多偷盲；对疯子用好牌让他来诈唬你。",
-    "7. 每局复盘" to "去\"牌局记录\"打开输得多的手牌，看每条街的胜率和 GTO 建议，标记\"偏离\"的地方就是要改进的地方。",
+    "7. 每局复盘" to "去\"牌局记录\"打开输得多的手牌，看每条街的胜率和模型参考，优先回看偏离较大的决策。",
     "8. 锦标赛：筹码短就推/弃" to "低于 15 个大盲时，宁可全下或弃牌，也不要小额加注后被迫弃牌。临近奖励圈时谨慎跟注别人的全下。",
 )
 
@@ -389,26 +389,26 @@ private val TIPS_EN = listOf(
     "4. Respect position" to "The same hand is much easier to play on the button. Play fewer marginal hands out of position.",
     "5. Don't marry one pair" to "Top pair is often behind in multi-way pots, on wet boards or against big raises. A passive player who suddenly raises usually has it.",
     "6. Adjust to opponents" to "On a mixed table: value-bet stations and bluff them less, steal blinds from nits, let maniacs bluff into your strong hands.",
-    "7. Review every session" to "Open your biggest losing hands in History. Check equity on each street and the GTO suggestion; every \"deviation\" is something to work on.",
+    "7. Review every session" to "Open your biggest losing hands in History. Check equity and the model reference on each street. Start with decisions that show a large deviation.",
     "8. Tournaments: short stack = push/fold" to "Below ~15 BB prefer all-in or fold over small raises you'll have to fold to a shove. Near the money, call all-ins carefully.",
 )
 
 private val APP_ZH = listOf(
     "模式" to "筹码局：盲注固定，NPC 输光离场，打到只剩一人或你退出时按筹码结算排名。锦标赛：每 N 手涨盲，后期加前注，奖励按名次分配，NPC 会考虑 ICM。注意：涨盲后所有人的筹码没有变，但用大盲(BB)衡量的数字会越来越小——这正是锦标赛逼大家行动的方式。",
-    "牌桌" to "GTO桌：所有 NPC 使用近似 GTO 策略，适合练习\"不被剥削\"。混合桌：随机分配紧凶、松凶、跟注站、紧弱、疯子、GTO 等风格，更像真实牌局，适合练习剥削。",
+    "牌桌" to "基准桌：对手默认采用基准策略。混合桌：随机分配紧凶、松凶、跟注站等打法。",
     "音效" to "牌桌右上角 🔊 可以随时静音，设置里也能关闭。快进时自动静音。",
     "练习模式" to "牌局中随时开关。打开后在你行动时显示底池、需跟注、底池赔率、所需胜率、SPR 和你当前的牌型，但不会显示胜率。",
     "本手结束" to "每手结束后会亮出摊牌玩家的底牌、高亮赢家的 5 张牌，并在右侧显示结果。点\"下一手\"才会继续。你弃牌后可以点\"快进本手\"。",
-    "复盘" to "\"牌局记录\"保存最近 1000 手，点开可以一步步回放，显示所有人底牌、每条街的胜率，并在你的每个决策点给出 GTO 建议和\"符合/偏离\"标记。点 ☆ 可以永久收藏。",
+    "复盘" to "\"牌局记录\"保存最近 1000 手，点开可以一步步回放，显示所有人底牌、每条街的胜率，并在你的每个决策点提供模型参考和偏离标记。点 ☆ 可以永久收藏。",
     "统计" to "VPIP、PFR、3-Bet、摊牌率、BB/100、各位置输赢以及生涯成绩。",
 )
 
 private val APP_EN = listOf(
     "Modes" to "Cash: blinds stay fixed; busted bots leave; play until one player remains or you leave, standings by chips. Tournament: blinds rise every N hands, antes later, prizes by finishing place, bots use ICM. When blinds rise nobody loses chips, but stacks measured in big blinds (BB) shrink — that pressure is how tournaments force action.",
-    "Tables" to "GTO table: every bot plays approximate GTO — practice not being exploited. Mixed table: random TAG, LAG, station, nit, maniac and GTO bots — closer to a real game, practice exploiting.",
+    "Tables" to "Baseline table: opponents use the baseline policy by default. Mixed table: opponents are assigned styles such as TAG, LAG and calling station.",
     "Sound" to "Tap 🔊 at the top right of the table to mute; also in Settings. Sounds are muted while skipping.",
     "Practice mode" to "Toggle any time. On your turn it shows pot, amount to call, pot odds, equity needed, SPR and your current hand — never your equity.",
     "End of a hand" to "Showdown hands are revealed, the winning five cards are highlighted and the result is shown on the right. Nothing continues until you tap \"Next hand\". After folding you can tap \"Skip hand\".",
-    "Replay" to "History keeps the last 1000 hands. Step through any of them with every hole card shown, equity per street, and a GTO suggestion with an \"in line / deviation\" flag for each of your decisions. Tap ☆ to keep a hand forever.",
+    "Replay" to "History keeps the last 1000 hands. Step through any of them with every hole card shown, equity per street, and a model reference and any deviation flag for each of your decisions. Tap ☆ to keep a hand forever.",
     "Stats" to "VPIP, PFR, 3-Bet, showdown stats, BB/100, results by position and career totals.",
 )

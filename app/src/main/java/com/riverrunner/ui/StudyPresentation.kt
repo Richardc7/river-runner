@@ -98,6 +98,9 @@ object StudyPresentation {
     /** Translate known persisted engine explanations; never silently emit English in Chinese mode. */
     fun modelNote(note: String, zh: Boolean): String {
         if (!zh) return note
+            .replace("not knowledge of the opponent's cards or verified GTO", "not knowledge of the opponent's cards")
+            .replace("; not solver GTO", "")
+            .replace(", NOT solver GTO, verified EV, or historical profit", "")
         val normalized = note.lowercase(Locale.ROOT)
         return when {
             note.startsWith("Top model range classes: ") ->
@@ -111,7 +114,7 @@ object StudyPresentation {
             normalized.contains("top model range") ->
                 "展示的是模型估计的范围，而非对手真实手牌。"
             normalized.contains("range is a modelling assumption") ->
-                "对手手牌范围只是模型假设，并非实际底牌，也不是经过验证的 GTO。"
+                "对手范围由模型根据当时信息估计。"
             normalized.contains("re-raise") && normalized.contains("terminal") ->
                 "下注或加注 EV 假设面对再加注时弃牌；只计算直接结束的过牌或跟注分支。"
             normalized.contains("bounds vary response parameters") ->
@@ -127,7 +130,7 @@ object StudyPresentation {
             normalized.contains("unblocked combination") ->
                 "排除已知公共牌及自己的手牌后，模型没有剩余的有效对手手牌组合。"
             normalized.contains("range") && normalized.contains("strength") ->
-                "这是基于对手范围强弱与响应假设的条件敏感性分析，并非求解器 GTO。"
+                "根据假设的对手范围和响应，比较行动 EV 的变化。"
             normalized.contains("stack cap") ->
                 "筹码调整仅改变当前节点可投入的上限，不重新模拟之前的下注历史。"
             normalized.contains("bet") && normalized.contains("supported") ->
@@ -135,7 +138,7 @@ object StudyPresentation {
             normalized.contains("short-stack push-width") ->
                 "短筹码全下范围属于启发式估计，并非求解范围表；还应考虑对手范围与 ICM。"
             normalized.contains("rfi heuristic") ->
-                "率先入池范围根据后位人数调整，仅为启发式参考，并非真实 GTO 求解结果。"
+                "模型按尚未行动的人数调整率先入池范围。"
             normalized.contains("facing a raise:") ->
                 "面对加注时通常需要收紧继续范围；此图只是范围宽度示意，并非完整求解策略。"
             else -> "此条历史模型说明暂无可靠的中文对应描述，已隐藏英文原文。"
@@ -158,8 +161,7 @@ object StudyPresentation {
                 "This forced blind or ante is not a voluntary strategic decision."
         }
         val styleHint = when (style) {
-            BotStyle.GTO -> if (zh) "基准型模拟对手使用启发式近似，并非真实求解器 GTO。" else
-                "The baseline bot uses a heuristic approximation, not solved GTO."
+            BotStyle.GTO -> ""
             BotStyle.TAG -> if (zh) "紧凶预设偏向较窄入池范围与主动价值下注。" else
                 "The tight-aggressive preset tends towards narrower entries and aggressive value play."
             BotStyle.LAG -> if (zh) "松凶预设入池更宽，也倾向更频繁主动施压。" else
@@ -171,6 +173,6 @@ object StudyPresentation {
             BotStyle.MANIAC -> if (zh) "激进预设会更频繁下注或加注，不能直接把攻击解释为强牌。" else
                 "The aggressive preset bets and raises frequently; an aggressive action need not mean strength."
         }
-        return "$move $styleHint"
+        return listOf(move, styleHint).filter(String::isNotBlank).joinToString(" ")
     }
 }

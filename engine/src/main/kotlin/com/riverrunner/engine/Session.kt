@@ -5,7 +5,8 @@ import com.riverrunner.engine.strategy.*
 enum class GameMode(val code: String) { CASH("C"), TOURNAMENT("T"); companion object { fun fromCode(c: String) = entries.first { it.code == c } } }
 enum class TableType { GTO, MIXED }
 data class SessionConfig(val mode: GameMode, val tableSize: Int, val startingBB: Int, val tableType: TableType,
-    val handsPerLevel: Int = 10, val cashAnteFraction: Double = 0.0, val seed: Long = System.nanoTime(), val edition: EditionConfig = EditionConfig())
+    val handsPerLevel: Int = 10, val cashAnteFraction: Double = 0.0, val seed: Long = System.nanoTime(),
+    val edition: EditionConfig = EditionConfig(), val opponentNaming: OpponentNaming = OpponentNaming())
 data class BlindLevel(val level: Int, val smallBlind: Int, val bigBlind: Int, val ante: Int)
 class SessionPlayer(val seat: Int, val name: String, val style: BotStyle, val isHuman: Boolean, var stack: Int) {
     val startStack = stack
@@ -50,7 +51,6 @@ class GameSession(val config: SessionConfig) {
     companion object {
         const val HERO_SEAT = 0
         const val BASE_BB = 100
-        private val BOT_NAMES = listOf("Ace", "Blaze", "Cobra", "Dune", "Echo", "Flint", "Ghost", "Hawk", "Iris", "Jade", "Koda", "Luna", "Maverick", "Nova", "Onyx", "Pike")
         private val MIXED_POOL = listOf(BotStyle.GTO, BotStyle.GTO, BotStyle.TAG, BotStyle.LAG, BotStyle.STATION, BotStyle.NIT, BotStyle.MANIAC)
         private val BB_SCHEDULE = intArrayOf(100, 150, 200, 300, 400, 500, 600, 800, 1000, 1200, 1500, 2000, 2500, 3000, 4000, 5000, 6000, 8000, 10000, 12000, 15000, 20000)
         fun levelFor(index: Int): BlindLevel {
@@ -62,13 +62,21 @@ class GameSession(val config: SessionConfig) {
     init {
         require(config.tableSize in 2..9 && config.startingBB in 1..10000)
         require(config.cashAnteFraction.isFinite() && config.cashAnteFraction in 0.0..10.0)
-        val names = BOT_NAMES.shuffled(random)
+        val names = config.opponentNaming.shuffle(random)
+        val occurrences = mutableMapOf<OpponentPreset, Int>()
         players = List(config.tableSize) { i ->
             val start = targetStackBB(i) * BASE_BB
             if (i == HERO_SEAT) SessionPlayer(i, "You", BotStyle.GTO, true, start)
             else {
                 val style = if (config.tableType == TableType.GTO) BotStyle.GTO else MIXED_POOL[random.nextInt(MIXED_POOL.size)]
-                SessionPlayer(i, names[i - 1], config.edition.opponents[i]?.legacyStyle ?: style, false, start)
+                val override = config.edition.opponents[i]
+                val name = if (config.opponentNaming.followsStyle) {
+                    val preset = override ?: OpponentPreset.entries.first { it.legacyStyle == style }
+                    val occurrence = occurrences.getOrDefault(preset, 0) + 1
+                    occurrences[preset] = occurrence
+                    config.opponentNaming.styledName(names[i - 1], preset, occurrence)
+                } else names[i - 1]
+                SessionPlayer(i, name, override?.legacyStyle ?: style, false, start)
             }
         }
         buttonSeat = random.nextInt(config.tableSize)

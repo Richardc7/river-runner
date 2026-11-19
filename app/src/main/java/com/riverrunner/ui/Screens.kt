@@ -251,8 +251,7 @@ fun SetupContent(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(if (st.isZh) "本局显示实时策略参考" else "Show live strategy during this game",
                                 color = Palette.Text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(if (st.isZh) "只在你行动时显示；默认是启发式模型，非已验证 GTO"
-                                else "Only on your turn; heuristic model, not verified GTO",
+                            Text(if (st.isZh) "在你行动时可查看" else "Available on your turn",
                                 color = Palette.TextDim, fontSize = 11.sp)
                         }
                         Switch(checked = liveStrategyEnabled, onCheckedChange = onLiveStrategyChange,
@@ -287,7 +286,7 @@ fun SetupContent(
             }
             if (onLiveStrategyChange != null) {
                 Text(if (liveStrategyEnabled) {
-                    if (st.isZh) "实时参考：开启（非已验证 GTO）" else "Live reference: ON (not verified GTO)"
+                    if (st.isZh) "实时参考：开启" else "Live reference: ON"
                 } else {
                     if (st.isZh) "实时参考：关闭" else "Live reference: OFF"
                 }, color = if (liveStrategyEnabled) Palette.Gold else Palette.TextDim, fontSize = 11.sp)
@@ -405,6 +404,7 @@ fun SettingsScreen(vm: AppViewModel) {
     var practice by remember { mutableStateOf(vm.prefs.practiceDefault) }
     var speed by remember { mutableIntStateOf(vm.prefs.speed) }
     var haptics by remember { mutableStateOf(vm.prefs.actionHaptics) }
+    var namesFollowStyle by remember { mutableStateOf(vm.prefs.opponentNamesFollowStyle) }
     var showAbout by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
     var resetting by remember { mutableStateOf(false) }
@@ -425,6 +425,14 @@ fun SettingsScreen(vm: AppViewModel) {
                 OptionRow(st.language) {
                     Pill("中文", st.isZh, { vm.setChinese(true) })
                     Pill("English", !st.isZh, { vm.setChinese(false) })
+                }
+                SettingsSwitch(
+                    if (st.isZh) "对手姓名随打法风格" else "Match opponent names to play style",
+                    if (st.isZh) "关闭时随机取名。更改从下一局生效。" else "Off uses random names. Changes apply to the next game.",
+                    namesFollowStyle,
+                ) {
+                    namesFollowStyle = it
+                    vm.prefs.opponentNamesFollowStyle = it
                 }
                 ActionButton(if (st.isZh) "牌桌与扑克牌外观  ›" else "Table and card appearance  ›", Palette.PanelHi,
                     modifier = Modifier.fillMaxWidth().height(46.dp)) { vm.screen = Screen.Appearance }
@@ -492,9 +500,10 @@ fun SettingsScreen(vm: AppViewModel) {
                 ToggleRow(if (st.isZh) "新牌局默认显示策略参考" else "Default live strategy reference in new games", vm.realtimeGtoEnabled) {
                     vm.setStudyToggle("live", it)
                 }
-                Text(if (st.isZh) "也可在「开始游戏」的牌局配置中选择开启或关闭。未匹配已验证的求解器数据时，只显示「启发式基准」；仅你的回合出现。"
-                    else "Choose ON/OFF directly in New Game as well. Without verified solver data, advice is heuristic only, shown on your turn.",
-                    color = Palette.TextDim, fontSize = 10.sp)
+                SectionTitle(if (st.isZh) "策略来源说明" else "Strategy sources")
+                Text(if (st.isZh) "启发式模型和剥削建议是训练参考，并非 GTO 求解结果。导入的求解器策略仅匹配对应场景，解法依赖求解时使用的范围和下注尺寸。"
+                    else "Heuristic and exploit suggestions are study references, not GTO solutions. Imported solver strategies match only their own scenarios and depend on the ranges and bet sizes used to solve them.",
+                    color = Palette.TextDim, fontSize = 12.sp, lineHeight = 17.sp)
                 ActionButton(if (st.isZh) "打开错题间隔训练" else "Open spaced training",
                     Palette.PanelHi, modifier = Modifier.fillMaxWidth().height(38.dp)) { vm.openTraining() }
                 SmallButton(st.whatsNew, { vm.showChangelog() })

@@ -81,7 +81,6 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                 else if (data == null) Text(if (zh) "\u6b64\u624b\u6ca1\u6709\u51b3\u7b56\u5f53\u65f6\u7684\u8bc1\u636e\u8bb0\u5f55\u3002\u65e7\u724c\u8c31\u4ecd\u53ef\u6b63\u5e38\u56de\u653e\uff0c\u4e0d\u4f1a\u4f2a\u9020\u5265\u524a\u5efa\u8bae\u3002" else "No contemporaneous evidence was saved for this hand. Legacy replay remains available; retrospective exploit advice is not fabricated.", color = Palette.Text)
                 else {
                     Text("${data.algorithmVersion} / ${data.randomVersion}", color = Palette.TextDim)
-                    Text(if (zh) "\u57fa\u51c6\u4e0e\u5265\u524a\u5747\u4e3a\u6a21\u578b\u5efa\u8bae\uff0c\u975e\u7ecf\u9a8c\u8bc1\u7684 GTO \u6216\u4fdd\u8bc1\u6536\u76ca\u3002\u8bc1\u636e\u6743\u91cd\u4e0d\u662f\u5efa\u8bae\u6b63\u786e\u7684\u6982\u7387\u3002" else "Heuristic baseline and exploit recommendations, not verified GTO or guaranteed profit. Evidence weight is not the probability that advice is correct.", color = Palette.TextDim)
                     for (trace in data.decisions) {
                         val view = remember(record.id, trace.actionIndex) { runCatching {
                             ObservationFactory.forActor(replayer.engineBeforeAction(trace.actionIndex), record.mode)

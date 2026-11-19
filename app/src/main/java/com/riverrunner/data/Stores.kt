@@ -20,6 +20,10 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("zh", Locale.getDefault().language == "zh")
         set(v) = sp.edit().putBoolean("zh", v).apply()
 
+    var opponentNamesFollowStyle: Boolean
+        get() = sp.getBoolean("opponent_names_follow_style", false)
+        set(v) = sp.edit().putBoolean("opponent_names_follow_style", v).apply()
+
     var practiceDefault: Boolean
         get() = sp.getBoolean("practice", true)
         set(v) = sp.edit().putBoolean("practice", v).apply()

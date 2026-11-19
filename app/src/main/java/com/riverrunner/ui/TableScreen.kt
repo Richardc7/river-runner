@@ -22,6 +22,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,7 +30,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,12 +37,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,6 +68,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -80,10 +80,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.riverrunner.engine.Cards
 import com.riverrunner.engine.LegalActions
 import com.riverrunner.engine.Move
-import com.riverrunner.engine.strategy.PolicyChoice
 import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.i18n.Strings
-import java.util.Locale
 import kotlin.math.roundToInt
 
 /** Live game screen, wired to the view model. */
@@ -150,123 +148,144 @@ fun TableContent(
     LaunchedEffect(turnKey) {
         if (turnKey != null) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
     }
-    Row(Modifier.fillMaxSize().background(Palette.Bg)) {
-        Box(Modifier.weight(1f).fillMaxHeight().padding(start = 4.dp, top = 4.dp, bottom = 2.dp)) {
-            val t = ui.table
-            if (t != null) PokerTable(t, fmt, st.pot, Modifier.fillMaxSize(), animateDeal = animate, showTotalPot = true)
-            androidx.compose.animation.AnimatedVisibility(
-                ui.notice != null,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 64.dp),
-                enter = androidx.compose.animation.slideInVertically { -it } + fadeIn(),
-                exit = fadeOut(tween(400)),
-            ) {
-                Text(
-                    ui.notice ?: "", color = Palette.Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 18.sp,
-                    modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Palette.Gold)
-                        .border(2.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                )
+    BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Bg)) {
+        val sideWidth = (maxWidth * .28f).coerceIn(202.dp, 270.dp)
+        Column(Modifier.fillMaxSize()) {
+            TableToolbar(ui, onPractice, onReview, onSound, onStar, onHelp, onExit)
+            Row(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 5.dp)) {
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        val table = ui.table
+                        if (table != null) {
+                            PokerTable(table, fmt, st.pot, Modifier.fillMaxSize(),
+                                animateDeal = animate, showTotalPot = true)
+                        }
+                        androidx.compose.animation.AnimatedVisibility(
+                            ui.notice != null,
+                            modifier = Modifier.align(Alignment.TopCenter).padding(top = 54.dp),
+                            enter = androidx.compose.animation.slideInVertically { -it } + fadeIn(),
+                            exit = fadeOut(tween(400)),
+                        ) {
+                            Text(
+                                ui.notice.orEmpty(), color = Palette.Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 18.sp,
+                                modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Palette.Gold)
+                                    .border(2.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+                    TableStatusBar(ui, fmt)
+                }
+                SidePanel(ui, fmt, sideWidth, onMove, onNext, onFastForward)
             }
         }
-        SidePanel(ui, fmt, onMove, onNext, onFastForward, onPractice, onExit, onHelp, onSound, onStar, onReview)
+    }
+}
+
+@Composable
+private fun TableToolbar(
+    ui: TableScreenUi, onPractice: (Boolean) -> Unit, onReview: (Boolean) -> Unit,
+    onSound: () -> Unit, onStar: () -> Unit, onHelp: () -> Unit, onExit: () -> Unit,
+) {
+    val st = LocalStrings.current
+    Row(Modifier.fillMaxWidth().background(Palette.Panel).padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                listOf(st.handNo(ui.handNumber), ui.blindsText).filter(String::isNotBlank).joinToString(" · "),
+                color = Palette.Text, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            ui.levelText?.let { Text(it, color = Palette.Gold, fontSize = 11.sp, maxLines = 1) }
+        }
+        TableToggle(if (st.isZh) "练习" else "Coach", ui.practice, onPractice)
+        TableToggle(if (st.isZh) "每手复盘" else "Review each", ui.reviewEach, onReview)
+        RoundIcon(if (ui.starred) "★" else "☆", st.starHand, onStar)
+        RoundIcon(if (ui.soundOn) "🔊" else "🔇", st.sound, onSound)
+        RoundIcon("?", st.guide, onHelp)
+        RoundIcon("✕", st.exit, onExit)
+    }
+}
+
+@Composable
+private fun TableToggle(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Box(Modifier.height(34.dp).clip(RoundedCornerShape(7.dp))
+        .background(if (checked) Palette.GoldDim else Palette.PanelHi)
+        .toggleable(checked, role = Role.Switch, onValueChange = onChange)
+        .padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+        Text(label, color = Palette.Text, fontSize = 12.sp, maxLines = 1)
+    }
+}
+
+@Composable
+private fun TableStatusBar(ui: TableScreenUi, fmt: (Int) -> String) {
+    val st = LocalStrings.current
+    val practice = ui.practiceInfo?.takeIf { ui.practice && ui.legal != null }
+    val live = ui.liveStrategy?.takeIf { ui.legal != null }
+    var showDetails by remember(ui.table?.handKey, ui.legal) { mutableStateOf(false) }
+    val shape = RoundedCornerShape(9.dp)
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(bottom = 4.dp).height(51.dp)
+        .clip(shape).background(Palette.Panel).border(1.dp, Palette.Line, shape)) {
+        val wide = maxWidth >= 490.dp
+        Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text(if (st.isZh) "最近行动" else "Latest action", color = Palette.TextDim, fontSize = 11.sp,
+                    lineHeight = 13.sp)
+                Text(ui.log.lastOrNull { it.kind == LogKind.ACTION }?.text ?: "—",
+                    color = Palette.Text, fontSize = 13.sp, lineHeight = 16.sp, maxLines = 2,
+                    overflow = TextOverflow.Ellipsis)
+            }
+            if (wide && practice != null) {
+                PracticeMetrics(practice, fmt)
+            }
+            if (live != null || (!wide && practice != null)) {
+                val label = if (live != null) {
+                    if (st.isZh) "策略参考" else "Strategy"
+                } else if (st.isZh) "练习数据" else "Coaching"
+                SmallButton(label, { showDetails = true })
+            }
+        }
+    }
+    if (showDetails) {
+        AlertDialog(
+            onDismissRequest = { showDetails = false },
+            title = { Text(if (st.isZh) "策略与数据" else "Strategy & odds") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (practice != null) PracticeHud(practice, fmt)
+                    if (live != null) {
+                        LiveStrategyDetails(live, ui.table?.bigBlind ?: 100, ui.legal?.isOpeningBet == true)
+                    }
+                }
+            },
+            confirmButton = { TextButton({ showDetails = false }) { Text(st.back) } },
+        )
     }
 }
 
 @Composable
 private fun SidePanel(
-    ui: TableScreenUi,
-    fmt: (Int) -> String,
-    onMove: (Move) -> Unit,
-    onNext: () -> Unit,
-    onFastForward: () -> Unit,
-    onPractice: (Boolean) -> Unit,
-    onExit: () -> Unit,
-    onHelp: () -> Unit,
-    onSound: () -> Unit,
-    onStar: () -> Unit,
-    onReview: (Boolean) -> Unit,
+    ui: TableScreenUi, fmt: (Int) -> String, width: Dp,
+    onMove: (Move) -> Unit, onNext: () -> Unit, onFastForward: () -> Unit,
 ) {
     val st = LocalStrings.current
     val heroTurn = ui.legal != null
-    val glow = if (heroTurn) pulse() else 0f
-    var liveExpanded by remember(ui.table?.handKey) { mutableStateOf(false) }
+    val border = if (heroTurn) Palette.Accent.copy(alpha = .65f) else Palette.Line
     Column(
-        Modifier.width(212.dp).fillMaxHeight().background(Palette.Panel)
-            .border(if (heroTurn) 2.dp else 0.dp, Palette.Accent.copy(alpha = 0.25f + 0.6f * glow), RoundedCornerShape(0.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+        Modifier.width(width).fillMaxHeight().padding(start = 2.dp, top = 4.dp, bottom = 4.dp, end = 4.dp)
+            .clip(RoundedCornerShape(9.dp)).background(Palette.Panel)
+            .border(1.dp, border, RoundedCornerShape(9.dp)).padding(7.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        // header
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(st.handNo(ui.handNumber), color = Palette.Text, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f))
-                RoundIcon(if (ui.starred) "★" else "☆", st.starHand, onStar)
-                Spacer(Modifier.width(4.dp))
-                RoundIcon(if (ui.soundOn) "🔊" else "🔇", st.sound, onSound)
-                Spacer(Modifier.width(4.dp))
-                RoundIcon("?", st.guide, onHelp)
-                Spacer(Modifier.width(4.dp))
-                RoundIcon("✕", st.exit, onExit)
-            }
-            Text(ui.blindsText, color = Palette.TextDim, fontSize = 11.sp, maxLines = 1)
-            if (ui.levelText != null) Text(ui.levelText, color = Palette.Gold, fontSize = 11.sp, maxLines = 1)
-        }
-        // Compact toggles preserve action-log space even on short landscape screens.
-        Row(Modifier.fillMaxWidth().height(28.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(7.dp))
-                .background(if (ui.practice) Palette.GoldDim else Palette.PanelHi)
-                .pressable { onPractice(!ui.practice) }, contentAlignment = Alignment.Center) {
-                Text((if (st.isZh) "练习" else "Coach") +
-                    (if (ui.practice) " ●" else " ○"),
-                    color = Palette.Text, fontSize = 11.sp, maxLines = 1)
-            }
-            Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(7.dp))
-                .background(if (ui.reviewEach) Palette.GoldDim else Palette.PanelHi)
-                .pressable { onReview(!ui.reviewEach) }, contentAlignment = Alignment.Center) {
-                Text((if (st.isZh) "每手复盘" else "Review") +
-                    (if (ui.reviewEach) " ●" else " ○"),
-                    color = Palette.Text, fontSize = 11.sp, maxLines = 1)
-            }
-        }
-        // The action log stays visible; secondary information scrolls independently.
+        val over = ui.handOver
+        Text(
+            if (over != null) { if (st.isZh) "本手结算" else "Hand settled" } else if (st.isZh) "行动记录" else "Action log",
+            color = Palette.Text, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.Bold,
+        )
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            val over = ui.handOver
-            if (over != null) {
-                HandOverPanel(over, fmt)
-            } else {
-                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
-                    val info = ui.practiceInfo
-                    val live = if (heroTurn) ui.liveStrategy else null
-                    val showStrategyDetails = live != null && liveExpanded
-                    val infoMaxHeight = if (showStrategyDetails) maxHeight else maxHeight * .55f
-                    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        if (live != null || (ui.practice && info != null)) {
-                            Column(Modifier.fillMaxWidth().heightIn(max = infoMaxHeight)
-                                .verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                if (live != null) {
-                                    LiveStrategyCard(live, ui.table?.bigBlind ?: 100, ui.legal?.isOpeningBet == true, liveExpanded) {
-                                        liveExpanded = !liveExpanded
-                                    }
-                                }
-                                if (ui.practice && info != null) PracticeHud(info, fmt)
-                            }
-                        }
-                        if (!showStrategyDetails) ActionLog(ui.log, Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-        if (ui.table != null) {
-            val latestAction = ui.log.lastOrNull { it.kind == LogKind.ACTION }
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                .background(Palette.PanelHi).padding(horizontal = 6.dp, vertical = 4.dp)) {
-                Text(if (st.isZh) "最近行动" else "Latest action", color = Palette.TextDim, fontSize = 10.sp)
-                Text(latestAction?.text ?: "—", color = Palette.Text, fontSize = 12.sp,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
+            if (over != null) HandOverPanel(over, fmt) else ActionLog(ui.log, Modifier.fillMaxSize())
         }
         // bottom: controls
         AnimatedContent(
@@ -293,43 +312,48 @@ private fun SidePanel(
 }
 
 @Composable
-private fun LiveStrategyCard(live: LiveStrategyHint, bb: Int, openingBet: Boolean, expanded: Boolean, onToggle: () -> Unit) {
+private fun LiveStrategyDetails(live: LiveStrategyHint, bb: Int, openingBet: Boolean) {
     val zh = LocalStrings.current.isZh
     val external = live.label == "declared-reference"
-    val heading = if (external) {
-        if (zh) "外部参考（未验证 GTO）" else "External reference (unverified GTO)"
-    } else if (zh) "启发式参考（非 GTO）" else "Heuristic reference (not GTO)"
-    val shortHeading = if (external) {
-        if (zh) "外部参考" else "External reference"
-    } else if (zh) "模型参考" else "Model reference"
-    val choices = live.choices.sortedByDescending { it.probability }.take(4)
-    fun choiceText(choice: PolicyChoice): String =
-        StudyPresentation.move(choice.move, bb, zh, openingBet) + "  " +
-            "%.0f%%".format(Locale.US, choice.probability * 100)
-
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Palette.PanelHi)) {
-        Row(
-            Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onToggle)
-                .padding(horizontal = 6.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val summary = if (expanded) heading else choices.firstOrNull()?.let {
-                "$shortHeading · ${choiceText(it)}"
-            } ?: heading
-            Text(summary, color = Palette.Gold, fontSize = 10.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(if (expanded) "▴" else "▾", color = Palette.TextDim, fontSize = 12.sp)
-        }
-        if (expanded) {
-            Column(Modifier.padding(start = 6.dp, end = 6.dp, bottom = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                for (choice in choices) Text(choiceText(choice), color = Palette.Text, fontSize = 10.sp)
-                Text(if (live.source == "decision-time") {
-                    if (zh) "仅基于决策时信息" else "Decision-time information only"
-                } else live.source, color = Palette.TextDim, fontSize = 9.sp, maxLines = 2)
+    val title = if (external) {
+        if (zh) "导入策略" else "Imported strategy"
+    } else if (zh) "启发式模型" else "Heuristic model"
+    val choices = live.choices.filter { it.probability > 0 }.sortedByDescending { it.probability }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        if (external) Text(live.source, color = Palette.TextDim, fontSize = 12.sp)
+        StrategyFrequencyBar(choices.groupBy { it.move.type }.map { (type, moves) ->
+            type to moves.sumOf { it.probability }
+        })
+        for (choice in choices) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(StudyPresentation.move(choice.move, bb, zh, openingBet), color = Palette.Text, fontSize = 14.sp)
+                Text(Format.pct(choice.probability), color = strategyActionColor(choice.move.type), fontSize = 14.sp)
             }
         }
+    }
+}
+
+@Composable
+private fun PracticeMetrics(info: PracticeInfo, fmt: (Int) -> String) {
+    val st = LocalStrings.current
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        TableMetric(st.toCall, fmt(info.toCall))
+        if (info.toCall > 0) {
+            TableMetric(st.potOdds, "1 : %.1f".format(info.pot.toDouble() / info.toCall))
+            TableMetric(if (st.isZh) "所需胜率" else "Needed", Format.pct(info.potOdds))
+        }
+        TableMetric(st.spr, "%.1f".format(info.spr))
+        TableMetric(if (st.isZh) "牌型" else "Hand", info.handText)
+    }
+}
+
+@Composable
+private fun TableMetric(label: String, value: String) {
+    Column {
+        Text(label, color = Palette.TextDim, fontSize = 10.sp, lineHeight = 13.sp, maxLines = 1)
+        Text(value, color = Palette.Text, fontSize = 15.sp, lineHeight = 17.sp,
+            fontFamily = Numeric, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -402,7 +426,7 @@ fun ActionLog(lines: List<LogLine>, modifier: Modifier = Modifier, highlightInde
             val mod = Modifier.fillMaxWidth()
                 .then(if (hl) Modifier.clip(RoundedCornerShape(4.dp)).background(Palette.AccentDim.copy(alpha = 0.6f)) else Modifier)
                 .then(if (onClick != null) Modifier.pressable { onClick(i) } else Modifier)
-                .padding(vertical = 1.dp)
+                .padding(vertical = 4.dp, horizontal = 4.dp)
             when (l.kind) {
                 LogKind.STREET -> Text(
                     buildAnnotatedString {
@@ -411,9 +435,9 @@ fun ActionLog(lines: List<LogLine>, modifier: Modifier = Modifier, highlightInde
                             withStyle(SpanStyle(color = logSuitColor(c), fontWeight = FontWeight.Bold)) { append(rankText(c) + suitText(c) + " ") }
                         }
                     },
-                    fontSize = 12.sp, modifier = mod.padding(top = 4.dp),
+                    fontSize = 13.sp, lineHeight = 17.sp, modifier = mod.padding(top = 4.dp),
                 )
-                LogKind.ACTION -> Text(l.text, color = if (hl) Palette.Accent else Palette.Text, fontSize = 12.sp, maxLines = 2, modifier = mod)
+                LogKind.ACTION -> Text(l.text, color = if (hl) Palette.Accent else Palette.Text, fontSize = 14.sp, lineHeight = 18.sp, modifier = mod)
                 LogKind.RESULT -> Text(l.text, color = Palette.Green, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = mod)
             }
         }

@@ -334,7 +334,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startGame(config: SessionConfig) {
         gameJob?.cancel(); topUpAvailable = false; liveStrategyHint = null
-        val selected = config.copy(edition = editionConfig.copy(opponents = editionConfig.opponents.toMap()))
+        val selected = config.copy(
+            edition = editionConfig.copy(opponents = editionConfig.opponents.toMap()),
+            opponentNaming = OpponentNaming(prefs.chinese, prefs.opponentNamesFollowStyle),
+        )
         lastConfig = selected
         val s = GameSession(selected); session = s
         quitRequested = false; reviewing = false; starHand = false; lastRecordId = null

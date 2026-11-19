@@ -61,8 +61,7 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(t("盲测复盘 · 先选后看", "Blind replay · answer before reveal"),
             style = MaterialTheme.typography.titleMedium, color = Palette.Gold)
-        Text(t("不提供对手底牌、未来公共牌或后续胜负。当前策略是模型参考，不是已经验证的 GTO。",
-            "No opponent cards, future board or later results. Advice is model-based, not verified GTO."),
+        Text(t("作答时只显示当时可见的牌面和行动。", "Answer using the cards and actions visible at the time."),
             color = Palette.TextDim)
         if (node == null) {
             Text(t("没有可校验的决策时分析。请在新牌桌中启用保存策略证据。",
@@ -145,8 +144,8 @@ fun WeaknessReportCoach(vm: AppViewModel) {
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(if (zh) "个人弱点：决策时模型偏离报告" else "Personal weaknesses: decision-time model deviation",
             style = MaterialTheme.typography.titleMedium, color = Palette.Gold)
-        Text(if (zh) "仅计入信息集哈希匹配的历史决策。标记说明你选择了模型中低频行动，不代表证明你犯了 GTO 错误。"
-            else "Only fingerprint-matched historical decisions. Marked low-frequency moves are NOT proven GTO mistakes.",
+        Text(if (zh) "根据已保存的决策，按位置和情景汇总模型偏离。"
+            else "Review model deviations from saved decisions by position and situation.",
             color = Palette.TextDim)
         val rows = data
         if (rows == null) Text(if (zh) "分析历史中…" else "Analysing saved hands…", color = Palette.Text)

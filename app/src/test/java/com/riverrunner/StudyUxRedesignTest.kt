@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -51,7 +52,7 @@ class StudyUxRedesignTest {
         compose.onNodeWithText("本局显示实时策略参考").assertExists()
         compose.onNodeWithTag("live-strategy-switch").performClick()
         compose.runOnIdle { assertTrue(enabled) }
-        compose.onNodeWithText("实时参考：开启（非已验证 GTO）").assertExists()
+        compose.onNodeWithText("实时参考：开启").assertExists()
     }
 
     @Test fun historyOpensBlindReviewBeforeShowingResultsOrReplay() {
@@ -158,9 +159,11 @@ class StudyUxRedesignTest {
         val table = TableMapper.build(ZH, hand, seats, 1, 0, TableMapper.Stage.LIVE, fmt)
         val latest = "对手 (BB) 大盲 1 BB"
         val ui = TableScreenUi(
-            table, 1, "50/100", null, false, hand.legalActions(), null,
+            table, 1, "50/100", null, true, hand.legalActions(),
+            PracticeInfo(50, 150, 0.25, 66.3, "高牌"),
             listOf(LogLine(LogKind.ACTION, latest), LogLine(LogKind.STREET, "翻牌")),
             null, null, true, false, false,
+            liveStrategy = LiveStrategyHint("heuristic", listOf(PolicyChoice(Move.CALL, 1.0)), "decision-time"),
         )
         compose.setContent {
             RiverTheme(ZH) { TableContent(ui, fmt, {}, {}, {}, {}, {}, {}, animate = false) }
@@ -170,6 +173,9 @@ class StudyUxRedesignTest {
         compose.onNodeWithText("底池 1.5 BB").assertExists()
         compose.onNodeWithText("最近行动").assertExists()
         assertTrue(compose.onAllNodesWithText(latest).fetchSemanticsNodes().isNotEmpty())
+        compose.onNodeWithText("行动记录").assertIsDisplayed()
+        compose.onNodeWithText("策略参考").assertIsDisplayed().performClick()
+        compose.onNodeWithText("启发式模型").assertIsDisplayed()
     }
 
     @Test fun resultOnlyUsesTheChampionHeadlineForAFinishedTournament() {

@@ -208,7 +208,7 @@ val ZH = Strings(
     players = "人数",
     startingStack = "起始筹码",
     tableType = "牌桌",
-    gtoTable = "GTO桌",
+    gtoTable = "基准桌",
     mixedTable = "混合桌",
     handsPerLevel = "涨盲(手)",
     ante = "前注",
@@ -405,7 +405,7 @@ val ZH = Strings(
             "$size 人" + if (tourney) "单桌锦标赛" else "筹码局",
             "每人 $bb 个大盲",
             if (tourney) "每 $hpl 手涨一次盲注" else if (ante) "有前注" else "无前注",
-            if (mixed) "混合桌：紧凶、松凶、跟注站等风格随机" else "GTO 桌：所有对手都按近似 GTO 打",
+            if (mixed) "混合桌：紧凶、松凶、跟注站等风格随机" else "基准桌：对手默认采用基准策略",
         )
     },
 )
@@ -420,7 +420,7 @@ val EN = Strings(
     players = "Players",
     startingStack = "Starting stack",
     tableType = "Table",
-    gtoTable = "GTO table",
+    gtoTable = "Baseline table",
     mixedTable = "Mixed table",
     handsPerLevel = "Hands/level",
     ante = "Ante",
@@ -617,7 +617,7 @@ val EN = Strings(
             "$size-player " + if (tourney) "single-table tournament" else "cash game",
             "$bb big blinds each",
             if (tourney) "Blinds go up every $hpl hands" else if (ante) "With antes" else "No antes",
-            if (mixed) "Mixed table: TAG, LAG, station and more" else "GTO table: every opponent plays approximate GTO",
+            if (mixed) "Mixed table: TAG, LAG, station and more" else "Baseline table: opponents default to the baseline policy",
         )
     },
 )
