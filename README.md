@@ -6,17 +6,17 @@
 
 <p align="center">
   <b>An offline Texas Hold'em drill partner for Android.</b><br>
-  <sub>No account · no ads · no in-app purchases · no network permission · 1.6 MB</sub>
+  <sub>Exploit Edition · No account · no ads · no in-app purchases · no network permission</sub>
 </p>
 
 <p align="center">
-  <a href="https://github.com/shunzhe1121/river-runner/releases/tag/latest"><img alt="Download the latest APK (1.6 MB)" src="https://img.shields.io/badge/%E2%AC%87%20Download%20APK-1.6%20MB-E6B54F?style=for-the-badge&labelColor=0C1310&logo=android&logoColor=0C1310"></a>
+  <a href="https://github.com/Richardc7/river-runner/releases/latest"><b>Download Exploit Edition APK / 下载 APK</b></a>
   <br>
-  <sub><a href="https://github.com/shunzhe1121/river-runner/releases/tag/latest">Direct APK link</a> · <a href="https://github.com/shunzhe1121/river-runner/releases">all releases</a> · <a href="CHANGELOG.md">更新日志 / changelog</a> · Android 8.0+</sub>
+  <sub><a href="https://github.com/Richardc7/river-runner/releases">Releases / 发布记录</a> · <a href="EXPLOIT_CHANGELOG.md">更新日志 / changelog</a> · Android 8.0+</sub>
 </p>
 
 <p align="center">
-  <img alt="build" src="https://github.com/shunzhe1121/river-runner/actions/workflows/build.yml/badge.svg?branch=main">
+  <img alt="build" src="https://github.com/Richardc7/river-runner/actions/workflows/build.yml/badge.svg?branch=exploit-edition">
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-1E7048?style=flat-square&labelColor=0C1310&logo=android&logoColor=white">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-100%25-7F52FF?style=flat-square&labelColor=0C1310&logo=kotlin&logoColor=white">
   <img alt="No permissions" src="https://img.shields.io/badge/permissions-none-4FC88A?style=flat-square&labelColor=0C1310">
@@ -92,22 +92,13 @@ River Runner 两者都不是：一个完全跑在手机本地的练习工具。�
 
 </details>
 
-## Before you install / 安装前请放心
+## Install / 安装
 
-An APK from a stranger's repository deserves suspicion. These are checkable, not promises:
+Download the signed Exploit Edition APK from the [GitHub release](https://github.com/Richardc7/river-runner/releases/latest). Each release includes its source commit, APK checksum and signing certificate fingerprint.
 
-- **No permissions at all.** [`AndroidManifest.xml`](app/src/main/AndroidManifest.xml) contains no `<uses-permission>` element — no `INTERNET`, no storage, no billing. It is 22 lines; read it.
-- **1.6 MB.** No ad SDK, no analytics SDK, no crash reporter to inflate it.
-- **Built by CI, not by hand.** Every push to `main` builds and publishes the `latest` release through GitHub Actions ([workflow](.github/workflows/build.yml)). The binary you download is the output of that job.
-- **Signed by CI with a key that is not in this repository.** The release key lives in repository secrets and is deleted from the runner after each build. The certificate SHA-256 is printed in every release note, so you can check the APK you downloaded yourself — see [Signing and verification](#signing-and-verification).
-- **sha256 is printed on the release**, next to the APK.
+以前安装过同包名的调试版本时，请先在「设置 → 存档备份与恢复」导出需要保留的存档。正式版使用独立的发布签名，Android 会拒绝跨签名覆盖安装。安装正式版后，可以从备份恢复存档。
 
-它没有任何权限声明、不含广告和统计 SDK、由 CI 从本仓库源码构建、签名密钥公开。想核实，看上面这 22 行 AndroidManifest 就够了。
-
-<p align="center">
-  <img src="docs/apk-qr.png" alt="Scan to download the APK" width="150">
-  <br><sub>Scan on Android to install · 手机扫码直接安装</sub>
-</p>
+If you installed a debug build of Exploit Edition, export your saves from Settings → Save backup and restore before switching. Android requires the signing certificate to match for an in-place update. You can restore the backup in the signed release.
 
 ## How the bots decide / NPC 如何决策
 
@@ -136,20 +127,18 @@ Styles (TAG, LAG, station, nit, maniac) shift range widths, aggression, bluffing
 
 Barlow Condensed is bundled under the SIL Open Font License (`licenses/`).
 
-## Signing and verification
+## Signing and verification / 签名与校验
 
-The APK is signed with a release key held in repository secrets. It is not in the source tree and not in the git history, so nobody can produce a build that Android accepts as an update to yours.
+Production APKs use the Exploit Edition release key. Signing credentials are stored outside the Git repository. CI publishes debug APKs for testing.
 
 ```bash
-sha256sum river-runner-*.apk                      # compare with the release note
-apksigner verify --print-certs river-runner-*.apk # certificate SHA-256
+shasum -a 256 -c SHA256SUMS.txt
+apksigner verify --print-certs river-runner-exploit-v*.apk
 ```
 
-The fingerprint from the second command must match the one in the release note. If it does not, the file did not come from this repository — do not install it.
+Compare the printed certificate SHA-256 fingerprint with `APK_CERTIFICATE.txt` from the same release. Future signed updates use the same package ID and certificate with an increased Android version code.
 
-**Upgrading from 0.2.x / 从 0.2.x 升级：** the signing key was replaced at 0.3.0. Android will not install an update signed with a different key, so uninstall the old build first — its saves and hand history go with it. From 0.3.0 onward, updates install in place again.
-
-0.3.0 更换了签名密钥。Android 不允许跨签名的覆盖安装，所以从 0.2.x 升级需要先卸载旧版本（存档会一并删除）。0.3.0 之后的版本可以正常覆盖升级。
+For maintainers, `EXPLOIT_VERSION` sets the tag and app version, and `EXPLOIT_VERSION_CODE` sets the monotonic Android version code. Run `:app:assembleRelease` with the private `RR_KEYSTORE_PATH`, `RR_STORE_PASSWORD`, `RR_KEY_ALIAS`, and `RR_KEY_PASSWORD` environment variables.
 
 ## If this is useful to you
 
