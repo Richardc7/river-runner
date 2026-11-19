@@ -120,31 +120,31 @@ internal class DecisionContext(private val view: DecisionView) {
             add(t("位置影响", "Position in this spot") to when {
                 able.isEmpty() -> t("对手没有后手；继续投入以后只剩发牌和结算。", "The remaining opponents have no chips behind. Continuing leads to the runout and settlement.")
                 preflop && lastAggressor == null && othersToAct > 0 ->
-                    t("翻前还没有加注。你${passiveAction}后仍有 $othersToAct 人待行动，后面有人加注会提高继续价格。",
+                    t("翻前还没有加注。${passiveAction}后仍有 $othersToAct 人待行动，后面有人加注会提高继续价格。",
                         "There has been no preflop raise. $passiveAction leaves $othersToAct still to act. A raise would increase the price.")
                 preflop && othersToAct > 0 ->
                     t("若只跟，仍有 $othersToAct 人待行动。要考虑身后跟入形成多人底池，或有人再加注。",
                         "If you only call, $othersToAct still have to act. A player behind can make the pot multiway or reraise.")
-                preflop -> if (playerAfter > 0) t("${passiveAction}会结束翻前。翻后你仍要先于有位置的对手行动。",
-                    "$passiveAction closes preflop. You will still act before the opponents in position after the flop.")
+                preflop -> if (playerAfter > 0) t("${passiveAction}会结束翻前。翻后仍要先于有位置的对手行动。",
+                    "$passiveAction closes preflop. The acting seat remains out of position after the flop.")
                 else t("${passiveAction}会结束翻前。翻后可先看仍有筹码的对手怎么打。",
-                    "$passiveAction closes preflop. After the flop you can see what the opponents with chips do first.")
+                    "$passiveAction closes preflop. After the flop this seat sees what opponents with chips do first.")
                 playerAfter > 0 && call > 0 && othersToAct > 0 ->
-                    t("你身后有 $playerAfter 名有后手的对手，这次只跟仍有 $othersToAct 人要行动。有人加注会改变继续价格。",
-                        "$playerAfter opponent(s) with chips act after you in positional order, and $othersToAct still have to act after a call. A raise would change the price.")
+                    t("行动者身后有 $playerAfter 名有后手的对手，这次只跟仍有 $othersToAct 人要行动。有人加注会改变继续价格。",
+                        "$playerAfter opponent(s) with chips act after this seat in positional order, and $othersToAct still have to act after a call. A raise would change the price.")
                 playerAfter > 0 && call > 0 -> t("当前跟注会结束这一轮；若还有下一街，有位置的对手仍能在你之后行动。",
                     "Calling closes this round. If another street follows, the opponent in position can still act after you.")
-                playerAfter > 0 -> t("有 $playerAfter 名有后手的对手位置在你之后。过牌可能给对手先下注的机会。",
-                    "$playerAfter opponent(s) with chips have position on you. Checking can hand them the first chance to bet.")
-                else -> t("你最后行动。无人下注时过牌可直接看下一张或摊牌；面对下注时可在已知对手动作后权衡价格。",
-                    "You act last. A check closes an unbet round; when facing a bet, you can weigh the price after seeing the other actions.")
+                playerAfter > 0 -> t("有 $playerAfter 名有后手的对手位置在该座位之后。过牌可能给对手先下注的机会。",
+                    "$playerAfter opponent(s) with chips have position on this seat. Checking can hand them the first chance to bet.")
+                else -> t("该座位最后行动。无人下注时过牌可直接看下一张或摊牌；面对下注时可在已知对手动作后权衡价格。",
+                    "This seat acts last. A check closes an unbet round; when facing a bet, you can weigh the price after seeing the other actions.")
             })
             if (call > 0) {
                 add(t("跟注后的筹码", "After calling") to when {
                     behindAfterCall == 0 && othersToAct == 0 -> t(
                         "跟注后没有可继续争夺的后手。可用 ${percent(requireNotNull(equityNeeded))} 作为直接摊牌的筹码门槛，另考虑抽水或奖金结构。",
                         "After calling there are no contestable chips behind. Use ${percent(requireNotNull(equityNeeded))} as the chip break-even point, with rake or payouts considered separately.")
-                    behindAfterCall == 0 -> t("跟注将用尽你可对抗的后手，其他玩家仍可能行动。多人全下时还要区分主池与边池。",
+                    behindAfterCall == 0 -> t("跟注将用尽可对抗的后手，其他玩家仍可能行动。多人全下时还要区分主池与边池。",
                         "This call uses the remaining contestable stack, with other players still to act. Multiway all-ins can create separate pots.")
                     view.street == Street.RIVER -> t("跟注后最多还剩 ${bb(behindAfterCall)} 可与对手对抗。河牌没有新牌，重点比较摊牌权益和当下价格。",
                         "Up to ${bb(behindAfterCall)} remains contestable after calling. The river brings no new cards, so compare showdown equity with the price.")
