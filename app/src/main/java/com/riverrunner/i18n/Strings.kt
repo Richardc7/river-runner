@@ -317,7 +317,7 @@ val ZH = Strings(
     careerTitle = "生涯",
     computing = "计算中…",
     about = "关于",
-    aboutText = "开源项目 · MIT 协议 · NPC 多人局使用近似GTO策略（翻前范围表 + 翻后胜率/赔率混合策略），单挑与短筹码使用推/弃与ICM。",
+    aboutText = "开源项目 · MIT 协议 · 多人局对手使用启发式基准策略（翻前范围表 + 翻后胜率/赔率混合策略），单挑与短筹码使用推/弃与ICM。",
     styleName = { when (it) {
         BotStyle.GTO -> "基准"; BotStyle.TAG -> "紧凶"; BotStyle.LAG -> "松凶"
         BotStyle.STATION -> "跟注站"; BotStyle.NIT -> "紧弱"; BotStyle.MANIAC -> "疯子"
@@ -529,7 +529,7 @@ val EN = Strings(
     careerTitle = "Career",
     computing = "Computing…",
     about = "About",
-    aboutText = "Open source · MIT license · Multi-way bots use approximate GTO (preflop range charts + equity/pot-odds mixed strategies postflop); heads-up and short stacks use push/fold and ICM.",
+    aboutText = "Open source · MIT license · Multi-way bots use a heuristic baseline (preflop range charts + equity/pot-odds mixed strategies postflop); heads-up and short stacks use push/fold and ICM.",
     styleName = { when (it) {
         BotStyle.GTO -> "Baseline"; BotStyle.TAG -> "TAG"; BotStyle.LAG -> "LAG"
         BotStyle.STATION -> "Station"; BotStyle.NIT -> "Nit"; BotStyle.MANIAC -> "Maniac"

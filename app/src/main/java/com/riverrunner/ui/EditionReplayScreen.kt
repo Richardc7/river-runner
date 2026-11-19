@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.engine.*
@@ -172,6 +173,7 @@ private fun ReplayNavigation(
 ) {
     val st = LocalStrings.current
     var expanded by remember { mutableStateOf(false) }
+    val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -184,7 +186,7 @@ private fun ReplayNavigation(
                     SegmentedButton(
                         selected = page == target, onClick = { onPage(target) },
                         shape = SegmentedButtonDefaults.itemShape(index, count = 2),
-                        modifier = Modifier.widthIn(min = if (st.isZh) 91.dp else 104.dp),
+                        modifier = Modifier.widthIn(min = ((if (st.isZh) 91 else 104) * fontScale).dp),
                         icon = {},
                     ) { Text(target.title(st.isZh), maxLines = 1) }
                 }

@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,7 +76,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** All positions on the table in dp, for a table area of [w] x [h] with [n] seats (hero at the bottom). */
-class TableGeometry(val w: Float, val h: Float, val n: Int) {
+class TableGeometry(val w: Float, val h: Float, val n: Int, textScale: Float = 1f) {
     /** 7-9 players or a narrow table: smaller seats and board */
     val crowded = n >= 7 || w < 520f
     val cx = w / 2f
@@ -88,7 +89,7 @@ class TableGeometry(val w: Float, val h: Float, val n: Int) {
         crowded -> 100f
         else -> 112f
     }
-    val podH = 50f
+    val podH = 50f + ((textScale - 1f).coerceAtLeast(0f) * 62f).coerceAtMost(18f)
     val miniCardW = if (n == 9 && w < 445f) 20f else if (crowded) 22f else 24f
     val boardCardW = if (crowded) 32f else if (w < 520f || h < 320f) 34f else 38f
     val boardCardH = boardCardW * 1.4f
@@ -140,7 +141,10 @@ fun PokerTable(
 ) {
     BoxWithConstraints(modifier) {
         val n = t.seats.size
-        val g = remember(maxWidth.value, maxHeight.value, n) { TableGeometry(maxWidth.value, maxHeight.value, n) }
+        val textScale = LocalDensity.current.fontScale
+        val g = remember(maxWidth.value, maxHeight.value, n, textScale) {
+            TableGeometry(maxWidth.value, maxHeight.value, n, textScale)
+        }
         val heroIndex = t.seats.indexOfFirst { it.isHero }.coerceAtLeast(0)
         fun rel(i: Int) = (i - heroIndex + n) % n
 
@@ -342,7 +346,8 @@ private fun SeatStatus(seat: SeatUi, fmt: (Int) -> String, modifier: Modifier = 
         seat.actKind == ActKind.ALLIN -> Palette.Red
         else -> Palette.TextDim
     }
-    Text(caption.orEmpty(), modifier = modifier.height(12.dp), color = color,
+    val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    Text(caption.orEmpty(), modifier = modifier.height((12 * textScale).dp), color = color,
         fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium,
         maxLines = 1, overflow = TextOverflow.Ellipsis)
 }

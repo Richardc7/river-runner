@@ -183,6 +183,15 @@ internal fun DecisionQuestion(
             Text(t("历史牌局", "Saved hand") + " #" + item.record.handNumber +
                 "  ·  " + StudyPresentation.street(view.street, zh),
                 color = Palette.TextDim, fontSize = 12.sp)
+            val scenario = if (toCall > 0) t("河牌面对下注", "facing a river bet")
+                else t("河牌可过牌或下注", "checking or betting the river")
+            val attempts = categoryProgress?.attempts ?: 0
+            Text(if (attempts == 0) t("选中这手：$scenario，你还没练过这类题。",
+                "Why this hand: $scenario, from a category you haven’t practised.")
+            else t(
+                "选中这手：$scenario，此类题的模型首选一致次数为 ${categoryProgress?.exact}/$attempts。",
+                "Why this hand: $scenario. You matched the model on ${categoryProgress?.exact}/$attempts attempts in this category.",
+            ), color = Palette.TextDim, fontSize = 12.sp)
             HorizontalDivider(color = Palette.Line)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 QuestionMetric(t("底池", "Pot"), "%.1f BB".format(Locale.US, view.pot.toDouble() / bb), Modifier.weight(1f))
@@ -196,15 +205,7 @@ internal fun DecisionQuestion(
             Text(t("位置：", "Position: ") + position +
                 "  ·  " + t("有效人数：", "Players: ") + view.seats.size,
                 color = Palette.Text, fontSize = 12.sp)
-            val scenario = if (toCall > 0) t("河牌面对下注", "facing a river bet")
-                else t("河牌可过牌或下注", "checking or betting the river")
-            val attempts = categoryProgress?.attempts ?: 0
-            Text(if (attempts == 0) t("选中这手：$scenario，你还没练过这类题。",
-                "Why this hand: $scenario, from a category you haven’t practised.")
-            else t(
-                "选中这手：$scenario，此类题的模型首选一致次数为 ${categoryProgress?.exact}/$attempts。",
-                "Why this hand: $scenario. You matched the model on ${categoryProgress?.exact}/$attempts attempts in this category.",
-            ), color = Palette.TextDim, fontSize = 12.sp)
+
         }
         val answerScroll = key(d.id, explanation) { rememberScrollState() }
         Column(Modifier.weight(1.05f).fillMaxHeight()

@@ -211,8 +211,8 @@ fun PreflopRangeCoachPanel(vm: AppViewModel, nodes: List<HistoricalDecision>) {
         verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Text(if (zh) "九人桌翻前范围教练" else "Nine-handed preflop range coach",
             style = MaterialTheme.typography.titleMedium, color = Palette.Gold)
-        Text(if (zh) "13×13 为启发式行动倾向矩阵，并非求解器输出。位置、玩家数量与有效筹码都参与计算。"
-            else "13×13 heuristic action tendencies, not a solver chart. Position, table size and effective stacks matter.",
+        Text(if (zh) "13×13 启发式行动倾向矩阵，按位置、玩家数量和有效筹码计算。"
+            else "13×13 heuristic action tendencies by position, table size and effective stack.",
             color = Palette.TextDim)
         if (node == null || result == null) {
             Text(if (zh) "没有已保存的翻前决策。" else "No saved preflop decision.", color = Palette.Text)

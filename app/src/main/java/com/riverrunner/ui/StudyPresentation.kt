@@ -136,7 +136,7 @@ object StudyPresentation {
             normalized.contains("bet") && normalized.contains("supported") ->
                 "此局面不符合目前下注模型支持的条件，数值结果已隐藏。"
             normalized.contains("short-stack push-width") ->
-                "短筹码全下范围属于启发式估计，并非求解范围表；还应考虑对手范围与 ICM。"
+                "短筹码全下范围按启发式规则估计，解读时还需考虑对手范围与 ICM。"
             normalized.contains("rfi heuristic") ->
                 "模型按尚未行动的人数调整率先入池范围。"
             normalized.contains("facing a raise:") ->
