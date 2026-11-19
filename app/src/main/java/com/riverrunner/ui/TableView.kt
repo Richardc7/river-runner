@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.layout
@@ -65,8 +66,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -234,10 +233,15 @@ internal fun TableSurface(style: TableStyle, modifier: Modifier, centerY: Float 
                 topLeft = surface.topLeft, size = surface.size,
             )
         } else {
+            val cover = maxOf(surface.width / art.width, surface.height / art.height)
+            val imageOrigin = surface.center - Offset(art.width * cover / 2f, art.height * cover / 2f)
             clipPath(Path().apply { addOval(surface) }) {
-                drawImage(art,
-                    dstOffset = IntOffset(surface.left.roundToInt(), surface.top.roundToInt()),
-                    dstSize = IntSize(surface.width.roundToInt(), surface.height.roundToInt()))
+                withTransform({
+                    translate(imageOrigin.x, imageOrigin.y)
+                    scale(cover, cover, pivot = Offset.Zero)
+                }) {
+                    drawImage(art)
+                }
             }
             drawOval(style.trim.copy(alpha = .68f), surface.topLeft, surface.size, style = Stroke(1.5f * d))
         }
