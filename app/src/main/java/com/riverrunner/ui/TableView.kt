@@ -119,10 +119,13 @@ class TableGeometry(val w: Float, val h: Float, val n: Int, textScale: Float = 1
         val x = cx + rx * cos(ang).toFloat()
         val y = cy + ry * sin(ang).toFloat()
         return Offset(
-            x.coerceIn(podW / 2 + 6f, w - podW / 2 - 4f),
-            y.coerceIn(podH / 2 + 12f, h - podH / 2 - 16f),
+            clampSeatAxis(x, podW / 2 + 6f, w - podW / 2 - 4f, cx),
+            clampSeatAxis(y, podH / 2 + 12f, h - podH / 2 - 16f, h / 2f),
         )
     }
+
+    private fun clampSeatAxis(value: Float, minimum: Float, maximum: Float, center: Float): Float =
+        if (minimum <= maximum) value.coerceIn(minimum, maximum) else center
 }
 
 private fun Modifier.centerAt(p: Offset): Modifier = this.layout { measurable, constraints ->

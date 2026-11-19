@@ -11,6 +11,7 @@ import com.riverrunner.ui.StudyIndexStore
 import com.riverrunner.ui.mergeReferenceBooks
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -66,19 +67,21 @@ class StudyIndexAndBatchTest {
     @Test
     fun mergeReferenceBooksRejectsOversizedEncodedOutputBeforeSaving() {
         val prov = ReferenceProvenance("Solver", "User", "MIT", "HU river")
-        val actions = (1..20).map { i ->
-            ReferenceAction(Move.raiseTo(100 + i), 0.05)
+        val actions = (1..32).map { i ->
+            ReferenceAction(Move.raiseTo(100 + i), 1.0 / 32)
         }
         val bookA = ReferenceBook(prov, (1..600).map { ReferenceNode(hexHash(it), actions) })
         val bookB = ReferenceBook(prov, (601..1200).map { ReferenceNode(hexHash(it), actions) })
         val bookC = ReferenceBook(prov, (1201..1800).map { ReferenceNode(hexHash(it), actions) })
-        assertTrue(ReferenceCodec.encode(bookA).length <= ReferenceCodec.MAX_TEXT_LENGTH)
-        var failed = false
-        try {
-            mergeReferenceBooks(bookA, listOf(bookB, bookC))
-        } catch (_: IllegalArgumentException) {
-            failed = true
+        val books = listOf(bookA, bookB, bookC)
+        books.forEach { book ->
+            assertEquals(book, ReferenceCodec.decode(ReferenceCodec.encode(book)))
         }
-        assertTrue(failed)
+        val combined = ReferenceBook(prov, books.flatMap { it.nodes })
+        assertTrue(ReferenceCodec.encode(combined).length > ReferenceCodec.MAX_TEXT_LENGTH)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            mergeReferenceBooks(bookA, listOf(bookB, bookC))
+        }
     }
 }

@@ -252,7 +252,7 @@ private fun TableStatusBar(ui: TableScreenUi, fmt: (Int) -> String) {
     ) {
         val wide = maxWidth >= (500 * LocalDensity.current.fontScale).dp
         Row(
-            Modifier.fillMaxSize().padding(horizontal = 8.dp),
+            Modifier.align(Alignment.Center).fillMaxWidth().padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
