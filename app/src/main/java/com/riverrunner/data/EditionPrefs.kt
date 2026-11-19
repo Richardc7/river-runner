@@ -1,8 +1,8 @@
 package com.riverrunner.data
 
 import android.content.Context
-import com.riverrunner.engine.strategy.*
 import com.riverrunner.engine.CashRules
+import com.riverrunner.engine.strategy.*
 import org.json.JSONObject
 
 /** Separate, versioned preferences; old saves and upstream preference keys are unchanged. */
@@ -25,15 +25,26 @@ class EditionPrefs(context: Context) {
                 val rules = json.optJSONObject("cashRules") ?: JSONObject()
                 val stacks = json.optJSONObject("seatStackBB") ?: JSONObject()
                 val stackMap = (0..8).filter { stacks.has(it.toString()) }.associateWith { stacks.getInt(it.toString()) }
-                EditionConfig(mode, overrides, json.optBoolean("recordAdvice", true),
-                    CashRules(rules.optBoolean("utgStraddle", false), rules.optInt("rakeBasisPoints", 0),
-                        rules.optInt("rakeCapBB", 0), rules.optBoolean("noFlopNoDrop", true)),
-                    stackMap, json.optInt("automaticRebuys", 0))
+                EditionConfig(
+                    mode,
+                    overrides,
+                    json.optBoolean("recordAdvice", true),
+                    CashRules(
+                        rules.optBoolean("utgStraddle", false),
+                        rules.optInt("rakeBasisPoints", 0),
+                        rules.optInt("rakeCapBB", 0),
+                        rules.optBoolean("noFlopNoDrop", true),
+                    ),
+                    stackMap,
+                    json.optInt("automaticRebuys", 0),
+                    json.optBoolean("antiExploit", false),
+                )
             }.getOrElse { EditionConfig() }
         }
         fun encode(config: EditionConfig): String = JSONObject().apply {
             put("schema", 1); put("mode", config.aiMode.name); put("recordAdvice", config.recordAdvice)
             put("automaticRebuys", config.automaticRebuys)
+            put("antiExploit", config.antiExploit)
             put("seatStackBB", JSONObject().apply { config.seatStackBB.forEach { (seat, stack) -> put(seat.toString(), stack) } })
             put("cashRules", JSONObject().apply {
                 put("utgStraddle", config.cashRules.utgStraddle); put("rakeBasisPoints", config.cashRules.rakeBasisPoints)

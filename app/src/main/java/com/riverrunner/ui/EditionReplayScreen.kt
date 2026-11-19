@@ -265,4 +265,6 @@ private fun reasonText(reason: ReasonCode, zh: Boolean): String = if (!zh) reaso
     ReasonCode.EXCESS_FOLDING -> "\u5f03\u724c\u504f\u591a\uff0c\u9002\u5ea6\u589e\u52a0\u8bc8\u552c"
     ReasonCode.INDUCE_AGGRESSION -> "\u5f3a\u724c\u8fc7\u724c\u8bf1\u5bfc\u4e0b\u6ce8"
     ReasonCode.PASSIVE_RAISE_CAUTION -> "\u7f55\u89c1\u52a0\u6ce8\uff0c\u5c0f\u5e45\u6536\u7d27\u8fb9\u7f18\u8ddf\u6ce8"
+    ReasonCode.COUNTER_EXCESS_CBET_FOLD -> "\u5bf9\u624b C-Bet \u5f03\u724c\u8fc7\u9ad8\uff0c\u9002\u5ea6\u589e\u52a0\u65bd\u538b"
+    ReasonCode.COUNTER_OVER_BLUFF_STAB -> "\u5bf9\u624b\u9ad8\u9891\u5077\u6c60\uff0c\u589e\u52a0\u6293\u9e21\u8ddf\u6ce8"
 }

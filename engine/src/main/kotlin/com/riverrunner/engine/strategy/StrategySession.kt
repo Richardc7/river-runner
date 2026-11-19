@@ -23,7 +23,7 @@ class StrategySession(private val seed: Long, private val mode: GameMode, val co
         val rng = StrategyRandom.forDecision(seed, handNumber, view.actionIndex, view.actorSeat, 1)
         val raw = Bot.decide(engine, view.actorSeat, style, rng, tournament)
         val base = PolicyTools.validated(PresetPolicy.apply(view, raw, config.opponents[view.actorSeat]), view.legal)
-        return ExploitPolicy.adjust(view, base, opponents.snapshots())
+        return ExploitPolicy.adjust(view, base, opponents.snapshots(), config.antiExploit)
     }
     /** Capture before the hero acts; later observations never rewrite this trace. */
     fun capture(engine: HandEngine, tournament: TournamentContext? = null) {

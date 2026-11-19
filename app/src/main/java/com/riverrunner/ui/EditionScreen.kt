@@ -70,6 +70,13 @@ fun EditionScreen(initial: EditionConfig, chinese: Boolean, onSave: (EditionConf
                                 "Opponents adapt to actions in this session. Sparse evidence retains the baseline."),
                             fontSize = 13.sp, lineHeight = 18.sp, color = Palette.TextDim,
                         )
+                        if (config.aiMode == AiMode.ADAPTIVE) {
+                            SettingsSwitch(
+                                t("高阶反剥削（识别过度弃牌与高频偷池）", "Counter-exploit mode (punish over-folding & frequent stabs)"),
+                                t("仅基于本桌公开行动做有上限反制，不读取底牌。", "Bounded public-info counter-adjustments only; never sees hidden cards."),
+                                config.antiExploit,
+                            ) { config = config.copy(antiExploit = it) }
+                        }
                         HorizontalDivider(color = Palette.Line)
                         SettingsSwitch(
                             t("保存决策时的证据与双轨建议", "Record evidence and both strategy recommendations"),
@@ -202,7 +209,11 @@ fun presetLabel(preset: OpponentPreset?, chinese: Boolean): String = when (prese
 /** Visible summary of exactly the settings applied by AppViewModel.startGame. */
 fun editionSummary(config: EditionConfig, chinese: Boolean): String {
     val mode = if (config.aiMode == AiMode.ADAPTIVE) {
-        if (chinese) "动态剥削" else "Adaptive exploit"
+        if (config.antiExploit) {
+            if (chinese) "动态剥削（反制）" else "Adaptive + counter"
+        } else {
+            if (chinese) "动态剥削" else "Adaptive exploit"
+        }
     } else {
         if (chinese) "原版基准" else "Legacy baseline"
     }

@@ -14,6 +14,7 @@ data class EditionConfig(
     val cashRules: CashRules = CashRules(),
     val seatStackBB: Map<Int, Int> = emptyMap(),
     val automaticRebuys: Int = 0,
+    val antiExploit: Boolean = false,
 ) {
     init {
         require(opponents.keys.all { it in 1..8 }) { "Only bot seats 1..8 may be overridden" }
