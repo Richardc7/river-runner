@@ -207,7 +207,7 @@ fun SetupScreen(vm: AppViewModel, forTraining: Boolean = false) {
     SetupContent(
         initial = initial,
         onBack = onBack,
-        onCustomize = vm::openEditionSettings,
+        onCustomize = { vm.openEditionSettings() },
         selectedEdition = editionSummary(vm.editionConfig, vm.prefs.chinese),
         liveStrategyEnabled = vm.realtimeGtoEnabled,
         onLiveStrategyChange = { vm.setStudyToggle("live", it) },

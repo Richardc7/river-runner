@@ -114,8 +114,8 @@ private fun RiverTrainingEmpty(vm: AppViewModel) {
     val config = vm.editionConfig
     val (guidance, action) = when {
         !config.recordAdvice -> t(
-            "请在「自定义对手及规则」中打开「保存决策时的证据与双轨建议」并保存。",
-            "Open Customize opponents / rules, enable recording of decision evidence, and save.",
+            "请在「自定义 AI、对手与规则」中打开「保存决策时的证据与双轨建议」并保存。",
+            "Open Customize AI, opponents and rules, enable recording of decision evidence, and save.",
         ) to t("去开启记录", "Enable recording")
         config.cashRules.hasRake -> t(
             "决策记录已开启。河牌题需要无抽水的筹码局，请在规则中将抽水设为 0 并保存。",
@@ -137,8 +137,11 @@ private fun RiverTrainingEmpty(vm: AppViewModel) {
             fontWeight = FontWeight.Bold, fontSize = 17.sp)
         Text(guidance, color = Palette.TextDim, fontSize = 13.sp, modifier = Modifier.widthIn(max = 490.dp))
         Button(onClick = {
-            if (!config.recordAdvice || config.cashRules.hasRake) vm.openEditionSettings()
-            else vm.screen = Screen.TrainingSetup
+            when {
+                !config.recordAdvice -> vm.openEditionSettings()
+                config.cashRules.hasRake -> vm.openEditionSettings(showCashRules = true)
+                else -> vm.screen = Screen.TrainingSetup
+            }
         }) { Text(action) }
     }
 }

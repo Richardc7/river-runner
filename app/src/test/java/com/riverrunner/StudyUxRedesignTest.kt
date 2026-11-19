@@ -134,7 +134,7 @@ class StudyUxRedesignTest {
         compose.onNodeWithText("1 / 50 个样本").assertDoesNotExist()
     }
 
-    @Test fun emptyTrainingRoutesToRecordingSettingsOrHeadsUpCashSetup() {
+    @Test fun emptyTrainingRoutesToRecordingSettingsCashRulesOrHeadsUpCashSetup() {
         val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
         vm.openTraining()
         vm.saveEdition(EditionConfig(recordAdvice = false))
@@ -142,10 +142,19 @@ class StudyUxRedesignTest {
         compose.waitUntil(5_000) { compose.onAllNodesWithText("去开启记录").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("去开启记录").performClick()
         compose.runOnIdle {
-            assertEquals(Screen.EditionSettings, vm.screen)
-            vm.saveEdition(EditionConfig(recordAdvice = true))
+            assertEquals(Screen.EditionSettings(), vm.screen)
+            vm.saveEdition(EditionConfig(
+                recordAdvice = true,
+                cashRules = CashRules(rakeBasisPoints = 250, rakeCapBB = 3),
+            ))
             vm.closeEditionSettings()
             assertEquals(Screen.Training, vm.screen)
+        }
+        compose.onNodeWithText("前往规则设置").performClick()
+        compose.runOnIdle {
+            assertEquals(Screen.EditionSettings(showCashRules = true), vm.screen)
+            vm.saveEdition(EditionConfig(recordAdvice = true))
+            vm.closeEditionSettings()
         }
         compose.onNodeWithText("配置单挑筹码局").performClick()
         compose.runOnIdle { assertEquals(Screen.TrainingSetup, vm.screen) }
