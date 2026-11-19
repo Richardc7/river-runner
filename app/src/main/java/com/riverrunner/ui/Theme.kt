@@ -8,8 +8,20 @@ import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.i18n.Strings
 
 @Composable
-fun RiverTheme(strings: Strings, deck: DeckStyle = DeckStyle.FOUR_COLOR, content: @Composable () -> Unit) {
+fun RiverTheme(
+    strings: Strings,
+    deck: DeckStyle = DeckStyle.FOUR_COLOR,
+    back: CardBackStyle = CardBackStyle.CLASSIC,
+    table: TableStyle = TableStyle.CLASSIC,
+    content: @Composable () -> Unit,
+) {
     MaterialTheme(colorScheme = darkColorScheme(primary = Palette.Accent, onPrimary = Palette.Ink, secondary = Palette.Accent, background = Palette.Bg, surface = Palette.Panel)) {
-        CompositionLocalProvider(LocalStrings provides strings, LocalDeckStyle provides deck) { content() }
+        CompositionLocalProvider(
+            LocalStrings provides strings,
+            LocalDeckStyle provides deck,
+            LocalCardBackStyle provides back,
+            LocalTableStyle provides table,
+            content = content,
+        )
     }
 }

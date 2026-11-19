@@ -35,6 +35,7 @@ sealed class Screen {
     data class Replay(val record: HandRecord, val blind: Boolean = false) : Screen()
     data object Stats : Screen()
     data object Settings : Screen()
+    data object Appearance : Screen()
     data object EditionSettings : Screen()
     data object Training : Screen()
     data object Guide : Screen()
@@ -281,8 +282,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var showInBB by mutableStateOf(prefs.showInBB); private set
     fun setChinese(zh: Boolean) { prefs.chinese = zh; strings = if (zh) ZH else EN }
     fun setShowBB(v: Boolean) { prefs.showInBB = v; showInBB = v }
-    var deckStyle by mutableStateOf(DeckStyle.fromCode(prefs.deckStyle)); private set
-    fun setDeck(d: DeckStyle) { prefs.deckStyle = d.code; deckStyle = d }
+    var appearance by mutableStateOf(PokerAppearance(
+        DeckStyle.fromCode(prefs.deckStyle),
+        CardBackStyle.fromCode(prefs.cardBackStyle),
+        TableStyle.fromCode(prefs.tableStyle),
+    )); private set
+    fun updateAppearance(value: PokerAppearance) {
+        prefs.saveAppearance(value.face.code, value.back.art.code, value.table.code)
+        appearance = value
+    }
     private val sound = SoundPlayer(app).also { it.enabled = prefs.sound }
     var soundOn by mutableStateOf(prefs.sound); private set
     fun setSound(v: Boolean) { prefs.sound = v; soundOn = v; sound.enabled = v }

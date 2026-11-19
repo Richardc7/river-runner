@@ -3,13 +3,17 @@ package com.riverrunner.ui
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +25,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -34,6 +40,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -98,16 +107,47 @@ fun PlayingCard(card: Int?, width: Dp, dim: Boolean = false, modifier: Modifier 
         DeckStyle.CLASSIC -> classicColor(suit)
         DeckStyle.FOUR_COLOR -> fourColor(suit)
         DeckStyle.FOUR_COLOR_FILLED -> Color.White
+        DeckStyle.CYBERPUNK -> when (suit) {
+            0 -> Color(0xFF84F5A8)
+            1 -> Color(0xFF70E7FF)
+            2 -> Color(0xFFFF86B4)
+            else -> Color(0xFFE1DAFF)
+        }
+        DeckStyle.WESTERN -> if (suit == 1 || suit == 2) Color(0xFF902F2B) else Color(0xFF382820)
+        DeckStyle.TAROT -> when (suit) {
+            0 -> Color(0xFF2C684E)
+            1 -> Color(0xFF3458A0)
+            2 -> Color(0xFF9A2D4B)
+            else -> Color(0xFF292346)
+        }
     }
-    val face = if (filled) fourColor(suit).let { if (suit == 3) Color(0xFF2A2D31) else it } else Color(0xFFFBF9F3)
+    val face = when (style) {
+        DeckStyle.FOUR_COLOR_FILLED -> if (suit == 3) Color(0xFF2A2D31) else fourColor(suit)
+        DeckStyle.CYBERPUNK -> Color(0xFF151629)
+        DeckStyle.WESTERN -> Color(0xFFFFE6BB)
+        DeckStyle.TAROT -> Color(0xFFF7EBCA)
+        else -> Color(0xFFFBF9F3)
+    }
+    val border = when (style) {
+        DeckStyle.FOUR_COLOR_FILLED -> Color.White.copy(alpha = 0.85f)
+        DeckStyle.CYBERPUNK -> ink.copy(alpha = 0.66f)
+        DeckStyle.WESTERN -> Color(0xFFAE7946)
+        DeckStyle.TAROT -> Color(0xFFA37A3D)
+        else -> Color(0x40000000)
+    }
+    val font = when (style) {
+        DeckStyle.CYBERPUNK -> FontFamily.Monospace
+        DeckStyle.TAROT, DeckStyle.WESTERN -> FontFamily.Serif
+        else -> FontFamily.Default
+    }
     Box(
         modifier.size(width, h).clip(shape)
             .background(face)
-            .border(if (filled) 1.5.dp else 1.dp, if (filled) Color.White.copy(alpha = 0.85f) else Color(0x40000000), shape)
+            .border(if (filled) 1.5.dp else 1.dp, border, shape)
     ) {
         Column(Modifier.padding(start = width * 0.09f, top = width * 0.03f)) {
             Text(
-                rankText(card), color = ink, fontWeight = FontWeight.Bold,
+                rankText(card), color = ink, fontWeight = FontWeight.Bold, fontFamily = font,
                 fontSize = (width.value * 0.44f).sp, lineHeight = (width.value * 0.48f).sp,
             )
             SuitIcon(suit, width * 0.27f, ink)
@@ -123,6 +163,16 @@ fun PlayingCard(card: Int?, width: Dp, dim: Boolean = false, modifier: Modifier 
 @Composable
 fun CardBack(width: Dp, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(width * 0.12f)
+    val style = LocalCardBackStyle.current
+    val art = style.image
+    if (art != null) {
+        Image(
+            painterResource(art), contentDescription = null, contentScale = ContentScale.FillBounds,
+            modifier = modifier.size(width, width * 1.4f).clip(shape)
+                .border(1.dp, style.art.trim.copy(alpha = .7f), shape),
+        )
+        return
+    }
     Box(
         modifier.size(width, width * 1.4f).clip(shape)
             .background(Brush.linearGradient(listOf(Color(0xFF8A2232), Color(0xFF4B0F1A))))
@@ -173,6 +223,31 @@ fun Pill(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifie
         contentAlignment = Alignment.Center,
     ) {
         Text(text, color = if (selected) Palette.Ink else Palette.Text, maxLines = 1, softWrap = false, fontSize = 14.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+    }
+}
+
+@Composable
+internal fun SettingsChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected, onClick = onClick,
+        label = { Text(label, fontSize = 13.sp) },
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = Palette.PanelHi, labelColor = Palette.Text,
+            selectedContainerColor = Palette.Gold, selectedLabelColor = Palette.Ink,
+        ),
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun <T> ConfigurationChoices(
+    label: String, options: List<T>, selected: T, title: (T) -> String, onPick: (T) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(label, color = Palette.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            for (option in options) SettingsChip(title(option), selected == option) { onPick(option) }
+        }
     }
 }
 

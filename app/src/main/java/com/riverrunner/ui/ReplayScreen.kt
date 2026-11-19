@@ -2,8 +2,10 @@ package com.riverrunner.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,10 +16,15 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,16 +35,17 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.riverrunner.engine.Action
-import com.riverrunner.engine.ActionType
 import com.riverrunner.engine.Bot
 import com.riverrunner.engine.BotStyle
 import com.riverrunner.engine.Cards
@@ -48,7 +56,6 @@ import com.riverrunner.engine.HandRecord
 import com.riverrunner.engine.MoveType
 import com.riverrunner.engine.ReplayFrame
 import com.riverrunner.engine.Replayer
-import com.riverrunner.engine.Street
 import com.riverrunner.engine.strategy.PolicySnapshot
 import com.riverrunner.engine.strategy.StudyCoach
 import com.riverrunner.i18n.LocalStrings
@@ -185,92 +192,151 @@ fun ReplayContent(
     val savedDecisions = remember(decisions) { decisions.associateBy { it.trace.actionIndex } }
     val savedDecision = savedDecisions[decisionIndex]
     val wasHeroAction = frame.action?.seat == record.heroSeat
+    var pane by rememberSaveable(record.id) { mutableStateOf(ReplayPane.TIMELINE) }
     val modelGap = remember(record.id, savedDecision, wasHeroAction) {
         if (wasHeroAction && savedDecision != null) {
             StudyCoach.assess(record.id, savedDecision.view, savedDecision.trace, savedDecision.action).modelGapBB
         } else null
     }
-    val policyCache = remember(record.id) { mutableStateMapOf<Int, PolicySnapshot>() }
-    LaunchedEffect(record.id, decisionIndex, savedDecision) {
-        if (decisionIndex >= 0 && savedDecision == null && policyCache[decisionIndex] == null) {
-            val p = withContext(Dispatchers.Default) {
+    val policyCache = remember(record.id) { mutableStateMapOf<Int, ReplayPolicy?>() }
+    LaunchedEffect(pane, record.id, decisionIndex, savedDecision) {
+        if (pane == ReplayPane.ANALYSIS && decisionIndex >= 0 && savedDecision == null &&
+            !policyCache.containsKey(decisionIndex)) {
+            policyCache[decisionIndex] = withContext(Dispatchers.Default) {
                 runCatching {
                     val e = replayer.engineBeforeAction(decisionIndex)
-                    PolicySnapshot.from(Bot.decide(e, record.heroSeat, BotStyle.GTO, Random(record.id + decisionIndex)))
+                    ReplayPolicy(
+                        PolicySnapshot.from(Bot.decide(e, record.heroSeat, BotStyle.GTO, Random(record.id + decisionIndex))),
+                        e.legalActions().isOpeningBet,
+                    )
                 }.getOrNull()
             }
-            if (p != null) policyCache[decisionIndex] = p
         }
     }
-    val policy = savedDecision?.trace?.baseline ?: policyCache[decisionIndex]
+    val reference = savedDecision?.let { ReplayPolicy(it.trace.baseline, it.view.legal.isOpeningBet) }
+        ?: policyCache[decisionIndex]
     val table = replayTable(st, record, frames, idx, equityCache[eqKey], fmt)
-    val log = remember(record.id, st) { replayLog(st, record, frames, fmt) }
-    var explainExpanded by remember(record.id) { mutableStateOf(true) }
+    val log = remember(record.id, st, fmt) { replayLog(st, record, frames, fmt) }
     val opponentAction = frame.action?.takeIf { it.seat != record.heroSeat && !it.type.isPost }
     val opponent = opponentAction?.let { action -> record.players.firstOrNull { it.seat == action.seat } }
+    val timelineState = rememberLazyListState()
 
-    Row(Modifier.fillMaxSize().background(Palette.Bg)) {
-        Box(Modifier.weight(1f).fillMaxHeight().padding(start = 4.dp, top = 4.dp, bottom = 2.dp)) {
-            PokerTable(table, fmt, st.pot, Modifier.fillMaxSize(), animateDeal = false, showTotalPot = !frame.isEnd)
-        }
-        Column(
-            Modifier.width(240.dp).fillMaxHeight().background(Palette.Panel).padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                if (onBack != null) SmallButton("←", onBack)
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "${st.replay} · ${st.handNo(record.handNumber)}", color = Palette.Text, fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold, maxLines = 1,
-                    )
-                    Text(
-                        streetName(st, frame.street) + " · ${idx + 1} / ${frames.size}",
-                        color = Palette.TextDim, fontSize = 11.sp, maxLines = 1,
-                    )
-                }
-                SmallButton(if (record.favorite) "★" else "☆", onStar,
-                    Modifier.semantics {
-                        contentDescription = if (record.favorite) {
-                            if (st.isZh) "取消收藏本手" else "Remove hand from favorites"
-                        } else st.starHand
-                    }, highlight = record.favorite)
+    BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Bg)) {
+        val railWidth = (maxWidth * .39f).coerceIn(222.dp, 342.dp)
+        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Box(Modifier.weight(1f).fillMaxHeight().padding(start = 4.dp, top = 4.dp, bottom = 2.dp)) {
+                PokerTable(table, fmt, st.pot, Modifier.fillMaxSize(), animateDeal = false, showTotalPot = !frame.isEnd)
             }
-            ReplayControls(idx, frames.lastIndex, jumpTo)
-            if (!frame.isEnd && live.size >= 2) {
+            val shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
+            Column(
+                Modifier.width(railWidth).fillMaxHeight().clip(shape).background(Palette.Panel)
+                    .border(1.dp, Palette.Line, shape).padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(Palette.Blue))
-                    Text(if (st.isZh) "蓝色百分比 · 摊牌权益（含平分）" else "Blue % · showdown equity incl. splits",
-                        color = Palette.TextDim, fontSize = 10.sp)
-                }
-            }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (st.isZh) "行动记录 · 点击一条可查看原因" else "Action log · tap to inspect",
-                    modifier = Modifier.weight(1f), color = Palette.TextDim, fontSize = 10.sp, maxLines = 2)
-                if (heroAction != null || opponentAction != null) {
-                    SmallButton(if (explainExpanded) "−" else "+", { explainExpanded = !explainExpanded })
-                }
-            }
-            if (explainExpanded && (heroAction != null || opponentAction != null)) {
-                Column(Modifier.weight(.54f).fillMaxWidth().verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    if (heroAction != null) {
-                        val openingBet = savedDecision?.view?.legal?.isOpeningBet
-                            ?: (heroAction.type == ActionType.BET || heroAction.type == ActionType.CHECK && frame.street != Street.PREFLOP)
-                        AnalysisCard(heroAction, wasHeroAction, policy, modelGap, openingBet, fmt)
+                    if (onBack != null) SmallButton("←", onBack)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("${st.replay} · ${st.handNo(record.handNumber)}", color = Palette.Text, fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text(streetName(st, frame.street) + " · ${idx + 1} / ${frames.size}",
+                            color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
-                    if (opponentAction != null && opponent != null) {
-                        OpponentInsightCard(opponentAction, opponent, frame.board, st, fmt)
+                    SmallButton(if (record.favorite) "★" else "☆", onStar,
+                        Modifier.semantics {
+                            contentDescription = if (record.favorite) {
+                                if (st.isZh) "取消收藏本手" else "Remove hand from favorites"
+                            } else st.starHand
+                        }, highlight = record.favorite)
+                }
+                ReplayControls(idx, frames.lastIndex, jumpTo)
+                ReplayPaneTabs(pane, st) { pane = it }
+
+                if (pane == ReplayPane.TIMELINE) {
+                    ReplayTimeline(log, idx, timelineState, jumpTo, Modifier.weight(1f))
+                } else {
+                    val scroll = rememberScrollState()
+                    LaunchedEffect(idx) { scroll.scrollTo(0) }
+                    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (opponentAction != null && opponent != null) {
+                            OpponentInsightCard(opponentAction, opponent, frame.board, st, fmt)
+                        }
+                        if (decisionIndex >= 0) {
+                            AnalysisCard(heroAction.takeIf { wasHeroAction }, reference, modelGap,
+                                loading = savedDecision == null && !policyCache.containsKey(decisionIndex), fmt = fmt)
+                        } else if (opponentAction == null) {
+                            Text(if (st.isZh) "这一帧没有行动。可从行动记录选择要查看的决策。"
+                                else "There is no action in this frame. Select a decision in the action log.",
+                                color = Palette.Text, fontSize = 14.sp, modifier = Modifier.padding(8.dp))
+                        }
                     }
                 }
-                HorizontalDivider(color = Palette.Line)
-                ActionLog(log, Modifier.weight(.46f), highlightIndex = idx, onClick = jumpTo)
-            } else {
-                ActionLog(log, Modifier.weight(1f), highlightIndex = idx, onClick = jumpTo)
+                if (!frame.isEnd && live.size >= 2) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(Palette.Blue))
+                        Text(if (st.isZh) "蓝色百分比为摊牌权益（含平分）" else "Blue % is showdown equity, including splits",
+                            color = Palette.TextDim, fontSize = 11.sp)
+                    }
+                }
+                if (onContinue != null) {
+                    ActionButton(st.reviewNext, Palette.Gold, Modifier.fillMaxWidth(), textColor = Palette.Ink, onClick = onContinue)
+                }
             }
-            if (onContinue != null) {
-                ActionButton(st.reviewNext, Palette.Gold, Modifier.fillMaxWidth(), textColor = Palette.Ink, onClick = onContinue)
+        }
+    }
+}
+
+private enum class ReplayPane { TIMELINE, ANALYSIS }
+
+private data class ReplayPolicy(val snapshot: PolicySnapshot, val openingBet: Boolean)
+
+@Composable
+private fun ReplayPaneTabs(pane: ReplayPane, st: Strings, select: (ReplayPane) -> Unit) {
+    val shape = RoundedCornerShape(8.dp)
+    Row(Modifier.fillMaxWidth().clip(shape).background(Palette.Bg).selectableGroup().padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        for (option in ReplayPane.entries) {
+            val active = pane == option
+            val label = when (option) {
+                ReplayPane.TIMELINE -> if (st.isZh) "行动记录" else "Action log"
+                ReplayPane.ANALYSIS -> if (st.isZh) "本步分析" else "Step analysis"
+            }
+            Box(Modifier.weight(1f).heightIn(min = 38.dp).clip(shape)
+                .background(if (active) Palette.Gold else Palette.PanelHi)
+                .selectable(active, role = Role.Tab) { select(option) },
+                contentAlignment = Alignment.Center) {
+                Text(label, color = if (active) Palette.Ink else Palette.Text, fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReplayTimeline(lines: List<LogLine>, index: Int, state: androidx.compose.foundation.lazy.LazyListState,
+    jump: (Int) -> Unit, modifier: Modifier) {
+    LaunchedEffect(index) {
+        if (state.layoutInfo.visibleItemsInfo.none { it.index == index }) state.scrollToItem(index)
+    }
+    LazyColumn(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Palette.Bg),
+        state = state, contentPadding = PaddingValues(5.dp), verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        itemsIndexed(lines) { i, entry ->
+            val selected = i == index
+            val color = when {
+                selected -> Palette.Gold
+                i > index -> Palette.TextDim
+                else -> Palette.Text
+            }
+            Row(Modifier.fillMaxWidth().heightIn(min = 38.dp).clip(RoundedCornerShape(6.dp))
+                .background(if (selected) Palette.GoldDim.copy(alpha = .52f) else Palette.Bg)
+                .selectable(selected, role = Role.Button) { jump(i) }
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(entry.text, color = color, fontSize = 14.sp, lineHeight = 18.sp,
+                    fontWeight = if (selected || entry.kind == LogKind.STREET) FontWeight.SemiBold else FontWeight.Normal)
+                for (card in entry.cards) PlayingCard(card, 16.dp)
             }
         }
     }
@@ -290,8 +356,12 @@ private fun ReplayControls(index: Int, last: Int, onJump: (Int) -> Unit) {
             OutlinedButton(
                 onClick = { onJump(target) }, enabled = target in 0..last && target != index,
                 modifier = Modifier.weight(1f).heightIn(min = 38.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Palette.Text,
+                    containerColor = if (target == index + 1) Palette.PanelHi2 else Palette.PanelHi,
+                ),
                 contentPadding = PaddingValues(horizontal = 2.dp),
-            ) { Text(label, fontSize = 11.sp, maxLines = 1) }
+            ) { Text(label, fontSize = 12.sp, maxLines = 1, fontWeight = FontWeight.SemiBold) }
         }
     }
 }
@@ -307,9 +377,9 @@ private fun OpponentInsightCard(
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Text((if (st.isZh) "对手行动解读 · " else "Opponent decision · ") + player.name,
-            color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         Text((if (st.isZh) "实际行动：" else "Recorded action: ") +
-            TableMapper.actionLabel(st, action, fmt), color = Palette.Text, fontSize = 12.sp)
+            TableMapper.actionLabel(st, action, fmt), color = Palette.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Text((if (st.isZh) "模拟对手风格：" else "Bot preset: ") + st.styleName(player.style),
             color = Palette.TextDim, fontSize = 11.sp)
         Text((if (st.isZh) "赛后回看对手底牌：" else "Opponent hole cards, revealed in replay: ") +
@@ -321,7 +391,7 @@ private fun OpponentInsightCard(
                 HandEvaluator.categoryName(rank, st.isZh), color = Palette.TextDim, fontSize = 11.sp)
         }
         Text(StudyPresentation.opponentReason(action, player.style, st.isZh),
-            color = Palette.Text, fontSize = 12.sp)
+            color = Palette.Text, fontSize = 14.sp, lineHeight = 20.sp)
         Text(if (st.isZh)
             "对手底牌只供赛后回看；上述可能原因来自行动与预设类型，并非 AI 当时的内部推理或真实 GTO 判断。"
             else "A plausible explanation from the public action and preset, not a recorded internal bot rationale or verified GTO.",
@@ -331,46 +401,54 @@ private fun OpponentInsightCard(
 
 @Composable
 private fun AnalysisCard(
-    heroAction: Action, decided: Boolean, policy: PolicySnapshot?, modelGapBB: Double?, openingBet: Boolean, fmt: (Int) -> String,
+    heroAction: Action?, reference: ReplayPolicy?, modelGapBB: Double?, loading: Boolean, fmt: (Int) -> String,
 ) {
     val st = LocalStrings.current
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Palette.PanelHi).padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (decided) {
-            Text("${st.yourAction}: ${TableMapper.actionLabel(st, heroAction, fmt)}", color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(
+            if (heroAction != null) TableMapper.actionLabel(st, heroAction, fmt)
+            else if (st.isZh) "你的下一步参考" else "Your next decision",
+            color = Palette.Text, fontSize = 17.sp, fontWeight = FontWeight.Bold,
+        )
+        if (modelGapBB != null) {
+            val delta = if (modelGapBB < .005) 0.0 else -modelGapBB
+            Text((if (st.isZh) "相对模型最优 EV · " else "EV versus model best · ") + "%.2f BB".format(delta),
+                color = Palette.Gold, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
-        if (policy == null) {
-            Text(st.computing, color = Palette.TextDim, fontSize = 12.sp)
+        if (reference == null) {
+            val unavailable = if (st.isZh) "这个决策没有可用的策略参考。" else "No strategy reference for this decision."
+            Text(if (loading) st.computing else unavailable, color = Palette.Text, fontSize = 14.sp)
             return@Column
         }
-        Text(if (st.isZh) "启发式基准频率" else "Heuristic frequencies", color = Palette.Accent, fontSize = 12.sp)
+        val policy = reference.snapshot
+        Text(if (st.isZh) "启发式基准频率" else "Heuristic baseline frequencies",
+            color = Palette.TextDim, fontSize = 13.sp)
         val dist = policy.choices.groupBy { it.move.type }.mapValues { (_, choices) -> choices.sumOf { it.probability } }
         val frequencies = MoveType.entries.mapNotNull { type -> dist[type]?.takeIf { it > 0 }?.let { type to it } }
         StrategyFrequencyBar(frequencies)
-        for ((type, frequency) in frequencies) {
-            Text(StudyPresentation.moveType(type, st.isZh, openingBet) + " " + Format.pct(frequency),
-                color = strategyActionColor(type), fontSize = 11.sp)
+        for ((type, frequency) in frequencies.sortedByDescending { it.second }) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(StudyPresentation.moveType(type, st.isZh, reference.openingBet),
+                    color = Palette.Text, fontSize = 14.sp)
+                Text(Format.pct(frequency), color = strategyActionColor(type), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
         }
         val bets = policy.choices.filter { it.move.type == MoveType.RAISE && it.probability > 0 }
         if (bets.isNotEmpty()) Text(
             bets.joinToString(" · ") { fmt(it.move.raiseTo) + " " + Format.pct(it.probability) },
-            color = Palette.TextDim, fontSize = 11.sp,
+            color = Palette.TextDim, fontSize = 13.sp,
         )
-        if (decided) {
+        if (heroAction != null) {
             val frequency = StudyCoach.moveOf(heroAction)?.let { dist[it.type] } ?: 0.0
             if (frequency < 0.15) Text(
                 (if (st.isZh) "基准低频行动 · " else "Low-frequency action · ") + Format.pct(frequency),
-                color = Palette.Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
             )
-            if (modelGapBB != null) {
-                val delta = if (modelGapBB < .005) 0.0 else -modelGapBB
-                Text((if (st.isZh) "相对模型最优 EV · " else "EV versus model best · ") + "%.2f BB".format(delta),
-                    color = if (delta < 0) Palette.Gold else Palette.TextDim, fontSize = 12.sp)
-            }
         }
-        policy.equity?.let { Text("${st.estEquity}: ${Format.pct(it)}", color = Palette.TextDim, fontSize = 11.sp) }
-        if (policy.potOdds > 0) Text("${st.needEquity}: ${Format.pct(policy.potOdds)}", color = Palette.TextDim, fontSize = 11.sp)
+        policy.equity?.let { Text("${st.estEquity}: ${Format.pct(it)}", color = Palette.TextDim, fontSize = 13.sp) }
+        if (policy.potOdds > 0) Text("${st.needEquity}: ${Format.pct(policy.potOdds)}", color = Palette.TextDim, fontSize = 13.sp)
     }
 }

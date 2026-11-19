@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -92,11 +93,23 @@ class StudyUxRedesignTest {
         compose.setContent { RiverTheme(ZH) { EditionReplayScreen(vm, record) } }
         compose.onNodeWithText("下一步").performClick()
         compose.onNodeWithText("翻牌前 · 2 / 2").assertExists()
+        compose.onNodeWithText("本步分析").performClick().assertIsSelected()
+        compose.onNodeWithText("翻牌前 · 2 / 2").assertExists()
+        compose.onNodeWithText("行动记录").performClick().assertIsSelected()
         compose.onNodeWithText("双轨分析").performClick()
         compose.onNodeWithText("逐街回放").performClick()
         compose.onNodeWithText("翻牌前 · 2 / 2").assertExists()
         compose.onNodeWithText("开头").performClick()
         compose.onNodeWithText("翻牌前 · 1 / 2").assertExists()
+    }
+
+    @Test fun appearanceKeepsIndependentCardAndTableChoices() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val vm = AppViewModel(app)
+        val preset = PokerAppearance.presets.first { it.table == TableStyle.WESTERN }
+        val appearance = preset.copy(face = DeckStyle.CLASSIC, back = CardBackStyle.TAROT)
+        vm.updateAppearance(appearance)
+        assertEquals(appearance, AppViewModel(app).appearance)
     }
 
     @Test fun statisticsExplainMissingRatesAndFilterTheSample() {
