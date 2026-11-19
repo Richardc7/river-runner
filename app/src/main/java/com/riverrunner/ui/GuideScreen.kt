@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -41,6 +43,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,6 +66,7 @@ fun GuideScreen(vm: AppViewModel) {
 fun GuideContent(onClose: () -> Unit, startTab: GuideTab = GuideTab.BASICS) {
     val st = LocalStrings.current
     val zh = st.isZh
+    val focus = LocalFocusManager.current
     var tab by rememberSaveable(startTab) { mutableStateOf(startTab) }
     var termQuery by rememberSaveable { mutableStateOf("") }
     val scroll = rememberScrollState()
@@ -81,7 +86,10 @@ fun GuideContent(onClose: () -> Unit, startTab: GuideTab = GuideTab.BASICS) {
                     Box(Modifier.fillMaxWidth().clip(shape)
                         .background(if (selected) Palette.AccentDim else Palette.Panel)
                         .then(if (selected) Modifier.border(1.dp, Palette.Accent, shape) else Modifier)
-                        .selectable(selected, role = Role.Tab) { tab = target }
+                        .selectable(selected, role = Role.Tab) {
+                            focus.clearFocus()
+                            tab = target
+                        }
                         .padding(horizontal = 10.dp, vertical = 7.dp)) {
                         Text(tabTitle(target, zh), color = Palette.Text, fontSize = 13.sp, lineHeight = 17.sp,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
@@ -396,6 +404,7 @@ private val TERMS = listOf(
 
 @Composable
 private fun Glossary(zh: Boolean, query: String, onQuery: (String) -> Unit) {
+    val focus = LocalFocusManager.current
     OutlinedTextField(
         value = query,
         onValueChange = { onQuery(it.take(100)) },
@@ -403,6 +412,8 @@ private fun Glossary(zh: Boolean, query: String, onQuery: (String) -> Unit) {
         label = { Text(if (zh) "搜索中英文术语" else "Search terms in either language") },
         placeholder = { Text(if (zh) "例如 SPR、底池、4/2" else "Try SPR, pot or 4/2") },
         singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
         trailingIcon = if (query.isBlank()) null else {
             { TextButton(onClick = { onQuery("") }) { Text(if (zh) "清除" else "Clear") } }
         },
