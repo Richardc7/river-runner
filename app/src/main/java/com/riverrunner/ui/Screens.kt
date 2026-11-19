@@ -79,7 +79,7 @@ fun HomeScreen(vm: AppViewModel) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text("River Runner", color = Palette.Text, fontSize = 30.sp, lineHeight = 30.sp, fontFamily = Numeric, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(10.dp))
-                Text("Exploit " + (vm.changelog.firstOrNull()?.version ?: "Edition"),
+                Text("EE" + (vm.changelog.firstOrNull()?.version?.let { " $it" } ?: ""),
                     color = accent, fontSize = 12.sp, maxLines = 1,
                     modifier = Modifier.padding(bottom = 3.dp))
             }
@@ -304,7 +304,7 @@ fun SetupContent(
             Text(lines[0], color = Palette.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 24.sp)
             for (l in lines.drop(1)) Text(l, color = Palette.Text.copy(alpha = 0.85f), fontSize = 13.sp, lineHeight = 19.sp)
             if (selectedEdition != null) {
-                Text((if (st.isZh) "Exploit 配置：" else "Exploit config: ") + selectedEdition,
+                Text((if (st.isZh) "EE 配置：" else "EE settings: ") + selectedEdition,
                     color = Palette.Gold, fontSize = 11.sp, maxLines = 3)
             }
             if (onLiveStrategyChange != null) {
@@ -496,7 +496,7 @@ fun SettingsScreen(vm: AppViewModel) {
                 }
                 ActionButton(if (st.isZh) "存档备份与恢复" else "Save backup and restore", Palette.PanelHi,
                     modifier = Modifier.fillMaxWidth()) { showBackup = true }
-                SectionTitle("Exploit Edition")
+                SectionTitle(if (st.isZh) "EE 版" else "EE settings")
                 Text(if (st.isZh) "AI、对手、抽水与筹码设置已集成；保存后从新牌桌开始生效。" else
                     "AI, opponents, rake and stacks are configurable. Saved settings apply to the next table.",
                     color = Palette.TextDim, fontSize = 12.sp)
@@ -596,7 +596,7 @@ private fun AboutDialog(onClose: () -> Unit) {
         title = { Text(if (st.isZh) "关于与隐私" else "About & privacy") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("River Runner · " + st.currentVersion(version))
+                Text("River Runner EE · " + st.currentVersion(version))
                 Text(if (st.isZh) "牌局、练习进度和导入的策略保存在设备上。应用本身离线运行。Android 可能按照设备备份设置备份应用数据。导出时，由你在系统文件选择器中指定保存位置。"
                     else "Hands, practice progress, and imported strategies are stored on the device. The app runs offline. Android may back up app data according to your device settings. Exports go to the location you select in the system file picker.")
                 Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {

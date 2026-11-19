@@ -31,7 +31,7 @@ android {
     }
     buildTypes {
         debug {
-            if (versionNameOverride == null) versionNameSuffix = "-exploit-dev"
+            if (versionNameOverride == null) versionNameSuffix = "-ee-dev"
         }
         release {
             isMinifyEnabled = true

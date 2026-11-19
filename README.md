@@ -1,155 +1,51 @@
-# River Runner ♠
+# River Runner EE
 
-<p align="center">
-  <img src="docs/banner.png" alt="River Runner — offline Texas Hold'em practice" width="100%">
-</p>
+River Runner EE（EE 版）是 Android 横屏离线德州扑克训练器。你可以和电脑对局，用牌局记录回看自己的决策，再把实际遇到的局面拿来练习。
 
-<p align="center">
-  <b>An offline Texas Hold'em drill partner for Android.</b><br>
-  <sub>Exploit Edition · No account · no ads · no in-app purchases · no network permission</sub>
-</p>
+**[下载正式版 APK](https://github.com/Richardc7/river-runner/releases/latest)** · [完整功能改动](https://github.com/Richardc7/river-runner/blob/exploit-edition/docs/EE_CHANGES.md) · [版本更新日志](https://github.com/Richardc7/river-runner/blob/exploit-edition/EXPLOIT_CHANGELOG.md) · [EE 版源码](https://github.com/Richardc7/river-runner/tree/exploit-edition) · Android 8.0+
 
-<p align="center">
-  <a href="https://github.com/Richardc7/river-runner/releases/latest"><b>Download Exploit Edition APK / 下载 APK</b></a>
-  <br>
-  <sub><a href="https://github.com/Richardc7/river-runner/releases">Releases / 发布记录</a> · <a href="EXPLOIT_CHANGELOG.md">更新日志 / changelog</a> · Android 8.0+</sub>
-</p>
+[![EE build](https://github.com/Richardc7/river-runner/actions/workflows/build.yml/badge.svg?branch=exploit-edition)](https://github.com/Richardc7/river-runner/actions/workflows/build.yml?query=branch%3Aexploit-edition)
 
-<p align="center">
-  <img alt="build" src="https://github.com/Richardc7/river-runner/actions/workflows/build.yml/badge.svg?branch=exploit-edition">
-  <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-1E7048?style=flat-square&labelColor=0C1310&logo=android&logoColor=white">
-  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-100%25-7F52FF?style=flat-square&labelColor=0C1310&logo=kotlin&logoColor=white">
-  <img alt="No permissions" src="https://img.shields.io/badge/permissions-none-4FC88A?style=flat-square&labelColor=0C1310">
-  <img alt="licence-MIT" src="https://img.shields.io/badge/license-MIT-E6B54F?style=flat-square&labelColor=0C1310">
-</p>
+## 项目来源
 
-## What it is
+原作由 **[shunzhe1121](https://github.com/shunzhe1121)** 开发。EE 版由 **[Richardc7](https://github.com/Richardc7)** 在 [原 River Runner 仓库](https://github.com/shunzhe1121/river-runner)的 [`36ada64` 提交](https://github.com/shunzhe1121/river-runner/commit/36ada64827fd9f3a379b2bc737b593c65746eeb1)基础上维护。原版提供了离线对局、筹码局与锦标赛、横屏牌桌、对手风格、牌局记录、回放、存档和新手引导。EE 版保留原作署名与 [MIT 许可](LICENSE)，Barlow Condensed 字体继续沿用 [SIL Open Font License](licenses/)。
 
-Most poker trainers are subscriptions. Most free poker apps are online, ad-supported, or quietly steering you toward a deposit.
+## EE 版改了什么
 
-River Runner is neither. It is a study tool that runs entirely on your phone: you play hands against bots, and while you decide it shows the numbers a cash-game player actually uses — **pot odds, required equity, SPR** — without showing your own equity, because working that out is the exercise. After the hand you step back through it with **every hole card face up**, see what the GTO approximation would have done on each street, and whether you agreed with it.
+| 模块 | 相对于原版的改动 |
+| --- | --- |
+| **开局、对手与私人局** | 扩展到最多 9 人桌。逐座位设置对手风格和初始筹码，中文对局使用中文姓名，可选姓名是否随打法风格变化。筹码局可配置 2 BB 枪口位活抓盲、抽水比例和封顶、见翻牌才抽水、自动重买及手间补码。 |
+| **对手策略** | 保留原版基准 AI，另可开启动态调整。对手画像按当局公开行动的实际机会计数，样本少时沿用基准。加入按组合加权的范围估计，以及适用河牌局面的模型 EV。 |
+| **牌桌与外观** | 固定显示底池和最近行动，整理右侧行动记录与下注控件。牌桌、牌面、牌背可分别搭配经典、赛博朋克、美式西部与塔罗主题。提供字号、高对比度、音效及震动设置。 |
+| **牌局回放与盲测** | 逐步浏览牌局，看所选行动之前的位置、有效筹码、牌面、底池、跟注门槛与下注尺度。双轨分析比较基准与调整策略。符合条件的记录可直接进入盲测，先按当时可见的信息作答，再看实战与参考。 |
+| **训练和外部策略** | 加入河牌专项题、错题间隔复习、弱点报告、13×13 翻前范围教练和河牌情景对比。支持把符合条件的单挑河牌场景交给电脑端 TexasSolver，再按原决策导回结果。 |
+| **记录、统计与结算** | 按牌号、位置、日期或底牌搜索，按结果、偏离、收藏等筛选。标示自动弃牌和已复盘，支持导出牌谱和清理未收藏记录。统计显示分母与累计盈亏趋势，样本不足时暂不显示对应比率。结算区分提前退出与正式夺冠，筹码局盈亏计入重买和补码。 |
+| **指南与数据** | 中英双语新手指南覆盖新增入口，术语可搜索。扑克速算包括 4/2 法则、底池赔率、纯诈唬门槛、跟注 EV、有效筹码与 SPR。可用 ZIP 备份和恢复存档，也可单独重置当前存档的训练进度。 |
 
-No real money, no chips to buy, no login, nothing that phones home.
+内置启发式和动态调整策略用于训练。导入的外部策略只匹配对应决策，频率取决于求解时使用的范围和下注树。[完整差异和适用条件](https://github.com/Richardc7/river-runner/blob/exploit-edition/docs/EE_CHANGES.md)
 
-## 这是什么
+## 安装与更新
 
-市面上的德州训练软件要么按订阅收费，要么是带广告、引导充值的在线房间。
+- 已安装本仓库签名的 **v0.10 正式版**，可以直接覆盖安装 EE 版，保留应用数据。
+- 曾安装本仓库的同包名**调试版**，请先在「设置 → 存档备份与恢复」导出 ZIP，再卸载调试版、安装正式版并恢复。
+- 原作 App 和 EE 版可并存，各自使用独立的 Android 存储空间。EE 版可读取兼容的历史牌谱格式，原作的应用数据需另行保存。
 
-River Runner 两者都不是：一个完全跑在手机本地的练习工具。你和 NPC 对局，决策时它实时给出真实牌局里真正用得到的数字——**底池赔率、所需胜率、SPR**——但刻意不显示你自己的胜率，因为那部分正是要你自己算的。每手结束后可以逐街复盘，**所有底牌全部翻开**，每条街给出 GTO 建议并标记你的偏差。
+发布页附有 APK 的 SHA-256、签名证书指纹和源码提交。将附件下载到同一目录后可校验：
 
-没有真钱、没有充值、不用登录、不联网。
-
-## Practice mode — the numbers, not the answer
-
-<p align="center">
-  <img src="docs/shots/shot-table.png" alt="Practice mode: pot odds, required equity and SPR beside the table" width="100%">
-</p>
-
-<p align="center"><sub>Jade opens to 2.5 BB, you are in the small blind with Q8o. Pot odds 1:2, required equity 33 %, SPR 24.9. Your own equity stays hidden — that is the part you are meant to work out.</sub></p>
-
-## Replay — every card face up, with a verdict
-
-<p align="center">
-  <img src="docs/shots/shot-replay.png" alt="Replay: all hole cards shown, GTO suggestion with frequencies and deviation flag" width="100%">
-</p>
-
-<p align="center"><sub>Board K♠7♦2♣, you hold Q♥Q♠ in the small blind. The solver approximation checks 61 % and raises 39 % here, and your check is marked ✓. Both sides' equity is put on the table for that street.</sub></p>
-
-## A table that behaves like one
-
-<p align="center">
-  <img src="docs/shots/shot-home.png" alt="Lobby with save slots and career stats" width="31%">
-  <img src="docs/shots/shot-showdown.png" alt="Showdown with the winning hand spelled out" width="31%">
-  <img src="docs/shots/shot-achievements.png" alt="35 achievement chips across six categories" width="31%">
-</p>
-
-<p align="center"><sub>Lobby with independent save slots · showdown with the winning hand spelled out · 35 achievement chips across six categories</sub></p>
-
-## Features / 功能
-
-| Area | What you get |
-|---|---|
-| **Tables / 牌桌** | Heads-up through 8-handed, landscape / 单挑到 8 人桌，横屏 |
-| **Bots / NPC** | GTO table, or a mixed table of TAG / LAG / calling station / nit / maniac / GTO 桌或混合风格桌 |
-| **Practice HUD / 练习面板** | Pot odds, required equity, SPR as you act — never your own equity / 实时底池赔率、所需胜率、SPR（不显示你的胜率） |
-| **Replay / 复盘** | All hole cards, per-street equity, GTO suggestion with a deviation flag / 显示所有底牌、每条街胜率、GTO 建议与偏差标记 |
-| **History / 记录** | Last 1000 hands kept automatically; star a hand to keep it forever / 自动保留最近 1000 手，收藏永久保存 |
-| **Stats / 统计** | VPIP, PFR, 3-bet, WTSD, W$SD, BB/100, by position / 入池率、加注率、摊牌率、百手盈亏 |
-| **Saves / 存档** | 6 slots, each with its own stats, history and achievements / 6 个独立存档 |
-| **Achievements / 成就** | 35 chips across six categories / 6 类共 35 个成就 |
-| **Language / 语言** | 中文 / English, switchable in-app |
-
-<details>
-<summary>Table feel, guide, tournaments and everything else / 牌桌手感、新手指南、锦标赛等</summary>
-
-| Area | What you get |
-|---|---|
-| **Modes / 模式** | Cash (standings by chips) and single-table tournament with rising blinds and ICM payouts / 筹码局 + 单桌锦标赛 |
-| **Stacks / 筹码** | Starting stack set in big blinds / 以大盲数设置起始筹码 |
-| **Table feel / 牌桌体验** | Dealing and card-flip animations, chips sliding to the pot and to the winner, pulsing turn indicator, vibration on your turn, live action log; every hand waits for **Next hand** / 发牌翻牌动画、筹码动画、行动提示与震动、行动记录 |
-| **Beginner guide / 新手指南** | Rules, hand rankings, positions, glossary, tips — also reachable from the table via **?** / 玩法、牌型、位置、术语、新手建议 |
-| **Sound / 音效** | Synthesised game sounds, toggle on the table / 合成音效，牌桌上可开关 |
-
-</details>
-
-## Install / 安装
-
-Download the signed Exploit Edition APK from the [GitHub release](https://github.com/Richardc7/river-runner/releases/latest). Each release includes its source commit, APK checksum and signing certificate fingerprint.
-
-以前安装过同包名的调试版本时，请先在「设置 → 存档备份与恢复」导出需要保留的存档。正式版使用独立的发布签名，Android 会拒绝跨签名覆盖安装。安装正式版后，可以从备份恢复存档。
-
-If you installed a debug build of Exploit Edition, export your saves from Settings → Save backup and restore before switching. Android requires the signing certificate to match for an in-place update. You can restore the backup in the signed release.
-
-## How the bots decide / NPC 如何决策
-
-True GTO solutions only exist for heads-up play; no one can solve 5–8 handed games exactly. The bots use an approximation built from published solver output:
-
-- **Preflop** — position-based raise-first-in, 3-bet, 4-bet and calling ranges (e.g. BTN ≈ 44 %, CO ≈ 28 %, UTG 6-max ≈ 17 % opens) on a 169-hand ordering that blends simulated equity with playability. Borderline hands are played as mixed strategies.
-- **Short stacks** — Nash-style push/fold widths by stack depth and players left to act; calls against all-ins compare equity vs. the shover's range to pot odds — or to **ICM** required equity in tournaments.
-- **Postflop** — Monte Carlo equity against each opponent's range (narrowed by their actions), board-texture-based bet sizing, value/bluff frequencies, pot odds with equity realisation, and minimum-defence guards.
-
-Styles (TAG, LAG, station, nit, maniac) shift range widths, aggression, bluffing and call-down thresholds, so a mixed table has exploitable opponents.
-
-真正的 GTO 只对单挑存在可靠解，多人局使用近似解：翻前按位置的范围表 + 混合策略；短筹码使用推/弃与 ICM；翻后根据对手范围的蒙特卡洛胜率、牌面结构、底池赔率做混合决策。
-
-## Under the hood
-
-- **`engine/`** — a plain Kotlin JVM module with no Android dependency: hand evaluator, NLHE state machine with side pots and all-ins, ICM, Monte Carlo equity, bot ranges, hand records and replay, stats. `./gradlew :engine:test` runs it all on a laptop.
-- **`app/`** — Jetpack Compose, landscape, one hand-written design system (see [DESIGN.md](DESIGN.md)).
-- **The screenshots above are generated, not taken.** Robolectric + Roborazzi render them on the JVM in CI (`./gradlew :app:recordRoborazziDebug`) and publish to the [`screenshots`](https://github.com/shunzhe1121/river-runner/tree/screenshots) branch — deterministic, no emulator, no device. The copies in `docs/shots/` are pulled from that branch.
-
-## Build / 构建
-
-```bash
-./gradlew :engine:test          # rules, side pots, ICM, replay
-./gradlew :app:assembleRelease  # APK in app/build/outputs/apk/release/
-```
-
-Barlow Condensed is bundled under the SIL Open Font License (`licenses/`).
-
-## Signing and verification / 签名与校验
-
-Production APKs use the Exploit Edition release key. Signing credentials are stored outside the Git repository. CI publishes debug APKs for testing.
-
-```bash
+```sh
 shasum -a 256 -c SHA256SUMS.txt
-apksigner verify --print-certs river-runner-exploit-v*.apk
+apksigner verify --print-certs river-runner-ee-v*.apk
 ```
 
-Compare the printed certificate SHA-256 fingerprint with `APK_CERTIFICATE.txt` from the same release. Future signed updates use the same package ID and certificate with an increased Android version code.
+将第二条命令的证书 SHA-256 与 `APK_CERTIFICATE.txt` 比较。正式版升级沿用同一个 Android 包名和证书。
 
-For maintainers, `EXPLOIT_VERSION` sets the tag and app version, and `EXPLOIT_VERSION_CODE` sets the monotonic Android version code. Run `:app:assembleRelease` with the private `RR_KEYSTORE_PATH`, `RR_STORE_PASSWORD`, `RR_KEY_ALIAS`, and `RR_KEY_PASSWORD` environment variables.
+## Source and build
 
-## If this is useful to you
+**River Runner EE** is an offline Android Texas Hold’em trainer based on [shunzhe1121’s River Runner](https://github.com/shunzhe1121/river-runner) at [`36ada64`](https://github.com/shunzhe1121/river-runner/commit/36ada64827fd9f3a379b2bc737b593c65746eeb1). Richardc7’s fork adds nine-player tables, configurable cash rules and opponents, action-by-action coaching, blind replay, targeted drills, an offline solver bridge, searchable hand history, backup and restore, and a bilingual guide with quick poker maths. The original copyright and MIT license are retained. [EE source branch](https://github.com/Richardc7/river-runner/tree/exploit-edition)
 
-There is no subscription, no ad and no telemetry in River Runner — the only budget it runs on is attention, and on GitHub stars are the signal that decides whether the next person searching for an offline poker trainer ever finds it.
+```sh
+git switch exploit-edition
+./gradlew :engine:test :app:testDebugUnitTest :app:assembleDebug
+```
 
-- **⭐ Star the repo** if you want more people to find a free trainer. It costs one click and it is the whole marketing department.
-- **🐞 Open an issue** if something is wrong or missing. Reports get read and fixed; that is also how you tell whether a project is alive.
-- **🍴 Fork it** if you are building something similar. The engine is MIT — take it, the maths is the hard part.
-
-如果它对你有点用，一个 star 就是最便宜的支持方式。项目没有订阅、没有广告、也没有埋点。
-
-## License
-
-MIT
+The Kotlin JVM `engine/` contains the poker rules, opponent models and replay. The Jetpack Compose `app/` contains the Android interface. For release signing and storage conventions, see [Build and migration](https://github.com/Richardc7/river-runner/blob/exploit-edition/docs/BUILD_AND_MIGRATION.md).

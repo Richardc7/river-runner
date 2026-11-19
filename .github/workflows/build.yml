@@ -1,4 +1,4 @@
-name: Exploit Edition verification
+name: River Runner EE verification
 
 on:
   push:
@@ -41,15 +41,15 @@ jobs:
         run: ./gradlew :engine:test :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace
       - name: Record APK integrity and signing identity
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk river-runner-exploit-debug.apk
-          sha256sum river-runner-exploit-debug.apk > SHA256SUMS.txt
+          cp app/build/outputs/apk/debug/app-debug.apk river-runner-ee-debug.apk
+          sha256sum river-runner-ee-debug.apk > SHA256SUMS.txt
           build_tools=$(find "${ANDROID_HOME}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
-          "${build_tools}/apksigner" verify --print-certs river-runner-exploit-debug.apk > APK_CERTIFICATE.txt
+          "${build_tools}/apksigner" verify --print-certs river-runner-ee-debug.apk > APK_CERTIFICATE.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: river-runner-exploit-debug
+          name: river-runner-ee-debug
           path: |
-            river-runner-exploit-debug.apk
+            river-runner-ee-debug.apk
             SHA256SUMS.txt
             APK_CERTIFICATE.txt
             SOURCE_COMMIT.txt
