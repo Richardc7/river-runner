@@ -33,11 +33,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -405,10 +407,12 @@ private val TERMS = listOf(
 @Composable
 private fun Glossary(zh: Boolean, query: String, onQuery: (String) -> Unit) {
     val focus = LocalFocusManager.current
+    var searchFocused by remember { mutableStateOf(false) }
+    BackHandler(enabled = searchFocused) { focus.clearFocus() }
     OutlinedTextField(
         value = query,
         onValueChange = { onQuery(it.take(100)) },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().onFocusChanged { searchFocused = it.isFocused },
         label = { Text(if (zh) "搜索中英文术语" else "Search terms in either language") },
         placeholder = { Text(if (zh) "例如 SPR、底池、4/2" else "Try SPR, pot or 4/2") },
         singleLine = true,

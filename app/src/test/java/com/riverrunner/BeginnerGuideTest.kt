@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.riverrunner.i18n.ZH
@@ -32,6 +33,7 @@ class BeginnerGuideTest {
         compose.onNodeWithText("搜索中英文术语").performTextInput("4.2")
         compose.onNodeWithText("4/2 法则").assertIsDisplayed()
         compose.onNodeWithText("BB / 大盲").assertDoesNotExist()
+        compose.onNodeWithText("搜索中英文术语").performImeAction()
 
         compose.onNodeWithText("功能指南").performClick()
         compose.onNodeWithText("专项训练").performClick()
