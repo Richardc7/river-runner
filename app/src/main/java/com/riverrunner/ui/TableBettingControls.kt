@@ -94,13 +94,13 @@ internal fun HeroControls(la: LegalActions, fmt: (Int) -> String, bb: Int, onMov
             Text(st.yourTurn, color = accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
         if (la.canRaise) {
-            Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                 for ((label, v) in presets(st, la, bb)) {
                     val sel = v == target
                     Box(
-                        Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(7.dp))
-                            .background(lerp(Palette.Bg, accent, if (sel) .14f else .035f))
-                            .border(1.dp, accent.copy(alpha = if (sel) .7f else .18f), RoundedCornerShape(7.dp))
+                        Modifier.weight(1f).height(36.dp).clip(RoundedCornerShape(8.dp))
+                            .background(lerp(Palette.Bg, accent, if (sel) .16f else .04f))
+                            .border(1.dp, accent.copy(alpha = if (sel) .75f else .22f), RoundedCornerShape(8.dp))
                             .selectable(sel, role = Role.RadioButton) { target = v },
                         contentAlignment = Alignment.Center,
                     ) {
@@ -128,7 +128,7 @@ internal fun HeroControls(la: LegalActions, fmt: (Int) -> String, bb: Int, onMov
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth().height(46.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth().height(48.dp)) {
             if (la.canCheck) {
                 LiveActionButton(st.check, Palette.Green, Modifier.weight(1f).fillMaxHeight()) { onMove(Move.CHECK) }
             } else {
@@ -177,10 +177,10 @@ internal fun pulse(): Float {
 private fun StepButton(text: String, onClick: () -> Unit) {
     val accent = LocalTableStyle.current.controlAccent
     Box(
-        Modifier.size(34.dp).pressable(onClick = onClick).clip(RoundedCornerShape(7.dp)).background(Palette.Bg)
-            .border(1.dp, accent.copy(alpha = .22f), RoundedCornerShape(7.dp)),
+        Modifier.size(38.dp).pressable(onClick = onClick).clip(RoundedCornerShape(8.dp)).background(Palette.Bg)
+            .border(1.dp, accent.copy(alpha = .26f), RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center,
-    ) { Text(text, color = Palette.Text, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+    ) { Text(text, color = Palette.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
 }
 
 @Composable
@@ -188,7 +188,7 @@ private fun BetSlider(fraction: Float, onChange: (Float) -> Unit, modifier: Modi
     val cb by rememberUpdatedState(onChange)
     val accent = LocalTableStyle.current.controlAccent
     Box(
-        modifier.height(34.dp)
+        modifier.height(38.dp)
             .pointerInput(Unit) { detectTapGestures { cb((it.x / size.width).coerceIn(0f, 1f)) } }
             .pointerInput(Unit) {
                 detectHorizontalDragGestures { change, _ -> cb((change.position.x / size.width).coerceIn(0f, 1f)) }
@@ -196,15 +196,15 @@ private fun BetSlider(fraction: Float, onChange: (Float) -> Unit, modifier: Modi
     ) {
         Canvas(Modifier.fillMaxSize()) {
             val f = fraction.coerceIn(0f, 1f)
-            val r = 8.dp.toPx()
-            val trackH = 4.dp.toPx()
+            val r = 9.dp.toPx()
+            val trackH = 5.dp.toPx()
             val y = size.height / 2
             val left = r
             val right = size.width - r
             drawRoundRect(Palette.PanelHi2, Offset(left, y - trackH / 2), Size(right - left, trackH), CornerRadius(trackH / 2))
             val x = left + (right - left) * f
             drawRoundRect(accent, Offset(left, y - trackH / 2), Size(x - left, trackH), CornerRadius(trackH / 2))
-            drawCircle(accent.copy(alpha = .15f), r + 4.dp.toPx(), Offset(x, y))
+            drawCircle(accent.copy(alpha = .16f), r + 4.dp.toPx(), Offset(x, y))
             drawCircle(accent, r, Offset(x, y))
             drawCircle(lerp(accent, Color.White, .5f), r, Offset(x, y), style = Stroke(1.dp.toPx()))
         }

@@ -374,7 +374,7 @@ class ScreenshotTest {
         )
     }
 
-    /** Seat frames should not collide at reference landscape widths. */
+    /** Seat frames should not collide at reference landscape widths, and pot stays clear of hero cards. */
     @Test fun t31_nine_geometry_no_pod_overlap() {
         for ((w, h) in listOf(568f to 360f, 508f to 360f, 468f to 320f, 420f to 300f)) {
             val geometry = com.riverrunner.ui.TableGeometry(w, h, 9)
@@ -385,6 +385,8 @@ class ScreenshotTest {
                 org.junit.Assert.assertTrue("Nine-seat overlap at ${w}x${h}: seat ${a} / ${b}",
                     horizontal >= geometry.podW || vertical >= geometry.podH)
             }
+            org.junit.Assert.assertTrue("Pot collides with hero cards at ${w}x${h}",
+                geometry.potCenter.y + 10f <= geometry.heroCardsTop)
         }
     }
 

@@ -23,6 +23,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -61,8 +62,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -70,7 +71,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -80,44 +80,47 @@ class TableGeometry(val w: Float, val h: Float, val n: Int, textScale: Float = 1
     /** 7-9 players or a narrow table: smaller seats and board */
     val crowded = n >= 7 || w < 520f
     val cx = w / 2f
-    val cy = h * 0.43f
+    val cy = h * 0.42f
     // Nine seats on short landscape viewports need compact pods so neighbouring
     // players remain separately tappable and the centre board stays legible.
     val podW = when {
         n == 9 && w < 445f -> 80f
         n == 9 && w < 500f -> 92f
         crowded -> 100f
-        else -> 112f
+        else -> 114f
     }
-    val podH = 50f + ((textScale - 1f).coerceAtLeast(0f) * 62f).coerceAtMost(18f)
+    val podH = 50f + ((textScale - 1f).coerceAtLeast(0f) * 56f).coerceAtMost(16f)
     private val cardWidth = if (n == 9 && w < 445f) 20f else if (crowded) 22f else 24f
-    val miniCardW = cardWidth - ((textScale - 1f).coerceAtLeast(0f) * 12f).coerceAtMost(3f)
-    val seatTextPadding = if (textScale > 1.05f) 4.dp else 8.dp
-    val boardCardW = if (crowded) 32f else if (w < 520f || h < 320f) 34f else 38f
+    val miniCardW = cardWidth - ((textScale - 1f).coerceAtLeast(0f) * 10f).coerceAtMost(3f)
+    val seatTextPadding = if (textScale > 1.05f) 5.dp else 8.dp
+    val boardCardW = if (crowded) 31f else if (w < 520f || h < 320f) 34f else 38f
     val boardCardH = boardCardW * 1.4f
     val boardGap = 4f
     val boardW = boardCardW * 5 + boardGap * 4
     val boardTop = cy - boardCardH / 2
     val boardBottom = cy + boardCardH / 2
-    val heroCardW = if (h < 330f) 44f else 50f
+    // Scale hero cards gracefully with viewport height so lifted cards never touch the pot pill.
+    val heroCardW = (h * 0.135f).coerceIn(38f, 50f)
     val heroCardH = heroCardW * 1.4f
     val heroCardsW = heroCardW * 1.8f
     val heroPod = Offset(cx, h - podH / 2 - 2f)
     val heroPodTop = heroPod.y - podH / 2
-    val heroCardsTop = heroPodTop + 10f - heroCardH
-    /** The pot sits under the board. In replay the result banner takes its place. */
-    val potCenter = Offset(cx, boardBottom + 14f)
-    val bannerCenter = Offset(cx, boardBottom + 16f)
-    val heroBadgeLeft = Offset(cx - heroCardsW / 2 - 46f, heroPodTop - 9f)
+    val heroCardsTop = heroPodTop + 8f - heroCardH
+    /** The pot sits under the board with guaranteed clearance above hero cards. */
+    val potCenter = Offset(cx, minOf(boardBottom + 14f, heroCardsTop - 16f))
+    val bannerCenter = Offset(cx, boardBottom + 15f)
+    val heroBadgeLeft = Offset((cx - heroCardsW / 2 - 42f).coerceAtLeast(podW / 2 + 12f), heroPodTop - 10f)
 
     fun seatCenter(rel: Int): Offset {
         if (rel == 0) return heroPod
         val ang = Math.toRadians(90.0 + rel * 360.0 / n)
-        val x = cx + (w / 2 - podW / 2 - 6f) * cos(ang).toFloat()
-        val y = cy + h * 0.45f * sin(ang).toFloat()
+        val rx = w / 2 - podW / 2 - 6f
+        val ry = h * if (n >= 7) 0.43f else 0.44f
+        val x = cx + rx * cos(ang).toFloat()
+        val y = cy + ry * sin(ang).toFloat()
         return Offset(
-            x.coerceIn(podW / 2 + 8f, w - podW / 2 - 4f),
-            y.coerceIn(podH / 2 + 20f, h - podH / 2 - 18f),
+            x.coerceIn(podW / 2 + 6f, w - podW / 2 - 4f),
+            y.coerceIn(podH / 2 + 12f, h - podH / 2 - 16f),
         )
     }
 }
@@ -174,7 +177,7 @@ fun PokerTable(
             }
         }
 
-        val bannerCenter = if (showTotalPot) Offset(g.cx, g.boardTop - 14f) else g.bannerCenter
+        val bannerCenter = if (showTotalPot) Offset(g.cx, (g.boardTop - 15f).coerceAtLeast(16f)) else g.bannerCenter
         Box(Modifier.fillMaxSize().centerAt(bannerCenter)) {
             AnimatedVisibility(
                 t.banner != null,
@@ -185,7 +188,7 @@ fun PokerTable(
                     t.banner ?: "", color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xE6000000))
-                        .border(1.dp, Palette.Gold.copy(alpha = 0.6f), RoundedCornerShape(50))
+                        .border(1.dp, Palette.Gold.copy(alpha = 0.65f), RoundedCornerShape(50))
                         .padding(horizontal = 14.dp, vertical = 4.dp),
                 )
             }
@@ -214,17 +217,26 @@ fun PokerTable(
 }
 
 @Composable
-internal fun TableSurface(style: TableStyle, modifier: Modifier, centerY: Float = .43f) {
+internal fun TableSurface(style: TableStyle, modifier: Modifier, centerY: Float = .42f) {
     val art = style.art?.let { ImageBitmap.imageResource(it) }
     Canvas(modifier) {
         val d = density
         val c = Offset(size.width * .5f, size.height * centerY)
         val rx = size.width * .43f
         val ry = size.height * .39f
-        val rail = minOf(12f * d, size.height * .075f)
+        val rail = minOf(13f * d, size.height * .078f)
         val outer = Rect(c.x - rx - rail, c.y - ry - rail, c.x + rx + rail, c.y + ry + rail)
         val surface = Rect(c.x - rx, c.y - ry, c.x + rx, c.y + ry)
-        val railColors = if (art == null) listOf(Palette.RailHi, Palette.Rail) else listOf(
+
+        // Subtle floor drop-shadow under the walnut rail
+        val shadowRect = outer.inflate(3f * d)
+        drawOval(
+            Color(0x55000000),
+            topLeft = Offset(shadowRect.left, shadowRect.top + 3f * d),
+            size = shadowRect.size,
+        )
+
+        val railColors = if (art == null) listOf(Palette.RailHi, Palette.Rail, Color(0xFF1A110B)) else listOf(
             lerp(Palette.Ink, style.trim, .58f),
             lerp(Palette.Ink, style.trim, .16f),
             lerp(Palette.Ink, style.trim, .36f),
@@ -235,14 +247,27 @@ internal fun TableSurface(style: TableStyle, modifier: Modifier, centerY: Float 
         )
         val railBevel = outer.deflate(2f * d)
         drawOval(
-            Brush.verticalGradient(listOf(style.trim.copy(alpha = .55f), Color.Transparent,
-                style.trim.copy(alpha = .24f)), startY = outer.top, endY = outer.bottom),
+            Brush.verticalGradient(
+                listOf(style.trim.copy(alpha = .62f), Color.Transparent, style.trim.copy(alpha = .28f)),
+                startY = outer.top, endY = outer.bottom,
+            ),
             topLeft = railBevel.topLeft, size = railBevel.size, style = Stroke(1.3f * d),
         )
         if (art == null) {
             drawOval(
-                Brush.radialGradient(listOf(Palette.FeltCenter, Palette.FeltEdge), center = c, radius = rx * 1.05f),
+                Brush.radialGradient(
+                    0.0f to Palette.FeltCenter,
+                    0.62f to Palette.FeltMid,
+                    1.0f to Palette.FeltEdge,
+                    center = c,
+                    radius = rx * 1.06f,
+                ),
                 topLeft = surface.topLeft, size = surface.size,
+            )
+            // Inner rail shadow ring for depth
+            drawOval(
+                Color(0x45000000),
+                topLeft = surface.topLeft, size = surface.size, style = Stroke(3.5f * d),
             )
         } else {
             val cover = maxOf(surface.width / art.width, surface.height / art.height)
@@ -257,10 +282,11 @@ internal fun TableSurface(style: TableStyle, modifier: Modifier, centerY: Float 
             }
             drawOval(style.trim.copy(alpha = .68f), surface.topLeft, surface.size, style = Stroke(1.5f * d))
         }
+        // Subtle brass/gold felt betting line
         drawOval(
-            if (art == null) Color(0x1FFFFFFF) else style.trim.copy(alpha = .22f),
-            topLeft = Offset(c.x - rx * 0.80f, c.y - ry * 0.74f),
-            size = Size(rx * 1.6f, ry * 1.48f), style = Stroke(1.5f * d),
+            if (art == null) Palette.Gold.copy(alpha = .20f) else style.trim.copy(alpha = .26f),
+            topLeft = Offset(c.x - rx * 0.79f, c.y - ry * 0.73f),
+            size = Size(rx * 1.58f, ry * 1.46f), style = Stroke(1.3f * d),
         )
     }
 }
@@ -270,10 +296,10 @@ internal fun TableSurface(style: TableStyle, modifier: Modifier, centerY: Float 
 private fun BoardCard(card: Int?, width: Dp, delayMs: Int, dim: Boolean) {
     if (card == null) {
         val theme = LocalTableStyle.current
-        val outline = if (theme == TableStyle.CLASSIC) Color(0x26FFFFFF) else theme.trim.copy(alpha = .4f)
+        val outline = if (theme == TableStyle.CLASSIC) Color(0x2EFFFFFF) else theme.trim.copy(alpha = .42f)
         Box(
             Modifier.size(width, width * 1.4f).clip(RoundedCornerShape(width * 0.12f))
-                .background(Color(0x14000000)).border(1.dp, outline, RoundedCornerShape(width * 0.12f))
+                .background(Color(0x18000000)).border(1.dp, outline, RoundedCornerShape(width * 0.12f))
         )
         return
     }
@@ -349,40 +375,49 @@ private fun SeatStatus(seat: SeatUi, fmt: (Int) -> String, modifier: Modifier = 
         else -> Palette.TextDim
     }
     val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
-    Text(caption.orEmpty(), modifier = modifier.height((12 * textScale).dp), color = color,
+    Text(
+        caption.orEmpty(), modifier = modifier.height((12 * textScale).dp), color = color,
         fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium,
-        maxLines = 1, overflow = TextOverflow.Ellipsis)
+        maxLines = 1, overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable
 private fun DealerButton() {
     Box(
-        Modifier.size(17.dp).shadow(2.dp, CircleShape).clip(CircleShape).background(Color.White)
-            .border(1.5.dp, Color(0xFF333333), CircleShape),
+        Modifier.size(18.dp).shadow(3.dp, CircleShape).clip(CircleShape)
+            .background(Brush.radialGradient(listOf(Color(0xFFFFFDF7), Color(0xFFDCD3BE))))
+            .border(1.5.dp, Color(0xFF8D6F37), CircleShape),
         contentAlignment = Alignment.Center,
-    ) { Text("D", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Black, lineHeight = 10.sp) }
+    ) { Text("D", color = Palette.Ink, fontSize = 10.sp, fontWeight = FontWeight.Black, lineHeight = 10.sp) }
 }
 
 @Composable
-private fun PodFrame(s: SeatUi, pulse: Float, modifier: Modifier, content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) {
+private fun PodFrame(s: SeatUi, pulse: Float, modifier: Modifier, content: @Composable BoxScope.() -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     val accent = LocalTableStyle.current.controlAccent
     val borderColor = when {
         s.won > 0 -> Palette.Gold
-        s.isActing -> accent.copy(alpha = .42f + pulse * .58f)
-        else -> accent.copy(alpha = .31f)
+        s.isActing -> accent.copy(alpha = .48f + pulse * .52f)
+        else -> accent.copy(alpha = .34f)
     }
     val borderW = if (s.isActing || s.won > 0) 2.dp else 1.dp
     Box(
         modifier
-            .shadow(if (s.isActing || s.won > 0) 8.dp else 3.dp, shape,
+            .shadow(
+                if (s.isActing || s.won > 0) 8.dp else 4.dp, shape,
                 ambientColor = if (s.won > 0) Palette.Gold else accent,
-                spotColor = if (s.won > 0) Palette.Gold else if (s.isActing) accent else Color.Black)
+                spotColor = if (s.won > 0) Palette.Gold else if (s.isActing) accent else Color.Black,
+            )
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(
-                lerp(Palette.PanelHi, accent, if (s.isActing) .15f else .08f),
-                lerp(Palette.Bg, accent, .022f),
-            )))
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        lerp(Palette.PanelHi, accent, if (s.isActing) .18f else .09f),
+                        lerp(Palette.Bg, accent, .028f),
+                    )
+                )
+            )
             .border(borderW, borderColor, shape),
     ) { content() }
 }
@@ -391,7 +426,7 @@ private fun PodFrame(s: SeatUi, pulse: Float, modifier: Modifier, content: @Comp
 private fun SeatPod(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> String, dealDelay: Int, dealFrom: Offset, animateDeal: Boolean) {
     val pulse = actingPulse(s.isActing)
     val dimAlpha by animateFloatAsState(if (s.busted) 0.3f else if (s.folded) 0.5f else 1f, tween(300), label = "fold")
-    Box(Modifier.size((g.podW + 12).dp, (g.podH + 36).dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.size((g.podW + 12).dp, (g.podH + 34).dp), contentAlignment = Alignment.Center) {
         PodFrame(s, pulse, Modifier.size(g.podW.dp, g.podH.dp).alpha(dimAlpha)) {
             Column(Modifier.fillMaxSize().padding(start = g.seatTextPadding, end = 5.dp)) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -425,7 +460,7 @@ private fun SeatPod(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Strin
             }
         }
         // dealer button (top-left)
-        if (s.isButton) Box(Modifier.align(Alignment.TopStart).offset(x = 0.dp, y = 11.dp)) { DealerButton() }
+        if (s.isButton) Box(Modifier.align(Alignment.TopStart).offset(x = 0.dp, y = 10.dp)) { DealerButton() }
         // position (+ style in replay) (bottom-left)
         val posText = listOfNotNull(s.position.takeIf { it.isNotEmpty() }, s.tag).joinToString(" · ")
         if (posText.isNotEmpty()) {
@@ -457,8 +492,10 @@ private fun SeatReadout(s: SeatUi, fmt: (Int) -> String, modifier: Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         SeatStatus(s, fmt, Modifier.weight(1f))
         s.equity?.let {
-            Text("%.1f%%".format(it * 100), color = Palette.Blue, fontSize = 11.sp,
-                fontFamily = Numeric, fontWeight = FontWeight.Bold, lineHeight = 12.sp, maxLines = 1)
+            Text(
+                "%.1f%%".format(it * 100), color = Palette.Blue, fontSize = 11.sp,
+                fontFamily = Numeric, fontWeight = FontWeight.Bold, lineHeight = 12.sp, maxLines = 1,
+            )
         }
     }
 }
@@ -466,7 +503,7 @@ private fun SeatReadout(s: SeatUi, fmt: (Int) -> String, modifier: Modifier) {
 @Composable
 private fun HeroSeat(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> String, dealDelay: Int, dealFrom: Offset, animateDeal: Boolean) {
     val pulse = actingPulse(s.isActing)
-    val lift by animateFloatAsState(if (s.isActing) -10f else 0f, spring(dampingRatio = 0.5f, stiffness = 400f), label = "lift")
+    val lift by animateFloatAsState(if (s.isActing) -8f else 0f, spring(dampingRatio = 0.5f, stiffness = 400f), label = "lift")
     val cardsAlpha by animateFloatAsState(if (s.folded) 0.45f else 1f, tween(300), label = "heroFold")
     // cards
     val hole = s.hole
@@ -492,11 +529,15 @@ private fun HeroSeat(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Stri
             PodFrame(s, pulse, Modifier.size((g.podW + 16).dp, g.podH.dp)) {
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(s.name, color = Palette.Text, fontSize = 12.sp, lineHeight = 14.sp,
-                            fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Text(
+                            s.name, color = Palette.Text, fontSize = 12.sp, lineHeight = 14.sp,
+                            fontWeight = FontWeight.SemiBold, maxLines = 1,
+                        )
                         if (s.position.isNotEmpty()) {
-                            Text(s.position, color = Palette.TextDim, fontSize = 10.sp, lineHeight = 12.sp,
-                                fontWeight = FontWeight.Bold)
+                            Text(
+                                s.position, color = Palette.TextDim, fontSize = 10.sp, lineHeight = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
                         }
                         Text(
                             if (s.busted) "—" else fmt(s.stack), color = if (s.allIn) Palette.Red else Palette.Gold,

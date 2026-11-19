@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -135,7 +136,7 @@ fun TableContent(
         if (turnKey != null) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Bg)) {
-        val sideWidth = (maxWidth * .28f).coerceIn(202.dp, 270.dp)
+        val sideWidth = (maxWidth * .29f).coerceIn(208.dp, 278.dp)
         Column(Modifier.fillMaxSize()) {
             TableToolbar(ui, onPractice, onReview, onSound, onStar, onHelp, onExit)
             Row(Modifier.weight(1f)) {
@@ -148,26 +149,34 @@ fun TableContent(
                                 animateDeal = animate, showTotalPot = true,
                             )
                         }
-                        AnimatedVisibility(
-                            ui.notice != null,
-                            modifier = Modifier.align(Alignment.TopCenter).padding(top = 54.dp),
-                            enter = slideInVertically { -it } + fadeIn(),
-                            exit = fadeOut(tween(400)),
-                        ) {
-                            Text(
-                                ui.notice.orEmpty(), color = Palette.Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center, lineHeight = 18.sp,
-                                modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Palette.Gold)
-                                    .border(2.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                            )
-                        }
+                        TableNotice(
+                            ui.notice,
+                            Modifier.align(Alignment.TopCenter).padding(top = 54.dp),
+                        )
                     }
                     TableStatusBar(ui, fmt)
                 }
                 SidePanel(ui, fmt, sideWidth, onMove, onNext, onFastForward)
             }
         }
+    }
+}
+
+@Composable
+private fun TableNotice(notice: String?, modifier: Modifier) {
+    AnimatedVisibility(
+        notice != null,
+        modifier = modifier,
+        enter = slideInVertically { -it } + fadeIn(),
+        exit = fadeOut(tween(400)),
+    ) {
+        Text(
+            notice.orEmpty(), color = Palette.Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center, lineHeight = 18.sp,
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Palette.Gold)
+                .border(2.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        )
     }
 }
 
@@ -216,11 +225,11 @@ private fun TableToggle(label: String, checked: Boolean, onChange: (Boolean) -> 
     val accent = LocalTableStyle.current.controlAccent
     val shape = RoundedCornerShape(50)
     Row(
-        Modifier.height(34.dp).clip(shape)
-            .background(if (checked) lerp(Palette.Bg, accent, .1f) else Palette.Bg)
-            .border(1.dp, accent.copy(alpha = if (checked) .45f else .14f), shape)
+        Modifier.height(36.dp).clip(shape)
+            .background(if (checked) lerp(Palette.Bg, accent, .12f) else Palette.Bg)
+            .border(1.dp, accent.copy(alpha = if (checked) .48f else .16f), shape)
             .toggleable(checked, role = Role.Switch, onValueChange = onChange)
-            .padding(horizontal = 9.dp),
+            .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
@@ -238,7 +247,7 @@ private fun TableStatusBar(ui: TableScreenUi, fmt: (Int) -> String) {
     var showDetails by remember(ui.table?.handKey, ui.legal) { mutableStateOf(false) }
     val shape = RoundedCornerShape(10.dp)
     BoxWithConstraints(
-        Modifier.fillMaxWidth().padding(bottom = 4.dp).height(51.dp)
+        Modifier.fillMaxWidth().padding(bottom = 4.dp).heightIn(min = 52.dp)
             .liveSurface(accent, shape)
     ) {
         val wide = maxWidth >= (500 * LocalDensity.current.fontScale).dp
@@ -372,7 +381,7 @@ private fun RoundIcon(text: String, label: String, onClick: () -> Unit) {
 private fun TableToolbarIcon(label: String, onClick: () -> Unit, content: @Composable () -> Unit) {
     val accent = LocalTableStyle.current.controlAccent
     Box(
-        Modifier.size(34.dp).pressable(onClick = onClick).clip(CircleShape)
+        Modifier.size(36.dp).pressable(onClick = onClick).clip(CircleShape)
             .background(lerp(Palette.Bg, accent, .05f)).border(1.dp, accent.copy(alpha = .25f), CircleShape)
             .semantics { contentDescription = label; role = Role.Button },
         contentAlignment = Alignment.Center,
