@@ -1,4 +1,4 @@
-# Exploit Edition V0.5 replay coach
+# River Runner EE V0.5 replay coach
 
 Six independent toggles are available in the normal Settings panel, under **Replay coach settings**.
 
