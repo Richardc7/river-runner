@@ -15,10 +15,10 @@ import com.riverrunner.engine.*
 import com.riverrunner.engine.strategy.*
 
 @Composable
-fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
+fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boolean = false) {
     var record by remember(initial.id) { mutableStateOf(initial) }
     var report by remember(initial.id) { mutableStateOf(false) }
-    var coachTab by remember(initial.id) { mutableIntStateOf(0) }
+    var coachTab by remember(initial.id, startBlind) { mutableIntStateOf(if (startBlind) 1 else 0) }
     var startIndex by remember(initial.id) { mutableIntStateOf(0) }
     var analysis by remember(initial.id) { mutableStateOf<HandAnalysis?>(null) }
     var loaded by remember(initial.id) { mutableStateOf(false) }
@@ -29,7 +29,9 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
     val replayer = remember(initial.id) { Replayer(initial) }
     val nodes = remember(record.id, analysis) { historicalDecisions(record, analysis, replayer) }
     Column(Modifier.fillMaxSize().background(Palette.Bg)) {
-        if (record.rake > 0) Text((if (zh) "\u672c\u624b\u62bd\u6c34: " else "Hand rake: ") + vm.fmt(record.rake, record.bigBlind), color = Palette.TextDim)
+        if (coachTab != 1 && record.rake > 0) {
+            Text((if (zh) "本手抽水: " else "Hand rake: ") + vm.fmt(record.rake, record.bigBlind), color = Palette.TextDim)
+        }
         Row(Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             TextButton(onClick = { coachTab = 0; report = false }) { Text(if (zh) "逐街回放" else "Replay") }
@@ -42,7 +44,11 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord) {
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (coachTab == 1 && vm.blindReviewEnabled) {
-                BlindReplayCoach(vm, record, nodes)
+                if (loaded) BlindReplayCoach(vm, record, nodes)
+                else Text(
+                    if (zh) "正在读取盲测决策…" else "Loading blind replay decisions…",
+                    color = Palette.TextDim, modifier = Modifier.padding(12.dp),
+                )
             } else if (coachTab == 2 && vm.weaknessReportEnabled) {
                 WeaknessReportCoach(vm)
             } else if (coachTab == 3 && vm.preflopCoachEnabled) {

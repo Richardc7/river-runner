@@ -30,7 +30,7 @@ sealed class Screen {
     data object Table : Screen()
     data class Result(val summary: SessionSummary) : Screen()
     data object History : Screen()
-    data class Replay(val record: HandRecord) : Screen()
+    data class Replay(val record: HandRecord, val blind: Boolean = false) : Screen()
     data object Stats : Screen()
     data object Settings : Screen()
     data object EditionSettings : Screen()
@@ -39,6 +39,7 @@ sealed class Screen {
     data object Saves : Screen()
     data object Achievements : Screen()
     data object Setup : Screen()
+    data object TrainingSetup : Screen()
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -219,7 +220,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun openGuide() { record(mapOf(Progress.GUIDE_OPENED to 1L)); screen = Screen.Guide }
     fun guideOpenedInGame() { record(mapOf(Progress.GUIDE_OPENED to 1L)) }
-    fun openReplay(r: HandRecord) { record(mapOf(Progress.REPLAYS to 1L)); screen = Screen.Replay(r) }
+    fun openReplay(r: HandRecord, blind: Boolean = false) {
+        record(mapOf(Progress.REPLAYS to 1L))
+        screen = Screen.Replay(r, blind && blindReviewEnabled)
+    }
 
     val changelog: List<Changelog.Release> = runCatching {
         app.assets.open("changelog.md").bufferedReader().use { Changelog.parse(it.readText()) }

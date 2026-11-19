@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -50,6 +51,75 @@ class StudyUxRedesignTest {
         compose.onNodeWithTag("live-strategy-switch").performClick()
         compose.runOnIdle { assertTrue(enabled) }
         compose.onNodeWithText("实时参考：开启（非已验证 GTO）").assertExists()
+    }
+
+    @Test fun historyOpensBlindReviewBeforeShowingResultsOrReplay() {
+        val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
+        vm.setStudyToggle("blind", true)
+        vm.screen = Screen.History
+        val session = GameSession(SessionConfig(GameMode.CASH, 2, 100, TableType.GTO, seed = 7))
+        val hand = session.startHand()
+        session.applyMove(Move.FOLD)
+        val record = session.completeHand(hand)
+        vm.history.add(record)
+        compose.setContent {
+            RiverTheme(ZH) {
+                when (val screen = vm.screen) {
+                    Screen.History -> HistoryScreen(vm)
+                    is Screen.Replay -> EditionReplayScreen(vm, screen.record, screen.blind)
+                    else -> error("Unexpected screen")
+                }
+            }
+        }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("盲测").fetchSemanticsNodes().isNotEmpty() }
+        val net = record.heroNet.toDouble() / record.bigBlind
+        val result = (if (net > 0) "+" else "") + "%.1f BB".format(net)
+        compose.onNodeWithText(result).assertDoesNotExist()
+        compose.onNodeWithText("盲测").performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("盲测复盘 · 先选后看").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("盲测复盘 · 先选后看").assertExists()
+        compose.onNodeWithText("复盘 · 第 1 手").assertDoesNotExist()
+    }
+
+    @Test fun emptyTrainingRoutesToRecordingSettingsOrHeadsUpCashSetup() {
+        val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
+        vm.openTraining()
+        vm.saveEdition(EditionConfig(recordAdvice = false))
+        compose.setContent { RiverTheme(ZH) { TrainingScreen(vm, vm::closeTraining) } }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("去开启记录").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("去开启记录").performClick()
+        compose.runOnIdle {
+            assertEquals(Screen.EditionSettings, vm.screen)
+            vm.saveEdition(EditionConfig(recordAdvice = true))
+            vm.closeEditionSettings()
+            assertEquals(Screen.Training, vm.screen)
+        }
+        compose.onNodeWithText("配置单挑筹码局").performClick()
+        compose.runOnIdle { assertEquals(Screen.TrainingSetup, vm.screen) }
+    }
+
+    @Test fun liveTablePinsTotalIncludingPostedBetsAndLatestAction() {
+        val session = GameSession(SessionConfig(GameMode.CASH, 2, 100, TableType.GTO, seed = 7))
+        val hand = session.startHand()
+        val seats = session.players.map { SeatInfo(it.seat, it.name, it.isHuman, it.stack, false) }
+        val fmt: (Int) -> String = { Format.amount(it, hand.bigBlind, true) }
+        val table = TableMapper.build(ZH, hand, seats, 1, 0, TableMapper.Stage.LIVE, fmt)
+        val latest = "对手 (BB) 大盲 1 BB"
+        val ui = TableScreenUi(
+            table, 1, "50/100", null, false, hand.legalActions(), null,
+            listOf(LogLine(LogKind.ACTION, latest), LogLine(LogKind.STREET, "翻牌")),
+            null, null, true, false, false,
+        )
+        compose.setContent {
+            RiverTheme(ZH) { TableContent(ui, fmt, {}, {}, {}, {}, {}, {}, animate = false) }
+        }
+        assertEquals(0, table.pot)
+        assertEquals(150, table.totalPot)
+        compose.onNodeWithText("底池 1.5 BB").assertExists()
+        compose.onNodeWithText("最近行动").assertExists()
+        assertTrue(compose.onAllNodesWithText(latest).fetchSemanticsNodes().isNotEmpty())
     }
 
     @Test fun trainingShowsQuestionThenExplanationAndNext() {

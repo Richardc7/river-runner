@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
                         Screen.Table -> TableScreen(vm)
                         is Screen.Result -> ResultScreen(vm, screen.summary)
                         Screen.History -> HistoryScreen(vm)
-                        is Screen.Replay -> EditionReplayScreen(vm, screen.record)
+                        is Screen.Replay -> EditionReplayScreen(vm, screen.record, screen.blind)
                         Screen.Stats -> StatsScreen(vm)
                         Screen.Settings -> SettingsScreen(vm)
                         Screen.EditionSettings -> EditionScreen(
@@ -46,6 +46,7 @@ class MainActivity : ComponentActivity() {
                         Screen.Saves -> SavesScreen(vm)
                         Screen.Achievements -> AchievementsScreen(vm)
                         Screen.Setup -> SetupScreen(vm)
+                        Screen.TrainingSetup -> SetupScreen(vm, forTraining = true)
                     }
                     UnlockToast(vm.unlockToast, Modifier.align(Alignment.TopCenter))
                     vm.whatsNew?.let { shown ->
