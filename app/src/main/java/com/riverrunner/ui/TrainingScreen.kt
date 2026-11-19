@@ -63,7 +63,7 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
                 CircularProgressIndicator(progress = { accuracy }, modifier = Modifier.size(24.dp),
                     color = Palette.Gold, trackColor = Palette.Line, strokeWidth = 3.dp)
                 Column {
-                    Text(t("与模型首选一致", "Matches model favourite") + " ${(accuracy * 100).roundToInt()}%",
+                    Text(t("模型首选一致率", "Model agreement") + " ${(accuracy * 100).roundToInt()}%",
                         color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Text(t("累计练习 $completed 次", "$completed total attempts"),
                         color = Palette.TextDim, fontSize = 11.sp)
@@ -87,7 +87,7 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
                     val item = items.firstOrNull { it.drill.id == current?.id }
                     if (loading) TrainingEmpty(t("正在准备练习…", "Preparing questions…"))
                     else if (item == null) RiverTrainingEmpty(vm)
-                    else DecisionQuestion(vm, item, reference, answer, onSelect = { answer = it }, onNext = {
+                    else DecisionQuestion(item, progress.categories[item.drill.category], reference, answer, onSelect = { answer = it }, onNext = {
                         val selected = answer ?: return@DecisionQuestion
                         progress = progress.record(item.drill.grade(selected))
                         vm.saveTrainingProgress(progress)
@@ -156,8 +156,8 @@ private fun TrainingEmpty(message: String) {
 
 @Composable
 internal fun DecisionQuestion(
-    vm: AppViewModel,
     item: TrainingItem,
+    categoryProgress: CategoryProgress?,
     reference: ReferenceBook?,
     picked: Move?,
     onSelect: (Move) -> Unit,
@@ -191,29 +191,20 @@ internal fun DecisionQuestion(
                     QuestionMetric(t("跟注所需胜率", "Equity needed"), "%.0f%%".format(Locale.US, 100 * potOdds), Modifier.weight(1f))
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(t("你的底牌", "Your cards"), color = Palette.TextDim, fontSize = 12.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        view.ownHole.forEach { PlayingCard(it, 30.dp) }
-                    }
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(t("当时可见的公共牌", "Board at decision time"), color = Palette.TextDim, fontSize = 12.sp)
-                    if (view.board.isEmpty()) Text(t("翻牌前尚无公共牌", "No public cards yet"),
-                        color = Palette.Text, fontSize = 11.sp)
-                    else Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        view.board.forEach { PlayingCard(it, 25.dp) }
-                    }
-                }
-            }
+            DecisionCards(view)
             val position = HandEngine.positionName(view.order.indexOf(view.actorSeat), view.order.size)
             Text(t("位置：", "Position: ") + position +
                 "  ·  " + t("有效人数：", "Players: ") + view.seats.size,
                 color = Palette.Text, fontSize = 12.sp)
-            Text(t("选题依据：优先练习尚未尝试或与模型首选一致率较低的决策类型。",
-                "Why this spot: the trainer prioritizes new categories and those with lower model agreement."),
-                color = Palette.TextDim, fontSize = 11.sp)
+            val scenario = if (toCall > 0) t("河牌面对下注", "facing a river bet")
+                else t("河牌可过牌或下注", "checking or betting the river")
+            val attempts = categoryProgress?.attempts ?: 0
+            Text(if (attempts == 0) t("选中这手：$scenario，你还没练过这类题。",
+                "Why this hand: $scenario, from a category you haven’t practised.")
+            else t(
+                "选中这手：$scenario，此类题的模型首选一致次数为 ${categoryProgress?.exact}/$attempts。",
+                "Why this hand: $scenario. You matched the model on ${categoryProgress?.exact}/$attempts attempts in this category.",
+            ), color = Palette.TextDim, fontSize = 12.sp)
         }
         val answerScroll = key(d.id, explanation) { rememberScrollState() }
         Column(Modifier.weight(1.05f).fillMaxHeight()
@@ -224,19 +215,26 @@ internal fun DecisionQuestion(
                 if (!explanation) {
                     Text(t("你会选择哪个行动？", "What would you do?"),
                         color = Palette.Text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                    for (option in options) {
-                        Button(
-                            onClick = { onSelect(option.move) },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(contentColor = Palette.Text,
-                                containerColor = Palette.PanelHi),
-                        ) {
-                            Text(StudyPresentation.move(option.move, bb, zh, view.legal.isOpeningBet), fontSize = 14.sp)
+                    val scrollHint = if (answerScroll.maxValue > 0 && answerScroll.maxValue < Int.MAX_VALUE)
+                        t(" · 向下滑动查看其余选项", " · Scroll for more choices") else ""
+                    Text(t("${options.size} 个选项", "${options.size} choices") + scrollHint,
+                        color = Palette.TextDim, fontSize = 12.sp)
+                    for (pair in options.chunked(2)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            for (option in pair) {
+                                OutlinedButton(
+                                    onClick = { onSelect(option.move) },
+                                    modifier = Modifier.weight(1f).heightIn(min = 45.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.Text,
+                                        containerColor = Palette.PanelHi),
+                                ) {
+                                    Text(StudyPresentation.move(option.move, bb, zh, view.legal.isOpeningBet), fontSize = 14.sp)
+                                }
+                            }
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
                         }
                     }
-                    Text(t("此题有 ", "Available answers: ") + options.size +
-                        t(" 个已建模的行动", " model-valued moves"), color = Palette.TextDim, fontSize = 11.sp)
                 } else {
                     val selected = requireNotNull(picked)
                     val score = d.grade(selected)

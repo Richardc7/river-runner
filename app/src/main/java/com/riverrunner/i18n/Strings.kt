@@ -319,14 +319,14 @@ val ZH = Strings(
     about = "关于",
     aboutText = "开源项目 · MIT 协议 · NPC 多人局使用近似GTO策略（翻前范围表 + 翻后胜率/赔率混合策略），单挑与短筹码使用推/弃与ICM。",
     styleName = { when (it) {
-        BotStyle.GTO -> "GTO"; BotStyle.TAG -> "紧凶"; BotStyle.LAG -> "松凶"
+        BotStyle.GTO -> "基准"; BotStyle.TAG -> "紧凶"; BotStyle.LAG -> "松凶"
         BotStyle.STATION -> "跟注站"; BotStyle.NIT -> "紧弱"; BotStyle.MANIAC -> "疯子"
     } },
     blindsUp = "涨盲",
     busted = "出局",
     back = "返回",
-    mixedHint = "随机风格：紧凶、松凶、跟注站、紧弱、疯子、GTO",
-    gtoHint = "所有NPC都使用近似GTO策略",
+    mixedHint = "随机风格：紧凶、松凶、跟注站、紧弱、疯子、基准",
+    gtoHint = "对手默认采用基准策略",
     icmNote = "ICM所需胜率",
     replayNoSuggestion = "",
     smallBlindShort = "小盲",
@@ -531,14 +531,14 @@ val EN = Strings(
     about = "About",
     aboutText = "Open source · MIT license · Multi-way bots use approximate GTO (preflop range charts + equity/pot-odds mixed strategies postflop); heads-up and short stacks use push/fold and ICM.",
     styleName = { when (it) {
-        BotStyle.GTO -> "GTO"; BotStyle.TAG -> "TAG"; BotStyle.LAG -> "LAG"
+        BotStyle.GTO -> "Baseline"; BotStyle.TAG -> "TAG"; BotStyle.LAG -> "LAG"
         BotStyle.STATION -> "Station"; BotStyle.NIT -> "Nit"; BotStyle.MANIAC -> "Maniac"
     } },
     blindsUp = "Blinds up",
     busted = "Out",
     back = "Back",
-    mixedHint = "Random styles: TAG, LAG, station, nit, maniac, GTO",
-    gtoHint = "Every bot plays approximate GTO",
+    mixedHint = "Random styles: TAG, LAG, station, nit, maniac, baseline",
+    gtoHint = "Opponents use the baseline strategy",
     icmNote = "ICM equity needed",
     replayNoSuggestion = "",
     smallBlindShort = "SB",

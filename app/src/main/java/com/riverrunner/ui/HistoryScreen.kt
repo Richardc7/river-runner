@@ -40,8 +40,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private enum class NetFilter { ALL, WON, LOST, EVEN }
+private enum class NetFilter { ALL, WON, LOST, EVEN, NO_DECISION }
 private data class HistoryEntry(val hand: HandRecord, val date: String, val title: String, val position: String) {
+    val noDecision = hand.actions.none { it.seat == hand.heroSeat && !it.type.isPost }
+
     fun matches(query: String): Boolean = query.isEmpty() ||
         listOf(date, title, position, hand.hero?.let { Cards.format(it.hole) }.orEmpty())
             .any { it.contains(query, ignoreCase = true) }
@@ -119,7 +121,8 @@ fun HistoryScreen(vm: AppViewModel, onClose: () -> Unit = {}) {
                     NetFilter.ALL -> true
                     NetFilter.WON -> hand.heroNet > 0
                     NetFilter.LOST -> hand.heroNet < 0
-                    NetFilter.EVEN -> hand.heroNet == 0
+                    NetFilter.EVEN -> hand.heroNet == 0 && !hand.autoFoldedOnExit && !entry.noDecision
+                    NetFilter.NO_DECISION -> hand.autoFoldedOnExit || entry.noDecision
                 } && (!deviationOnly || deviations?.contains(hand.id) == true)))
         }
     }
@@ -182,6 +185,7 @@ fun HistoryScreen(vm: AppViewModel, onClose: () -> Unit = {}) {
                         NetFilter.WON to t("盈利", "Won"),
                         NetFilter.LOST to t("亏损", "Lost"),
                         NetFilter.EVEN to t("持平", "Even"),
+                        NetFilter.NO_DECISION to t("未行动或自动弃牌", "No action or auto-folded"),
                     ), netFilter) { netFilter = it }
                     if (deviations?.isNotEmpty() == true) {
                         Pill(t("模型偏离", "Model deviations"), deviationOnly, { deviationOnly = !deviationOnly })
@@ -205,9 +209,12 @@ fun HistoryScreen(vm: AppViewModel, onClose: () -> Unit = {}) {
         } else {
             LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(shown, key = { it.hand.id }) { entry ->
+                    val canQuiz by produceState(false, store, entry.hand.id, vm.blindReviewEnabled) {
+                        if (vm.blindReviewEnabled) value = vm.hasBlindDecisions(entry.hand)
+                    }
                     HistoryRow(entry, showResults, deviations?.contains(entry.hand.id) == true,
                         onReplay = { vm.openReplay(entry.hand) },
-                        onBlind = if (vm.blindReviewEnabled) { { vm.openReplay(entry.hand, blind = true) } } else null,
+                        onBlind = if (canQuiz) { { vm.openReplay(entry.hand, blind = true) } } else null,
                         onFavorite = {
                             val updated = vm.toggleFavorite(entry.hand.id)
                             if (updated != null) records = records?.map { if (it.id == updated.id) updated else it }
@@ -261,7 +268,7 @@ private fun HistoryRow(entry: HistoryEntry, showResults: Boolean, deviated: Bool
     val hand = entry.hand
     val status = listOfNotNull(
         if (showResults && hand.autoFoldedOnExit) t("离桌自动弃牌", "Auto-folded on exit")
-        else if (showResults && hand.actions.none { it.seat == hand.heroSeat && !it.type.isPost }) t("未行动", "Did not act")
+        else if (showResults && entry.noDecision) t("未行动", "Did not act")
         else null,
         t("已复盘", "Reviewed").takeIf { hand.reviewed },
         t("有模型偏离", "Model deviation").takeIf { showResults && deviated },

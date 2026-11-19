@@ -429,6 +429,7 @@ fun SettingsScreen(vm: AppViewModel) {
     var haptics by remember { mutableStateOf(vm.prefs.actionHaptics) }
     var namesFollowStyle by remember { mutableStateOf(vm.prefs.opponentNamesFollowStyle) }
     var showAbout by remember { mutableStateOf(false) }
+    var showBackup by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
     var resetting by remember { mutableStateOf(false) }
     var resetStatus by remember { mutableStateOf<String?>(null) }
@@ -459,6 +460,12 @@ fun SettingsScreen(vm: AppViewModel) {
                 }
                 ActionButton(if (st.isZh) "牌桌与扑克牌外观  ›" else "Table and card appearance  ›", Palette.PanelHi,
                     modifier = Modifier.fillMaxWidth().height(46.dp)) { vm.screen = Screen.Appearance }
+                OptionRow(if (st.isZh) "字号" else "Text size") {
+                    for (size in listOf(100, 110, 120)) {
+                        Pill("$size%", vm.textSizePercent == size, { vm.setTextSize(size) })
+                    }
+                }
+                ToggleRow(if (st.isZh) "高对比度" else "High contrast", vm.highContrast, vm::updateHighContrast)
                 OptionRow(st.speed) {
                     Pill(st.slow, speed == 0, { speed = 0; vm.prefs.speed = 0 })
                     Pill(st.normal, speed == 1, { speed = 1; vm.prefs.speed = 1 })
@@ -487,6 +494,8 @@ fun SettingsScreen(vm: AppViewModel) {
                     SmallButton(if (st.isZh) "扑克术语表" else "Poker glossary", { vm.openGuide(GuideTab.GLOSSARY) })
                     SmallButton(if (st.isZh) "关于与隐私" else "About & privacy", { showAbout = true })
                 }
+                ActionButton(if (st.isZh) "存档备份与恢复" else "Save backup and restore", Palette.PanelHi,
+                    modifier = Modifier.fillMaxWidth()) { showBackup = true }
                 SectionTitle("Exploit Edition")
                 Text(if (st.isZh) "AI、对手、抽水与筹码设置已集成；保存后从新牌桌开始生效。" else
                     "AI, opponents, rake and stacks are configurable. Saved settings apply to the next table.",
@@ -533,6 +542,7 @@ fun SettingsScreen(vm: AppViewModel) {
             }
         }
     }
+    if (showBackup) SaveBackupDialog(vm) { showBackup = false }
     if (showAbout) {
         AboutDialog { showAbout = false }
     }

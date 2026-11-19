@@ -44,8 +44,9 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
     val zh = st.isZh
     val replayer = remember(initial.id) { Replayer(initial) }
     val nodes = remember(record.id, analysis) { historicalDecisions(record, analysis, replayer) }
+    val quizNodes = remember(record.id, nodes) { blindDecisions(record, nodes) }
     val tools = buildList {
-        if (vm.blindReviewEnabled) add(ReplayPage.BLIND)
+        if (vm.blindReviewEnabled && (quizNodes.isNotEmpty() || page == ReplayPage.BLIND)) add(ReplayPage.BLIND)
         if (vm.weaknessReportEnabled) add(ReplayPage.WEAKNESSES)
         if (vm.preflopCoachEnabled) add(ReplayPage.RANGE)
         if (vm.riverWhatIfEnabled) add(ReplayPage.WHAT_IF)
@@ -58,7 +59,7 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (page == ReplayPage.BLIND) {
-                if (loaded) BlindReplayCoach(vm, record, nodes)
+                if (loaded) BlindReplayCoach(vm, record, quizNodes)
                 else Text(
                     if (zh) "正在读取盲测决策…" else "Loading blind replay decisions…",
                     color = Palette.TextDim, modifier = Modifier.padding(12.dp),
@@ -80,7 +81,6 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                 if (!loaded) Text(if (zh) "\u8bfb\u53d6\u4e2d" else "Loading", color = Palette.Text)
                 else if (data == null) Text(if (zh) "\u6b64\u624b\u6ca1\u6709\u51b3\u7b56\u5f53\u65f6\u7684\u8bc1\u636e\u8bb0\u5f55\u3002\u65e7\u724c\u8c31\u4ecd\u53ef\u6b63\u5e38\u56de\u653e\uff0c\u4e0d\u4f1a\u4f2a\u9020\u5265\u524a\u5efa\u8bae\u3002" else "No contemporaneous evidence was saved for this hand. Legacy replay remains available; retrospective exploit advice is not fabricated.", color = Palette.Text)
                 else {
-                    Text("${data.algorithmVersion} / ${data.randomVersion}", color = Palette.TextDim)
                     for (trace in data.decisions) {
                         val view = remember(record.id, trace.actionIndex) { runCatching {
                             ObservationFactory.forActor(replayer.engineBeforeAction(trace.actionIndex), record.mode)
@@ -93,13 +93,21 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                                     color = Palette.Gold, style = MaterialTheme.typography.titleMedium)
                                 if (view == null || !matches) Text(if (zh) "\u8bb0\u5f55\u4e0e\u51b3\u7b56\u573a\u666f\u4e0d\u5339\u914d\uff0c\u4e0d\u5c55\u793a\u5efa\u8bae\u3002" else "Trace does not match this decision context; advice withheld.")
                                 else {
-                                    Text("${Cards.format(view.ownHole.toIntArray())} | ${Cards.format(view.board.toIntArray())}")
+                                    DecisionCards(view)
                                     val actual = record.actions.filter { !it.type.isPost }.getOrNull(trace.actionIndex)
                                     actual?.let { Text((if (zh) "\u4f60\u7684\u884c\u52a8\uff1a" else "Your action: ") + vm.actionLabel(it, record.bigBlind)) }
-                                    Text((if (zh) "基准参考：" else "Baseline model: ") +
-                                        policyText(trace.baseline, record.bigBlind, zh, view.legal.isOpeningBet), color = Palette.Text)
-                                    Text((if (zh) "针对性调整：" else "Exploit adjustment: ") +
-                                        policyText(trace.exploit, record.bigBlind, zh, view.legal.isOpeningBet), color = Palette.Gold)
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                        ReplayPolicyChart(if (zh) "基准参考" else "Baseline model", trace.baseline,
+                                            record.bigBlind, view.legal.isOpeningBet, Modifier.weight(1f))
+                                        ReplayPolicyChart(if (zh) "针对性调整" else "Exploit adjustment", trace.exploit,
+                                            record.bigBlind, view.legal.isOpeningBet, Modifier.weight(1f))
+                                    }
+                                    actual?.let {
+                                        StudyCoach.assess(record.id, view, trace, it).modelGapBB?.let { gap ->
+                                            Text((if (zh) "相对模型最优 EV · " else "EV versus model best · ") +
+                                                "%.2f BB".format(if (gap < .005) 0.0 else -gap), color = Palette.Gold)
+                                        }
+                                    }
                                     Text(statusText(trace.status, zh))
                                     SolverReferencePanel(view, reference)
                                     ExportSolverSpot(view)
@@ -134,6 +142,12 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                                 }
                             }
                         }
+                    }
+                    if (data.decisions.isNotEmpty()) {
+                        Text(if (zh) "分析模型与牌谱详情" else "Analysis details",
+                            color = Palette.TextDim, style = MaterialTheme.typography.labelMedium)
+                        Text("${data.algorithmVersion} / ${data.randomVersion}", color = Palette.TextDim,
+                            style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -170,6 +184,8 @@ private fun ReplayNavigation(
                     SegmentedButton(
                         selected = page == target, onClick = { onPage(target) },
                         shape = SegmentedButtonDefaults.itemShape(index, count = 2),
+                        modifier = Modifier.widthIn(min = if (st.isZh) 91.dp else 104.dp),
+                        icon = {},
                     ) { Text(target.title(st.isZh), maxLines = 1) }
                 }
             }
@@ -196,10 +212,24 @@ private fun ReplayNavigation(
 }
 
 private fun percent(value: Double): String = "%.0f%%".format(value * 100)
-private fun policyText(policy: PolicySnapshot, bb: Int, zh: Boolean, openingBet: Boolean): String =
-    policy.choices.joinToString(" / ") { choice ->
-        StudyPresentation.move(choice.move, bb, zh, openingBet) + " " + percent(choice.probability)
+
+@Composable
+private fun ReplayPolicyChart(label: String, policy: PolicySnapshot, bb: Int, openingBet: Boolean, modifier: Modifier) {
+    val zh = LocalStrings.current.isZh
+    val choices = policy.choices.filter { it.probability > 0 }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, color = Palette.Text, style = MaterialTheme.typography.labelLarge)
+        StrategyFrequencyBar(choices.groupBy { it.move.type }.map { (type, moves) ->
+            type to moves.sumOf { it.probability }
+        })
+        for (choice in choices.sortedByDescending { it.probability }) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(StudyPresentation.move(choice.move, bb, zh, openingBet), color = Palette.Text)
+                Text(Format.pct(choice.probability), color = strategyActionColor(choice.move.type))
+            }
+        }
     }
+}
 private fun statusText(status: AdviceStatus, zh: Boolean): String = when (status) {
     AdviceStatus.ADJUSTED -> if (zh) "\u5df2\u6309\u8bc1\u636e\u4f5c\u6709\u9650\u8c03\u6574" else "Bounded evidence-based adjustment"
     AdviceStatus.INSUFFICIENT_EVIDENCE -> if (zh) "\u8bc1\u636e\u4e0d\u8db3\uff1a\u4fdd\u7559\u57fa\u51c6" else "Insufficient evidence: baseline retained"

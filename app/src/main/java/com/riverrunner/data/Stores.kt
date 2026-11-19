@@ -20,6 +20,14 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("zh", Locale.getDefault().language == "zh")
         set(v) = sp.edit().putBoolean("zh", v).apply()
 
+    var textSizePercent: Int
+        get() = sp.getInt("text_size_percent", 100).coerceIn(100, 120)
+        set(value) = sp.edit().putInt("text_size_percent", value).apply()
+
+    var highContrast: Boolean
+        get() = sp.getBoolean("high_contrast", false)
+        set(value) = sp.edit().putBoolean("high_contrast", value).apply()
+
     var opponentNamesFollowStyle: Boolean
         get() = sp.getBoolean("opponent_names_follow_style", false)
         set(v) = sp.edit().putBoolean("opponent_names_follow_style", v).apply()
@@ -196,7 +204,9 @@ class ProfileStore(private val dir: File, private val prefs: Prefs?, private val
     fun active(): Profile = profiles.getValue(activeId)
     fun get(id: String): Profile? = profiles[id]
 
-    private fun newId(): String = "p" + System.currentTimeMillis().toString(36) + (100..999).random()
+    private fun newId(): String = generateSequence {
+        "p" + System.currentTimeMillis().toString(36) + (100..999).random()
+    }.first { it !in profiles && !profileFile(it).exists() }
 
     private fun migrateOrCreate() {
         val p = create(defaultName(1), activate = true)
@@ -231,7 +241,24 @@ class ProfileStore(private val dir: File, private val prefs: Prefs?, private val
         profiles[p.id] = p
         val tmp = File(dir, "profile_${p.id}.tmp")
         tmp.writeText(p.toJson().toString())
-        tmp.renameTo(profileFile(p.id))
+        check(tmp.renameTo(profileFile(p.id))) { "Could not save profile" }
+    }
+
+    /** Publish a new slot only after all of the restored data has reached disk. */
+    internal fun restore(source: Profile, populate: (String) -> Unit): Profile {
+        check(profiles.size < MAX_SLOTS)
+        val restored = source.copy(id = newId())
+        try {
+            populate(restored.id)
+            save(restored)
+            writeIndex()
+            return restored
+        } catch (failure: Exception) {
+            profiles.remove(restored.id)
+            profileFile(restored.id).delete()
+            historyFile(restored.id).delete()
+            throw failure
+        }
     }
 
     fun rename(id: String, name: String) {
@@ -262,7 +289,9 @@ class ProfileStore(private val dir: File, private val prefs: Prefs?, private val
         val o = JSONObject()
         o.put("active", activeId)
         o.put("ids", JSONArray(profiles.keys.toList()))
-        indexFile.writeText(o.toString())
+        val tmp = File(dir, "profiles.tmp")
+        tmp.writeText(o.toString())
+        check(tmp.renameTo(indexFile)) { "Could not save profile index" }
     }
 }
 

@@ -56,14 +56,24 @@ class StudyUxRedesignTest {
     }
 
     @Test fun historyOpensBlindReviewBeforeShowingResultsOrReplay() {
-        val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val vm = AppViewModel(app)
         vm.setStudyToggle("blind", true)
         vm.screen = Screen.History
-        val session = GameSession(SessionConfig(GameMode.CASH, 2, 100, TableType.GTO, seed = 7))
-        val hand = session.startHand()
+        val (session, hand) = (1L..16L).asSequence().map { seed ->
+            GameSession(SessionConfig(GameMode.CASH, 2, 100, TableType.GTO, seed = seed))
+                .let { it to it.startHand() }
+        }.first { it.second.toAct == GameSession.HERO_SEAT }
+        session.strategy.capture(hand)
         session.applyMove(Move.FOLD)
         val record = session.completeHand(hand)
+        val analysis = requireNotNull(session.lastAnalysis)
+        val traces = StrategyTraceStore(app.filesDir, vm.profile.id)
+        traces.save(analysis)
+        val automatic = record.copy(id = record.id + 1, autoFoldedOnExit = true)
+        traces.save(analysis.copy(handId = automatic.id))
         vm.history.add(record)
+        vm.history.add(automatic)
         compose.setContent {
             RiverTheme(ZH) {
                 when (val screen = vm.screen) {
@@ -77,7 +87,9 @@ class StudyUxRedesignTest {
         val net = record.heroNet.toDouble() / record.bigBlind
         val result = (if (net > 0) "+" else "") + "%.1f BB".format(net)
         compose.onNodeWithText(result).assertDoesNotExist()
+        assertEquals(1, compose.onAllNodesWithText("盲测").fetchSemanticsNodes().size)
         compose.onNodeWithText("盲测").performClick()
+        compose.runOnIdle { assertEquals(record.id, (vm.screen as Screen.Replay).record.id) }
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("盲测复盘 · 先选后看").fetchSemanticsNodes().isNotEmpty()
         }
@@ -206,7 +218,6 @@ class StudyUxRedesignTest {
     }
 
     @Test fun trainingShowsQuestionThenExplanationAndNext() {
-        val vm = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
         val engine = GameSession(SessionConfig(GameMode.CASH, 2, 100, TableType.GTO, seed = 7)).startHand()
         val view = ObservationFactory.forActor(engine, GameMode.CASH)
         val record = HandRecord(
@@ -217,6 +228,8 @@ class StudyUxRedesignTest {
             ActionValue(Move.FOLD, 0.0, 0.0, 0.0),
             ActionValue(Move.CALL, 10.0, 10.0, 10.0),
             ActionValue(Move.raiseTo(250), 25.0, 25.0, 25.0),
+            ActionValue(Move.raiseTo(350), 15.0, 15.0, 15.0),
+            ActionValue(Move.raiseTo(550), 20.0, 20.0, 20.0),
         )
         val item = TrainingItem(
             TrainingDrill("quiz1", "river-model", values),
@@ -229,12 +242,14 @@ class StudyUxRedesignTest {
         var advanced = 0
         compose.setContent {
             RiverTheme(ZH) {
-                DecisionQuestion(vm, item, null, picked,
+                DecisionQuestion(item, null, null, picked,
                     onSelect = { picked = it },
                     onNext = { advanced++; picked = null })
             }
         }
         compose.onNodeWithText("你会选择哪个行动？").assertExists()
+        compose.onNodeWithText("5 个选项").assertExists()
+        compose.onNodeWithText("加注 5.5 BB").assertIsDisplayed()
         compose.onNodeWithText("弃牌").performClick()
         compose.onNodeWithText("答案解析").assertExists()
         compose.onNodeWithText("保存练习记录 · 下一题 →").performClick()

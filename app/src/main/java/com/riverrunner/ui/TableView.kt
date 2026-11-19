@@ -410,7 +410,7 @@ private fun SeatPod(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Strin
                         }
                     }
                 }
-                SeatStatus(s, fmt, Modifier.fillMaxWidth())
+                SeatReadout(s, fmt, Modifier.fillMaxWidth())
                 Spacer(Modifier.height(3.dp))
             }
             if (s.isActing) {
@@ -428,27 +428,31 @@ private fun SeatPod(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Strin
                     .clip(RoundedCornerShape(4.dp)).background(Color(0xCC0B1210)).padding(horizontal = 4.dp),
             )
         }
-        // equity (replay) or winnings (bottom-right)
+        // winnings (bottom-right)
         Box(Modifier.align(Alignment.BottomEnd).offset(x = (-8).dp, y = 0.dp)) {
-            WonOrEquity(s, fmt)
+            WinningsBadge(s, fmt)
         }
     }
 }
 
 @Composable
-private fun WonOrEquity(s: SeatUi, fmt: (Int) -> String) {
+private fun WinningsBadge(s: SeatUi, fmt: (Int) -> String) {
     AnimatedVisibility(s.won > 0, enter = scaleIn(tween(300, 550)) + fadeIn(tween(300, 550)), exit = fadeOut()) {
         Text(
             "+" + fmt(s.won), color = Palette.Ink, fontSize = 14.sp, fontFamily = Numeric, fontWeight = FontWeight.Bold, maxLines = 1,
             modifier = Modifier.clip(RoundedCornerShape(50)).background(Palette.Green).padding(horizontal = 6.dp, vertical = 1.dp),
         )
     }
-    val eq = s.equity
-    if (eq != null && s.won == 0) {
-        Text(
-            "%.1f%%".format(eq * 100), color = Color.White, fontSize = 14.sp, fontFamily = Numeric, fontWeight = FontWeight.Bold, maxLines = 1,
-            modifier = Modifier.clip(RoundedCornerShape(50)).background(Palette.Blue).padding(horizontal = 6.dp, vertical = 1.dp),
-        )
+}
+
+@Composable
+private fun SeatReadout(s: SeatUi, fmt: (Int) -> String, modifier: Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        SeatStatus(s, fmt, Modifier.weight(1f))
+        s.equity?.let {
+            Text("%.1f%%".format(it * 100), color = Palette.Blue, fontSize = 11.sp,
+                fontFamily = Numeric, fontWeight = FontWeight.Bold, lineHeight = 12.sp, maxLines = 1)
+        }
     }
 }
 
@@ -494,14 +498,15 @@ private fun HeroSeat(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Stri
                         )
                     }
                     Spacer(Modifier.height(3.dp))
-                    SeatStatus(s, fmt, Modifier.padding(horizontal = 5.dp))
+                    if (s.equity == null) SeatStatus(s, fmt, Modifier.padding(horizontal = 5.dp))
+                    else SeatReadout(s, fmt, Modifier.fillMaxWidth().padding(horizontal = 8.dp))
                 }
             }
             if (s.isButton) Box(Modifier.align(Alignment.CenterStart).offset(x = (-22).dp)) { DealerButton() }
         }
     }
     Box(Modifier.fillMaxSize().centerAt(g.heroBadgeLeft)) {
-        WonOrEquity(s, fmt)
+        WinningsBadge(s, fmt)
     }
 }
 

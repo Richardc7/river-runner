@@ -31,7 +31,8 @@ class MainActivity : ComponentActivity() {
             val vm: AppViewModel = viewModel()
             val pageState = rememberSaveableStateHolder()
             val appearance = vm.appearance
-            RiverTheme(vm.strings, appearance.face, appearance.back, appearance.table) {
+            RiverTheme(vm.strings, appearance.face, appearance.back, appearance.table,
+                textSizePercent = vm.textSizePercent) {
                 Box(Modifier.fillMaxSize().background(Palette.Bg).windowInsetsPadding(WindowInsets.displayCutout)) {
                     when (val screen = vm.screen) {
                         Screen.Home -> HomeScreen(vm)
