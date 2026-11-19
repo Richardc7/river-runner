@@ -5,8 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,8 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -57,19 +53,19 @@ fun AppearanceScreen(vm: AppViewModel) {
                         CardBack(33.dp)
                     }
                 }
-                StyleChoices(t("整套风格", "Presets"), PokerAppearance.presets, appearance,
+                ConfigurationChoices(t("整套风格", "Presets"), PokerAppearance.presets, appearance,
                     { it.table.title(st.isZh) }, vm::updateAppearance)
             }
             Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(Palette.Panel)
                 .verticalScroll(rememberScrollState()).padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                StyleChoices(t("牌桌", "Table"), TableStyle.entries, appearance.table, { it.title(st.isZh) }) {
+                ConfigurationChoices(t("牌桌", "Table"), TableStyle.entries, appearance.table, { it.title(st.isZh) }) {
                     vm.updateAppearance(appearance.copy(table = it))
                 }
-                StyleChoices(t("牌背", "Card back"), CardBackStyle.entries, appearance.back, { it.art.title(st.isZh) }) {
+                ConfigurationChoices(t("牌背", "Card back"), CardBackStyle.entries, appearance.back, { it.art.title(st.isZh) }) {
                     vm.updateAppearance(appearance.copy(back = it))
                 }
-                StyleChoices(t("牌面", "Card face"), DeckStyle.entries, appearance.face, {
+                ConfigurationChoices(t("牌面", "Card face"), DeckStyle.entries, appearance.face, {
                     when (it) {
                         DeckStyle.FOUR_COLOR -> st.deckFour
                         DeckStyle.FOUR_COLOR_FILLED -> st.deckFilled
@@ -79,27 +75,6 @@ fun AppearanceScreen(vm: AppViewModel) {
                         DeckStyle.TAROT -> TableStyle.TAROT.title(st.isZh)
                     }
                 }) { vm.updateAppearance(appearance.copy(face = it)) }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun <T> StyleChoices(label: String, options: List<T>, selected: T, title: (T) -> String, onPick: (T) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, color = Palette.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            for (option in options) {
-                FilterChip(
-                    selected = selected == option, onClick = { onPick(option) },
-                    label = { Text(title(option), fontSize = 13.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = Palette.PanelHi, labelColor = Palette.Text,
-                        selectedContainerColor = Palette.Gold, selectedLabelColor = Palette.Ink,
-                    ),
-                )
             }
         }
     }

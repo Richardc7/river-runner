@@ -2,68 +2,186 @@ package com.riverrunner.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.riverrunner.engine.strategy.*
 
 @Composable
 fun EditionScreen(initial: EditionConfig, chinese: Boolean, onSave: (EditionConfig) -> Unit, onBack: () -> Unit) {
     var config by remember(initial) { mutableStateOf(initial) }
-    fun text(zh: String, en: String) = if (chinese) zh else en
+    var cashSelected by rememberSaveable { mutableStateOf(false) }
+    var editingSeat by rememberSaveable { mutableStateOf<Int?>(null) }
+    fun t(zh: String, en: String) = if (chinese) zh else en
+
     BackHandler(onBack = onBack)
-    Column(Modifier.fillMaxSize().background(Palette.Bg).verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Exploit Edition V0.5", style = MaterialTheme.typography.headlineSmall,
-                color = Palette.Text, modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = onBack) { Text(text("返回", "Back")) }
-            Button(onClick = { onSave(config); onBack() }) { Text(text("保存配置", "Save settings")) }
-        }
-        Text(text("当前配置：", "Current: ") + editionSummary(config, chinese), color = Palette.Gold)
-        Text(text("一、AI 模式与对手类型", "1. AI mode and opponent presets"),
-            style = MaterialTheme.typography.titleMedium, color = Palette.Text)
-        Text(text("\u8bbe\u7f6e\u4ec5\u5bf9\u65b0\u724c\u684c\u751f\u6548\uff1b\u753b\u50cf\u5728\u6bcf\u5c40\u91cd\u65b0\u5b66\u4e60\u3002", "Settings apply to new tables. Opponent evidence resets each session."), color = Palette.TextDim)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AiMode.entries.forEach { mode ->
-                FilterChip(selected = config.aiMode == mode, onClick = { config = config.copy(aiMode = mode) },
-                    label = { Text(if (mode == AiMode.LEGACY) text("\u539f\u7248\u57fa\u51c6", "Legacy baseline") else text("\u52a8\u6001\u5265\u524a", "Adaptive exploit")) })
+    Column(Modifier.fillMaxSize().background(Palette.Bg).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+            SmallButton(t("← 返回", "← Back"), onBack)
+            Column(Modifier.weight(1f)) {
+                Text(t("自定义 AI、对手与规则", "Customize AI, opponents and rules"),
+                    color = Palette.Text, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                Text(t("保存后用于新牌局", "Applies to new tables after saving"), color = Palette.TextDim, fontSize = 11.sp)
+            }
+            ActionButton(t("保存配置", "Save settings"), Palette.Gold, Modifier.widthIn(min = 110.dp).height(42.dp),
+                textColor = Palette.Ink) {
+                onSave(config)
+                onBack()
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Switch(checked = config.recordAdvice, onCheckedChange = { config = config.copy(recordAdvice = it) })
-            Text(text("\u4fdd\u5b58\u51b3\u7b56\u65f6\u7684\u8bc1\u636e\u4e0e\u53cc\u8f68\u5efa\u8bae", "Record contemporaneous evidence and both recommendations"), color = Palette.Text)
-        }
-        Text(text("\u5ea7\u4f4d 0 \u662f\u4f60\uff0c\u5176\u4ed6\u5ea7\u4f4d\u53ef\u6307\u5b9a\u5bf9\u624b\u3002\u8d85\u51fa\u724c\u684c\u4eba\u6570\u7684\u914d\u7f6e\u4f1a\u88ab\u5ffd\u7565\u3002", "Seat 0 is you. Overrides outside the chosen table size are ignored."), color = Palette.TextDim)
-        for (seat in 1..8) {
-            var expanded by remember(seat) { mutableStateOf(false) }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(text("\u5ea7\u4f4d", "Seat") + " $seat", color = Palette.Text, modifier = Modifier.padding(top = 12.dp))
-                Box {
-                    OutlinedButton(onClick = { expanded = true }) { Text(presetLabel(config.opponents[seat], chinese)) }
-                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        val choices: List<OpponentPreset?> = listOf(null) + OpponentPreset.entries
-                        choices.forEach { preset ->
-                            DropdownMenuItem(text = { Text(presetLabel(preset, chinese)) }, onClick = {
-                                val map = config.opponents.toMutableMap()
-                                if (preset == null) map.remove(seat) else map[seat] = preset
-                                config = config.copy(opponents = map.toMap()); expanded = false
-                            })
+
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+            Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Palette.Panel).padding(11.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SettingsChip(t("AI 策略", "AI strategy"), !cashSelected, { cashSelected = false })
+                    SettingsChip(t("筹码局规则", "Cash rules"), cashSelected, { cashSelected = true })
+                }
+                val scroll = key(cashSelected) { rememberScrollState() }
+                Column(Modifier.fillMaxSize().verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (cashSelected) {
+                        HouseRulesSettings(config, chinese) { config = it }
+                    } else {
+                        ConfigurationChoices(t("AI 模式", "AI mode"), AiMode.entries, config.aiMode, {
+                            if (it == AiMode.LEGACY) t("原版基准", "Legacy baseline") else t("动态剥削", "Adaptive exploit")
+                        }) { config = config.copy(aiMode = it) }
+                        Text(
+                            if (config.aiMode == AiMode.LEGACY) t("对手使用固定的基准策略。", "Opponents use the fixed baseline policy.")
+                            else t("对手会根据本次牌局的行动调整。样本不足时沿用基准策略。",
+                                "Opponents adapt to actions in this session. Sparse evidence retains the baseline."),
+                            fontSize = 13.sp, lineHeight = 18.sp, color = Palette.TextDim,
+                        )
+                        HorizontalDivider(color = Palette.Line)
+                        SettingsSwitch(
+                            t("保存决策时的证据与双轨建议", "Record evidence and both strategy recommendations"),
+                            t("用于盲测、河牌练习及策略对比。", "Used for blind reviews, river drills and strategy comparison."),
+                            config.recordAdvice,
+                        ) { config = config.copy(recordAdvice = it) }
+                    }
+                }
+            }
+
+            Column(Modifier.weight(1.06f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Palette.Panel)
+                .verticalScroll(rememberScrollState()).padding(11.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(t("座位配置", "Seat settings"), color = Palette.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(t("点选座位设置对手风格或筹码。超出开局人数的座位会忽略。",
+                    "Select a seat to set its opponent style or stack. Seats outside the table size are ignored."),
+                    color = Palette.TextDim, fontSize = 11.sp, lineHeight = 15.sp)
+                for (seats in (0..8).chunked(3)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        for (seat in seats) {
+                            val preset = config.opponents[seat]
+                            val stack = config.seatStackBB[seat]
+                            SeatSettingsCard(
+                                Modifier.weight(1f),
+                                if (seat == 0) t("你 · 座位 0", "You · Seat 0") else t("座位 $seat", "Seat $seat"),
+                                presetLabel(preset, chinese).takeIf { seat != 0 },
+                                stack?.let { "$it BB" } ?: t("默认筹码", "Default stack"),
+                                preset != null || stack != null,
+                            ) { editingSeat = seat }
                         }
                     }
                 }
             }
         }
-        Text(text("\u57fa\u51c6\u662f\u542f\u53d1\u5f0f\u8fd1\u4f3c\uff0c\u4e0d\u662f\u7ecf\u9a8c\u8bc1\u7684 GTO \u6c42\u89e3\u5668\u3002\u8bc1\u636e\u4e0d\u8db3\u65f6\u4fdd\u7559\u57fa\u51c6\u3002", "The baseline is heuristic, not a verified GTO solver. Sparse evidence retains the baseline."), color = Palette.TextDim)
-        HouseRulesSettings(config, chinese) { config = it }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { onSave(config); onBack() }) { Text(text("\u4fdd\u5b58", "Save")) }
-            OutlinedButton(onClick = onBack) { Text(text("\u8fd4\u56de", "Back")) }
+    }
+
+    editingSeat?.let { seat ->
+        SeatSettingsDialog(seat, config.opponents[seat], config.seatStackBB[seat], chinese,
+            close = { editingSeat = null }) { preset, stack ->
+            val opponents = config.opponents.toMutableMap()
+            if (seat > 0 && preset != null) opponents[seat] = preset else opponents.remove(seat)
+            val stacks = config.seatStackBB.toMutableMap()
+            if (stack != null) stacks[seat] = stack else stacks.remove(seat)
+            config = config.copy(opponents = opponents, seatStackBB = stacks)
+            editingSeat = null
         }
+    }
+}
+
+@Composable
+private fun SeatSettingsCard(modifier: Modifier, title: String, preset: String?, stack: String,
+    customized: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(8.dp)
+    Column(modifier.clip(shape).background(Palette.PanelHi).border(1.dp, if (customized) Palette.Gold else Palette.Line, shape)
+        .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, Modifier.weight(1f), color = Palette.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("›", color = Palette.Gold, fontSize = 15.sp, lineHeight = 15.sp)
+        }
+        Text(listOfNotNull(preset, stack).joinToString(" · "), color = Palette.TextDim, fontSize = 11.sp,
+            lineHeight = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun SeatSettingsDialog(
+    seat: Int, initialPreset: OpponentPreset?, initialStack: Int?, chinese: Boolean,
+    close: () -> Unit, apply: (OpponentPreset?, Int?) -> Unit,
+) {
+    var preset by rememberSaveable(seat) { mutableStateOf(initialPreset) }
+    var stack by rememberSaveable(seat) { mutableStateOf(initialStack) }
+    fun t(zh: String, en: String) = if (chinese) zh else en
+    Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxWidth(.85f).widthIn(max = 690.dp).fillMaxHeight(.84f),
+            shape = RoundedCornerShape(14.dp), color = Palette.Panel) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    if (seat == 0) t("你的起始筹码", "Your starting stack") else t("编辑座位 $seat", "Edit seat $seat"),
+                    color = Palette.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                )
+                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (seat != 0) {
+                        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+                            ConfigurationChoices(t("对手风格", "Opponent style"), listOf(null) + OpponentPreset.entries,
+                                preset, { presetLabel(it, chinese) }) { preset = it }
+                        }
+                    }
+                    Column(Modifier.weight(1.08f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+                        val stacks = listOf(null, 20, 40, 60, 100, 150, 200, 300, 500, 1000, 2000, 5000)
+                        val choices = if (initialStack == null || initialStack in stacks) stacks else stacks + initialStack
+                        ConfigurationChoices(t("起始筹码", "Starting stack"), choices, stack,
+                            { it?.let { "$it BB" } ?: t("跟随牌桌", "Table default") }) { stack = it }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = close) { Text(t("取消", "Cancel"), color = Palette.Text) }
+                    Button(onClick = { apply(preset, stack) }) { Text(t("完成", "Done")) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun SettingsSwitch(label: String, description: String, checked: Boolean, change: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(label, color = Palette.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(description, color = Palette.TextDim, fontSize = 11.sp, lineHeight = 15.sp)
+        }
+        Switch(checked, change)
     }
 }
 
