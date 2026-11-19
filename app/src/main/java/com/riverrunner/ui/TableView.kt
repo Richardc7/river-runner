@@ -90,7 +90,9 @@ class TableGeometry(val w: Float, val h: Float, val n: Int, textScale: Float = 1
         else -> 112f
     }
     val podH = 50f + ((textScale - 1f).coerceAtLeast(0f) * 62f).coerceAtMost(18f)
-    val miniCardW = if (n == 9 && w < 445f) 20f else if (crowded) 22f else 24f
+    private val cardWidth = if (n == 9 && w < 445f) 20f else if (crowded) 22f else 24f
+    val miniCardW = cardWidth - ((textScale - 1f).coerceAtLeast(0f) * 12f).coerceAtMost(3f)
+    val seatTextPadding = if (textScale > 1.05f) 4.dp else 8.dp
     val boardCardW = if (crowded) 32f else if (w < 520f || h < 320f) 34f else 38f
     val boardCardH = boardCardW * 1.4f
     val boardGap = 4f
@@ -391,7 +393,7 @@ private fun SeatPod(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Strin
     val dimAlpha by animateFloatAsState(if (s.busted) 0.3f else if (s.folded) 0.5f else 1f, tween(300), label = "fold")
     Box(Modifier.size((g.podW + 12).dp, (g.podH + 36).dp), contentAlignment = Alignment.Center) {
         PodFrame(s, pulse, Modifier.size(g.podW.dp, g.podH.dp).alpha(dimAlpha)) {
-            Column(Modifier.fillMaxSize().padding(start = 8.dp, end = 5.dp)) {
+            Column(Modifier.fillMaxSize().padding(start = g.seatTextPadding, end = 5.dp)) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(s.name, color = Palette.Text, fontSize = 12.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
