@@ -350,6 +350,12 @@ class SessionTest {
         assertEquals(english.players.map { it.style }, styled.players.map { it.style })
         assertEquals(english.buttonSeat, styled.buttonSeat)
         assertEquals(english.startHand().players.map { it.hole.toList() }, styled.startHand().players.map { it.hole.toList() })
+        val baseline = GameSession(config.copy(
+            tableType = TableType.GTO,
+            edition = EditionConfig(),
+            opponentNaming = OpponentNaming(chinese = true, followsStyle = true),
+        ))
+        assertEquals(8, baseline.players.drop(1).map { it.name.drop(1) }.distinct().size)
     }
 
     private fun playOut(cfg: SessionConfig, maxHands: Int): GameSession {

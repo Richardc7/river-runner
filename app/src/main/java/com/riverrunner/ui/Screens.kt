@@ -1,6 +1,7 @@
 package com.riverrunner.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import com.riverrunner.engine.Cards
 import com.riverrunner.data.Prefs
@@ -50,6 +51,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,13 +72,15 @@ import kotlinx.coroutines.launch
 fun HomeScreen(vm: AppViewModel) {
     val st = LocalStrings.current
     val p = vm.prefs
+    val style = LocalTableStyle.current
+    val accent = style.controlAccent
     Row(Modifier.fillMaxSize().background(Palette.Bg).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.width(270.dp).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text("River Runner", color = Palette.Text, fontSize = 30.sp, lineHeight = 30.sp, fontFamily = Numeric, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(10.dp))
                 Text("Exploit " + (vm.changelog.firstOrNull()?.version ?: "Edition"),
-                    color = Palette.Gold, fontSize = 12.sp, maxLines = 1,
+                    color = accent, fontSize = 12.sp, maxLines = 1,
                     modifier = Modifier.padding(bottom = 3.dp))
             }
             PlayerCard(vm.profile, vm.profileList.size, vm.maxSlots, onSwitch = { vm.screen = Screen.Saves }, modifier = Modifier.fillMaxWidth())
@@ -88,20 +94,30 @@ fun HomeScreen(vm: AppViewModel) {
             )
             tiles.chunked(3).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { (label, go) -> NavItem(label, Modifier.weight(1f), onClick = go) }
+                    row.forEach { (label, go) -> NavItem(label, accent, Modifier.weight(1f), onClick = go) }
                 }
             }
         }
-        // the "table" side of the lobby: the one place with felt
+        val lobbyShape = RoundedCornerShape(20.dp)
         Box(
-            Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(20.dp))
-                .background(Brush.radialGradient(listOf(Palette.FeltCenter, Palette.FeltEdge), radius = 900f))
-                .border(6.dp, Palette.Rail, RoundedCornerShape(20.dp))
-                .padding(18.dp),
+            Modifier.weight(1f).fillMaxHeight().clip(lobbyShape)
+                .background(Brush.horizontalGradient(listOf(Palette.Bg, Palette.FeltEdge))),
             contentAlignment = Alignment.Center,
         ) {
+            style.art?.let {
+                Image(painterResource(it), contentDescription = null, modifier = Modifier.matchParentSize(),
+                    contentScale = ContentScale.Crop)
+            }
+            Box(Modifier.matchParentSize()
+                .background(Brush.horizontalGradient(listOf(Palette.Bg.copy(alpha = .95f),
+                    Palette.Bg.copy(alpha = .78f), Palette.Bg.copy(alpha = .25f))))
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Palette.Bg.copy(alpha = .72f))))
+                .border(1.dp, accent.copy(alpha = .38f), lobbyShape))
+            Box(Modifier.matchParentSize().padding(5.dp)
+                .border(1.dp, accent.copy(alpha = .16f), RoundedCornerShape(15.dp)))
             Column(
-                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -123,7 +139,7 @@ fun HomeScreen(vm: AppViewModel) {
                             color = Palette.TextDim, fontSize = 11.sp, maxLines = 2)
                     }
                 }
-                ActionButton(st.startGame, Palette.Gold, textColor = Palette.Ink,
+                ActionButton(st.startGame, accent, textColor = Palette.Ink,
                     modifier = Modifier.fillMaxWidth().height(48.dp)) { vm.screen = Screen.Setup }
                 val summary = st.setupSummary(
                     p.lastMode == GameMode.TOURNAMENT, p.lastSize, p.lastStackBB,
@@ -138,8 +154,11 @@ fun HomeScreen(vm: AppViewModel) {
                         color = Palette.TextDim, fontSize = 11.sp, modifier = Modifier.weight(1f),
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
+                val trainingShape = RoundedCornerShape(12.dp)
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x66000000))
+                    Modifier.fillMaxWidth().clip(trainingShape)
+                        .background(Brush.horizontalGradient(listOf(lerp(Palette.Panel, accent, .1f), Palette.Bg)))
+                        .border(1.dp, accent.copy(alpha = .34f), trainingShape)
                         .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = vm::openTraining)
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -152,7 +171,7 @@ fun HomeScreen(vm: AppViewModel) {
                             else "Practise river decisions from your own hands",
                             color = Palette.TextDim, fontSize = 11.sp)
                     }
-                    Text("›", color = Palette.Gold, fontSize = 24.sp, lineHeight = 24.sp)
+                    Text("›", color = accent, fontSize = 24.sp, lineHeight = 24.sp)
                 }
             }
         }
@@ -165,10 +184,14 @@ private fun lastConfig(p: Prefs) = SessionConfig(
 )
 
 @Composable
-private fun NavItem(text: String, modifier: Modifier, onClick: () -> Unit) {
+private fun NavItem(text: String, accent: Color, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(10.dp)
     Box(
-        modifier.pressable(onClick = onClick).height(48.dp).clip(RoundedCornerShape(10.dp))
-            .background(Palette.Panel).padding(horizontal = 6.dp),
+        modifier.height(48.dp).clip(shape)
+            .background(Brush.verticalGradient(listOf(lerp(Palette.Panel, accent, .06f), Palette.Bg)))
+            .border(1.dp, accent.copy(alpha = .2f), shape)
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center,
     ) { Text(text, color = Palette.Text, fontSize = 14.sp, maxLines = 1) }
 }

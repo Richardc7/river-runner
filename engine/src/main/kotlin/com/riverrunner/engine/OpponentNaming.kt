@@ -8,16 +8,8 @@ data class OpponentNaming(val chinese: Boolean = false, val followsStyle: Boolea
 
     internal fun styledName(neutral: String, preset: OpponentPreset, occurrence: Int): String {
         if (chinese) {
-            val givenName = when (preset) {
-                OpponentPreset.BASELINE -> "知衡"
-                OpponentPreset.TAG -> "谨锋"
-                OpponentPreset.LAG -> "逐风"
-                OpponentPreset.STATION -> "守河"
-                OpponentPreset.NIT -> "慎言"
-                OpponentPreset.MANIAC -> "乘浪"
-                OpponentPreset.LOOSE_PASSIVE -> "随舟"
-            }
-            return neutral.first() + givenName
+            val variants = chineseStyleNames.getValue(preset)
+            return neutral.first() + variants[(occurrence - 1) % variants.size]
         }
         val nickname = when (preset) {
             OpponentPreset.BASELINE -> "Anchor"
@@ -37,5 +29,14 @@ data class OpponentNaming(val chinese: Boolean = false, val followsStyle: Boolea
         // Distinct surnames also keep style-linked names unique on a full table.
         val chineseNames = listOf("陈明远", "林思羽", "周启文", "沈安宁", "许清禾", "顾云青", "韩亦辰", "吴星扬",
             "唐子墨", "叶知秋", "罗书言", "何若岚", "梁景行", "宋雨桐", "程怀瑾", "孟晓月")
+        val chineseStyleNames = mapOf(
+            OpponentPreset.BASELINE to listOf("知衡", "景和", "允中", "修齐", "明达", "仲宁", "思齐", "怀远"),
+            OpponentPreset.TAG to listOf("谨锋", "锐行", "立钧", "峻成"),
+            OpponentPreset.LAG to listOf("逐风", "凌川", "远驰", "飞扬"),
+            OpponentPreset.STATION to listOf("守河", "久安", "笃行", "长宁"),
+            OpponentPreset.NIT to listOf("慎言", "静之", "思远", "清谨"),
+            OpponentPreset.MANIAC to listOf("乘浪", "鸣雷", "惊涛", "云驰"),
+            OpponentPreset.LOOSE_PASSIVE to listOf("随舟", "听澜", "泊川", "望潮"),
+        )
     }
 }
