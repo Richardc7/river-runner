@@ -59,8 +59,13 @@ object StudyCoach {
             else -> if (view.legal.canCall) view.street.name + " facing bet" else view.street.name + " initiative"
         }
         val exact = answer?.let { move -> trace.actionValues.firstOrNull { it.move == move } }
-        val modelGap = if (exact != null && trace.actionValues.size >= 2)
-            max(0.0, trace.actionValues.maxOf { it.chips } - exact.chips) / view.bigBlind else null
+        val modelGap = if (exact != null && trace.actionValues.size >= 2) {
+            // Sampling-only bounds must not turn an uncertain multiway edge into a scored error.
+            val gap = if (trace.notes.any { it.contains(MultiwayRiverEv.VERSION) })
+                trace.actionValues.maxOf { it.low } - exact.high
+            else trace.actionValues.maxOf { it.chips } - exact.chips
+            max(0.0, gap) / view.bigBlind
+        } else null
         val mismatch = actualFreq != null && actualFreq < .2 && byType.getValue(preferred) >= .45
         val marked = mismatch || modelGap != null && modelGap >= 1.0
         val legalTypes = buildList {
