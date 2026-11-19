@@ -1,6 +1,7 @@
 package com.riverrunner.ui
 
 import android.app.Application
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -10,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.riverrunner.audio.Sound
 import com.riverrunner.audio.SoundPlayer
 import com.riverrunner.data.HistoryStore
+import com.riverrunner.data.Profile
 import com.riverrunner.data.ProfileStore
 import com.riverrunner.data.Prefs
 import com.riverrunner.data.EditionPrefs
@@ -47,6 +49,21 @@ sealed class Screen {
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     val prefs = Prefs(app)
+    var textSizePercent by mutableStateOf(prefs.textSizePercent); private set
+    var highContrast by mutableStateOf(prefs.highContrast); private set
+
+    init { Palette.highContrast = highContrast }
+
+    fun setTextSize(percent: Int) {
+        prefs.textSizePercent = percent
+        textSizePercent = prefs.textSizePercent
+    }
+
+    fun updateHighContrast(enabled: Boolean) {
+        prefs.highContrast = enabled
+        highContrast = enabled
+        Palette.highContrast = enabled
+    }
     private val analysisRoot: File = app.filesDir
     private val practiceStorage = Dispatchers.IO.limitedParallelism(1)
     private fun analysisStore(id: String = profile.id) = StrategyTraceStore(analysisRoot, id)
@@ -78,6 +95,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         out
     }
+    internal suspend fun hasBlindDecisions(record: HandRecord): Boolean {
+        val id = profile.id
+        return withContext(Dispatchers.IO) {
+            val analysis = analysisStore(id).load(record.id) ?: return@withContext false
+            blindDecisions(record, historicalDecisions(record, analysis, Replayer(record))).isNotEmpty()
+        }
+    }
+
     /** Aggregates only fingerprint-matched historical hero decision-time records. */
     suspend fun studyAssessments(): List<DecisionAssessment> = withContext(Dispatchers.IO) {
         val store = analysisStore()
@@ -213,6 +238,57 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun nextProfileName(): String = profiles.nextDefaultName()
     val maxSlots: Int get() = ProfileStore.MAX_SLOTS
+
+    internal suspend fun exportSave(uri: Uri) {
+        val selected = profile
+        val hands = history.all()
+        withContext(practiceStorage) {
+            val id = selected.id
+            val traces = analysisStore(id)
+            val backup = SaveBackup(selected, hands, hands.mapNotNull { traces.load(it.id) },
+                TrainingProgressStore(analysisRoot, id).load(), SpacedReviewStore(analysisRoot, id).load(),
+                TrainingReferenceStore(analysisRoot, id).load())
+            val resolver = getApplication<Application>().contentResolver
+            val output = resolver.openOutputStream(uri, "wt") ?: throw java.io.IOException("Cannot open backup")
+            SaveBackupCodec.write(backup, output)
+        }
+    }
+
+    internal suspend fun importSave(uri: Uri): Profile {
+        check(profileList.size < maxSlots)
+        val restored = withContext(practiceStorage) {
+            val resolver = getApplication<Application>().contentResolver
+            val input = resolver.openInputStream(uri) ?: throw java.io.IOException("Cannot open backup")
+            val backup = SaveBackupCodec.read(input)
+            var importedId: String? = null
+            try {
+                profiles.restore(backup.profile) { id ->
+                    importedId = id
+                    profiles.historyFile(id).bufferedWriter().use { out ->
+                        for (hand in backup.hands) {
+                            out.write(hand.encode())
+                            out.newLine()
+                        }
+                    }
+                    val traces = analysisStore(id)
+                    backup.analyses.forEach(traces::save)
+                    TrainingProgressStore(analysisRoot, id).save(backup.training)
+                    SpacedReviewStore(analysisRoot, id).save(backup.review)
+                    backup.reference?.let { TrainingReferenceStore(analysisRoot, id).save(it) }
+                }
+            } catch (failure: Exception) {
+                importedId?.let { id ->
+                    analysisStore(id).deleteAll()
+                    TrainingProgressStore(analysisRoot, id).delete()
+                    SpacedReviewStore(analysisRoot, id).delete()
+                    TrainingReferenceStore(analysisRoot, id).delete()
+                }
+                throw failure
+            }
+        }
+        switchProfile(restored.id)
+        return restored
+    }
 
     private fun record(delta: Map<String, Long>) {
         if (delta.isEmpty()) return

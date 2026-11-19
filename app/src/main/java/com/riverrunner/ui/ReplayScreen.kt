@@ -224,14 +224,16 @@ fun ReplayContent(
     BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Bg)) {
         val railWidth = (maxWidth * .39f).coerceIn(222.dp, 342.dp)
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            Box(Modifier.weight(1f).fillMaxHeight().padding(start = 4.dp, top = 4.dp, bottom = 2.dp)) {
-                PokerTable(table, fmt, st.pot, Modifier.fillMaxSize(), animateDeal = false, showTotalPot = !frame.isEnd)
+            Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 5.dp)) {
+                PokerTable(table, fmt, st.pot, Modifier.weight(1f).fillMaxWidth(), animateDeal = false,
+                    showTotalPot = !frame.isEnd)
+                ReplayControls(idx, frames.lastIndex, jumpTo)
             }
             val shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
             Column(
                 Modifier.width(railWidth).fillMaxHeight().clip(shape).background(Palette.Panel)
                     .border(1.dp, Palette.Line, shape).padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(7.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     if (onBack != null) SmallButton("←", onBack)
@@ -248,7 +250,6 @@ fun ReplayContent(
                             } else st.starHand
                         }, highlight = record.favorite)
                 }
-                ReplayControls(idx, frames.lastIndex, jumpTo)
                 ReplayPaneTabs(pane, st) { pane = it }
 
                 if (pane == ReplayPane.TIMELINE) {
@@ -329,10 +330,10 @@ private fun ReplayTimeline(lines: List<LogLine>, index: Int, state: androidx.com
                 i > index -> Palette.TextDim
                 else -> Palette.Text
             }
-            Row(Modifier.fillMaxWidth().heightIn(min = 38.dp).clip(RoundedCornerShape(6.dp))
+            Row(Modifier.fillMaxWidth().heightIn(min = 29.dp).clip(RoundedCornerShape(6.dp))
                 .background(if (selected) Palette.GoldDim.copy(alpha = .52f) else Palette.Bg)
                 .selectable(selected, role = Role.Button) { jump(i) }
-                .padding(horizontal = 8.dp, vertical = 5.dp),
+                .padding(horizontal = 8.dp, vertical = 3.dp),
                 horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(entry.text, color = color, fontSize = 14.sp, lineHeight = 18.sp,
                     fontWeight = if (selected || entry.kind == LogKind.STREET) FontWeight.SemiBold else FontWeight.Normal)
@@ -383,7 +384,7 @@ private fun OpponentInsightCard(
         Text((if (st.isZh) "模拟对手风格：" else "Bot preset: ") + st.styleName(player.style),
             color = Palette.TextDim, fontSize = 11.sp)
         Text((if (st.isZh) "赛后回看对手底牌：" else "Opponent hole cards, revealed in replay: ") +
-            Cards.format(player.hole), color = Palette.Text, fontSize = 12.sp)
+            player.hole.joinToString(" ") { rankText(it) + suitText(it) }, color = Palette.Text, fontSize = 12.sp)
         if (board.size >= 3) {
             val visibleCards = player.hole.toList() + board
             val rank = HandEvaluator.evaluate(Cards.mask(visibleCards.toIntArray()))

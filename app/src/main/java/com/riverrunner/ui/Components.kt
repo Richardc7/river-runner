@@ -29,6 +29,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,27 +57,29 @@ import com.riverrunner.engine.Cards
  * current selection; Green/Red are results and the call/fold actions. See DESIGN.md.
  */
 object Palette {
-    val Bg = Color(0xFF0C1310)        // green-black
-    val Panel = Color(0xFF141E19)
-    val PanelHi = Color(0xFF1E2A24)
-    val PanelHi2 = Color(0xFF2B3A32)  // tracks, inactive controls
-    val Line = Color(0xFF465C4F)
+    internal var highContrast by mutableStateOf(false)
+
+    val Bg: Color get() = Color(if (highContrast) 0xFF000000 else 0xFF0C1310)
+    val Panel: Color get() = Color(if (highContrast) 0xFF0E1110 else 0xFF141E19)
+    val PanelHi: Color get() = Color(if (highContrast) 0xFF191E1B else 0xFF1E2A24)
+    val PanelHi2: Color get() = Color(if (highContrast) 0xFF323C37 else 0xFF2B3A32)
+    val Line: Color get() = Color(if (highContrast) 0xFF89968E else 0xFF465C4F)
     val FeltCenter = Color(0xFF1E7048) // casino green
     val FeltEdge = Color(0xFF0C3A25)
     val Rail = Color(0xFF241810)      // walnut
     val RailHi = Color(0xFF4E3624)
-    val Gold = Color(0xFFE6B54F)      // brass
+    val Gold: Color get() = Color(if (highContrast) 0xFFFFD76D else 0xFFE6B54F)
     val GoldDim = Color(0xFF6E5525)
-    val Accent = Gold                 // selection, your turn, primary action
+    val Accent get() = Gold                 // selection, your turn, primary action
     val AccentDim = GoldDim
-    val Text = Color(0xFFEEF1EA)
-    val TextDim = Color(0xFF9DAAA2)
-    val Red = Color(0xFFF06A63)
-    val Green = Color(0xFF4FC88A)
-    val Blue = Color(0xFF5B9BE6)
+    val Text: Color get() = Color(if (highContrast) 0xFFFFFFFF else 0xFFEEF1EA)
+    val TextDim: Color get() = Color(if (highContrast) 0xFFD9E1DC else 0xFF9DAAA2)
+    val Red: Color get() = Color(if (highContrast) 0xFFFF837D else 0xFFF06A63)
+    val Green: Color get() = Color(if (highContrast) 0xFF70E5AA else 0xFF4FC88A)
+    val Blue: Color get() = Color(if (highContrast) 0xFF90C6FF else 0xFF5B9BE6)
     val FoldBtn = Color(0xFFA83A33)
     val CallBtn = Color(0xFF1F7A50)
-    val RaiseBtn = Color(0xFFE6B54F)
+    val RaiseBtn get() = Gold
     val AllInBtn = Color(0xFFA82C22)
     val Ink = Color(0xFF0C1310)
 }

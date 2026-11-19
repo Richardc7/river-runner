@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.engine.*
 import com.riverrunner.engine.strategy.*
@@ -48,6 +49,34 @@ private fun studyChoices(view: DecisionView): List<Move> = buildList {
 private fun studyMoveLabel(move: Move, bb: Int, zh: Boolean): String =
     StudyPresentation.move(move, bb, zh)
 
+internal fun blindDecisions(record: HandRecord, nodes: List<HistoricalDecision>): List<HistoricalDecision> {
+    val exitFoldIndex = if (record.autoFoldedOnExit) {
+        record.actions.filterNot { it.type.isPost }.indexOfLast { it.seat == record.heroSeat }
+    } else -1
+    return nodes.filter { it.action != null && it.trace.actionIndex != exitFoldIndex }
+}
+
+@Composable
+internal fun DecisionCards(view: DecisionView) {
+    val zh = LocalStrings.current.isZh
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(if (zh) "你的底牌" else "Your cards", color = Palette.TextDim, fontSize = 12.sp, lineHeight = 16.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                view.ownHole.forEach { PlayingCard(it, 27.dp) }
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(if (zh) "当时可见的公共牌" else "Board at decision time", color = Palette.TextDim, fontSize = 12.sp, lineHeight = 16.sp)
+            if (view.board.isEmpty()) {
+                Text(if (zh) "翻牌前尚无公共牌" else "No public cards yet", color = Palette.Text, fontSize = 12.sp, lineHeight = 16.sp)
+            } else Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                view.board.forEach { PlayingCard(it, 25.dp) }
+            }
+        }
+    }
+}
+
 @Composable
 fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<HistoricalDecision>) {
     val zh = LocalStrings.current.isZh
@@ -64,8 +93,8 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
         Text(t("作答时只显示当时可见的牌面和行动。", "Answer using the cards and actions visible at the time."),
             color = Palette.TextDim)
         if (node == null) {
-            Text(t("没有可校验的决策时分析。请在新牌桌中启用保存策略证据。",
-                "No fingerprint-matched decision-time analysis."), color = Palette.Text)
+            Text(t("这手牌没有可作答的决策。可以切换到逐街回放查看牌局。",
+                "This hand has no quiz decisions. Open the street replay to view it."), color = Palette.Text)
         } else {
             val view = node.view
             val trace = node.trace
@@ -73,9 +102,7 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
             Text(t("决策", "Decision") + " " + (index + 1) + "/" + nodes.size + " · " +
                 StudyPresentation.street(view.street, zh),
                 color = Palette.Text, fontWeight = FontWeight.Bold)
-            Text(t("自己的牌：", "Your cards: ") + Cards.format(view.ownHole.toIntArray()) +
-                t(" · 当前公共牌：", " · Current board: ") +
-                (if (view.board.isEmpty()) "-" else Cards.format(view.board.toIntArray())), color = Palette.Text)
+            DecisionCards(view)
             val position = HandEngine.positionName(view.order.indexOf(view.actorSeat), view.order.size)
             Text(t("位置：", "Position: ") + position +
                 t(" · 底池：", " · Pot: ") + number(view.pot.toDouble() / view.bigBlind) + " BB" +
@@ -184,8 +211,8 @@ fun PreflopRangeCoachPanel(vm: AppViewModel, nodes: List<HistoricalDecision>) {
         verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Text(if (zh) "九人桌翻前范围教练" else "Nine-handed preflop range coach",
             style = MaterialTheme.typography.titleMedium, color = Palette.Gold)
-        Text(if (zh) "13×13 为启发式行动倾向矩阵，并非求解器输出。位置、玩家数量与有效筹码都参与计算。"
-            else "13×13 heuristic action tendencies, not a solver chart. Position, table size and effective stacks matter.",
+        Text(if (zh) "13×13 启发式行动倾向矩阵，按位置、玩家数量和有效筹码计算。"
+            else "13×13 heuristic action tendencies by position, table size and effective stack.",
             color = Palette.TextDim)
         if (node == null || result == null) {
             Text(if (zh) "没有已保存的翻前决策。" else "No saved preflop decision.", color = Palette.Text)

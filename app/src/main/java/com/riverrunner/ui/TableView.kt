@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,7 +76,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** All positions on the table in dp, for a table area of [w] x [h] with [n] seats (hero at the bottom). */
-class TableGeometry(val w: Float, val h: Float, val n: Int) {
+class TableGeometry(val w: Float, val h: Float, val n: Int, textScale: Float = 1f) {
     /** 7-9 players or a narrow table: smaller seats and board */
     val crowded = n >= 7 || w < 520f
     val cx = w / 2f
@@ -88,8 +89,10 @@ class TableGeometry(val w: Float, val h: Float, val n: Int) {
         crowded -> 100f
         else -> 112f
     }
-    val podH = 50f
-    val miniCardW = if (n == 9 && w < 445f) 20f else if (crowded) 22f else 24f
+    val podH = 50f + ((textScale - 1f).coerceAtLeast(0f) * 62f).coerceAtMost(18f)
+    private val cardWidth = if (n == 9 && w < 445f) 20f else if (crowded) 22f else 24f
+    val miniCardW = cardWidth - ((textScale - 1f).coerceAtLeast(0f) * 12f).coerceAtMost(3f)
+    val seatTextPadding = if (textScale > 1.05f) 4.dp else 8.dp
     val boardCardW = if (crowded) 32f else if (w < 520f || h < 320f) 34f else 38f
     val boardCardH = boardCardW * 1.4f
     val boardGap = 4f
@@ -140,7 +143,10 @@ fun PokerTable(
 ) {
     BoxWithConstraints(modifier) {
         val n = t.seats.size
-        val g = remember(maxWidth.value, maxHeight.value, n) { TableGeometry(maxWidth.value, maxHeight.value, n) }
+        val textScale = LocalDensity.current.fontScale
+        val g = remember(maxWidth.value, maxHeight.value, n, textScale) {
+            TableGeometry(maxWidth.value, maxHeight.value, n, textScale)
+        }
         val heroIndex = t.seats.indexOfFirst { it.isHero }.coerceAtLeast(0)
         fun rel(i: Int) = (i - heroIndex + n) % n
 
@@ -342,7 +348,8 @@ private fun SeatStatus(seat: SeatUi, fmt: (Int) -> String, modifier: Modifier = 
         seat.actKind == ActKind.ALLIN -> Palette.Red
         else -> Palette.TextDim
     }
-    Text(caption.orEmpty(), modifier = modifier.height(12.dp), color = color,
+    val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    Text(caption.orEmpty(), modifier = modifier.height((12 * textScale).dp), color = color,
         fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium,
         maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
@@ -386,7 +393,7 @@ private fun SeatPod(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Strin
     val dimAlpha by animateFloatAsState(if (s.busted) 0.3f else if (s.folded) 0.5f else 1f, tween(300), label = "fold")
     Box(Modifier.size((g.podW + 12).dp, (g.podH + 36).dp), contentAlignment = Alignment.Center) {
         PodFrame(s, pulse, Modifier.size(g.podW.dp, g.podH.dp).alpha(dimAlpha)) {
-            Column(Modifier.fillMaxSize().padding(start = 8.dp, end = 5.dp)) {
+            Column(Modifier.fillMaxSize().padding(start = g.seatTextPadding, end = 5.dp)) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(s.name, color = Palette.Text, fontSize = 12.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -410,7 +417,7 @@ private fun SeatPod(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Strin
                         }
                     }
                 }
-                SeatStatus(s, fmt, Modifier.fillMaxWidth())
+                SeatReadout(s, fmt, Modifier.fillMaxWidth())
                 Spacer(Modifier.height(3.dp))
             }
             if (s.isActing) {
@@ -428,27 +435,31 @@ private fun SeatPod(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Strin
                     .clip(RoundedCornerShape(4.dp)).background(Color(0xCC0B1210)).padding(horizontal = 4.dp),
             )
         }
-        // equity (replay) or winnings (bottom-right)
+        // winnings (bottom-right)
         Box(Modifier.align(Alignment.BottomEnd).offset(x = (-8).dp, y = 0.dp)) {
-            WonOrEquity(s, fmt)
+            WinningsBadge(s, fmt)
         }
     }
 }
 
 @Composable
-private fun WonOrEquity(s: SeatUi, fmt: (Int) -> String) {
+private fun WinningsBadge(s: SeatUi, fmt: (Int) -> String) {
     AnimatedVisibility(s.won > 0, enter = scaleIn(tween(300, 550)) + fadeIn(tween(300, 550)), exit = fadeOut()) {
         Text(
             "+" + fmt(s.won), color = Palette.Ink, fontSize = 14.sp, fontFamily = Numeric, fontWeight = FontWeight.Bold, maxLines = 1,
             modifier = Modifier.clip(RoundedCornerShape(50)).background(Palette.Green).padding(horizontal = 6.dp, vertical = 1.dp),
         )
     }
-    val eq = s.equity
-    if (eq != null && s.won == 0) {
-        Text(
-            "%.1f%%".format(eq * 100), color = Color.White, fontSize = 14.sp, fontFamily = Numeric, fontWeight = FontWeight.Bold, maxLines = 1,
-            modifier = Modifier.clip(RoundedCornerShape(50)).background(Palette.Blue).padding(horizontal = 6.dp, vertical = 1.dp),
-        )
+}
+
+@Composable
+private fun SeatReadout(s: SeatUi, fmt: (Int) -> String, modifier: Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        SeatStatus(s, fmt, Modifier.weight(1f))
+        s.equity?.let {
+            Text("%.1f%%".format(it * 100), color = Palette.Blue, fontSize = 11.sp,
+                fontFamily = Numeric, fontWeight = FontWeight.Bold, lineHeight = 12.sp, maxLines = 1)
+        }
     }
 }
 
@@ -494,14 +505,15 @@ private fun HeroSeat(s: SeatUi, g: TableGeometry, t: TableUi, fmt: (Int) -> Stri
                         )
                     }
                     Spacer(Modifier.height(3.dp))
-                    SeatStatus(s, fmt, Modifier.padding(horizontal = 5.dp))
+                    if (s.equity == null) SeatStatus(s, fmt, Modifier.padding(horizontal = 5.dp))
+                    else SeatReadout(s, fmt, Modifier.fillMaxWidth().padding(horizontal = 8.dp))
                 }
             }
             if (s.isButton) Box(Modifier.align(Alignment.CenterStart).offset(x = (-22).dp)) { DealerButton() }
         }
     }
     Box(Modifier.fillMaxSize().centerAt(g.heroBadgeLeft)) {
-        WonOrEquity(s, fmt)
+        WinningsBadge(s, fmt)
     }
 }
 

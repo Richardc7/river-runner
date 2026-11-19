@@ -1,6 +1,7 @@
 package com.riverrunner.ui
 
 import android.view.HapticFeedbackConstants
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -247,7 +248,7 @@ private fun TableStatusBar(ui: TableScreenUi, fmt: (Int) -> String) {
     val shape = RoundedCornerShape(10.dp)
     BoxWithConstraints(Modifier.fillMaxWidth().padding(bottom = 4.dp).height(51.dp)
         .liveSurface(accent, shape)) {
-        val wide = maxWidth >= 490.dp
+        val wide = maxWidth >= (500 * LocalDensity.current.fontScale).dp
         Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             Column(Modifier.weight(1f).drawBehind {
@@ -389,20 +390,29 @@ private fun LiveStrategyDetails(live: LiveStrategyHint, bb: Int, openingBet: Boo
 @Composable
 private fun PracticeMetrics(info: PracticeInfo, fmt: (Int) -> String) {
     val st = LocalStrings.current
+    var showSpr by remember { mutableStateOf(false) }
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         TableMetric(st.toCall, fmt(info.toCall))
         if (info.toCall > 0) {
             TableMetric(st.potOdds, "1 : %.1f".format(info.pot.toDouble() / info.toCall))
             TableMetric(if (st.isZh) "所需胜率" else "Needed", Format.pct(info.potOdds))
         }
-        TableMetric(st.spr, "%.1f".format(info.spr))
+        TableMetric(st.spr + " ⓘ", "%.1f".format(info.spr),
+            Modifier.clickable(onClickLabel = if (st.isZh) "查看筹码底池比的解释" else "Explain SPR") { showSpr = true })
         TableMetric(if (st.isZh) "牌型" else "Hand", info.handText)
     }
+    if (showSpr) AlertDialog(
+        onDismissRequest = { showSpr = false },
+        title = { Text(if (st.isZh) "SPR · 筹码底池比" else "SPR · Stack-to-pot ratio") },
+        text = { Text(if (st.isZh) "有效筹码除以底池。比值越小，剩余筹码越容易在接下来的下注中投入底池。"
+            else "Effective stack divided by pot. A smaller ratio makes it easier to commit the remaining stack.") },
+        confirmButton = { TextButton(onClick = { showSpr = false }) { Text(st.back) } },
+    )
 }
 
 @Composable
-private fun TableMetric(label: String, value: String) {
-    Column {
+private fun TableMetric(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
         Text(label, color = Palette.TextDim, fontSize = 10.sp, lineHeight = 13.sp, maxLines = 1)
         Text(value, color = Palette.Text, fontSize = 15.sp, lineHeight = 17.sp,
             fontFamily = Numeric, fontWeight = FontWeight.SemiBold, maxLines = 1)
