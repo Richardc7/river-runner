@@ -231,6 +231,7 @@ object Facts {
             }
             GameMode.TOURNAMENT -> {
                 d[Progress.TOURNEYS] = 1
+                if (s.endedEarly) return d
                 d[Progress.TOURNEY_POINTS] = Math.round(s.heroProfit)
                 val paid = Icm.payoutsFor(config.tableSize).size
                 if (s.heroPlace in 1..paid) d[Progress.TOURNEY_ITM] = 1

@@ -135,7 +135,11 @@ class GameSession(val config: SessionConfig) {
         val heroPlace = hero.place
         val profit = when (config.mode) {
             GameMode.CASH -> (hero.stack - paidIn(HERO_SEAT)).toDouble() / BASE_BB
-            GameMode.TOURNAMENT -> { val pool = 100.0 * config.tableSize; val pay = payouts.getOrNull(heroPlace - 1) ?: 0.0; pool * pay - 100.0 }
+            GameMode.TOURNAMENT -> if (early) 0.0 else {
+                val pool = 100.0 * config.tableSize
+                val pay = payouts.getOrNull(heroPlace - 1) ?: 0.0
+                pool * pay - 100.0
+            }
         }
         val s = SessionSummary(config.mode, standings, heroPlace, profit, handNumber, early, totalRake, paidIn(HERO_SEAT)); finished = s; return s
     }
