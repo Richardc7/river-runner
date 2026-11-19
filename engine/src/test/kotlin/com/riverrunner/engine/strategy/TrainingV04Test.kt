@@ -36,4 +36,32 @@ class TrainingV04Test {
         assertFailsWith<IllegalArgumentException> { ReferenceCodec.decode("bad input") }
         assertFailsWith<IllegalArgumentException> { ReferenceNode("a".repeat(64),listOf(ReferenceAction(Move.FOLD,.2))) }
     }
+
+    @Test fun solverSpotRetainsTheRiverRootWhenFacingABet() {
+        val session = GameSession(SessionConfig(GameMode.CASH, 2, 100, TableType.GTO, seed = 7))
+        val hand = session.startHand()
+        while (hand.street != Street.RIVER) {
+            if (hand.phase == Phase.STREET_DONE) hand.dealNextStreet()
+            else hand.apply(if (hand.legalActions().canCheck) Move.CHECK else Move.CALL)
+        }
+        val rootView = ObservationFactory.forActor(hand, GameMode.CASH)
+        val root = assertNotNull(SolverSpot.from(rootView))
+        hand.apply(Move.raiseTo(hand.legalActions().minRaiseTo))
+        val facingBet = ObservationFactory.forActor(hand, GameMode.CASH)
+        val spot = assertNotNull(SolverSpot.from(facingBet))
+        assertTrue(facingBet.pot > root.startingPot)
+        assertEquals(root.startingPot, spot.startingPot)
+        assertEquals(root.effectiveStack, spot.effectiveStack)
+        assertEquals(ActionType.BET, spot.riverActions.single().type)
+        assertNull(SolverSpot.from(facingBet.copy(mode = GameMode.TOURNAMENT)))
+        assertNull(SolverSpot.from(facingBet.copy(cashRules = CashRules(rakeBasisPoints = 100, rakeCapBB = 1))))
+
+        val hash = DecisionFingerprint.of(facingBet)
+        val provenance = ReferenceProvenance("test", "author", "local", "river")
+        val callNode = ReferenceNode(hash, listOf(ReferenceAction(Move.CALL, 1.0)))
+        val checkNode = ReferenceNode(hash, listOf(ReferenceAction(Move.CHECK, 1.0)))
+        assertEquals(callNode, ReferenceBook(provenance, listOf(callNode)).lookup(facingBet))
+        assertNull(ReferenceBook(provenance, listOf(callNode)).lookup(rootView))
+        assertNull(ReferenceBook(provenance, listOf(checkNode)).lookup(facingBet))
+    }
 }
