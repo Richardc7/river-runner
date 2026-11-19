@@ -118,40 +118,43 @@ fun HomeScreen(vm: AppViewModel) {
                         }
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(if (st.isZh) "牌桌 · 训练中心" else "Play · Training",
+                        Text(if (st.isZh) "开一桌德州扑克" else "Play Texas Hold’em",
                             color = Palette.Text, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text(if (st.isZh) "开始牌局，或针对弱项专项练习"
-                            else "Play a table or practise your weakest spots",
+                        Text(if (st.isZh) "选择筹码局或锦标赛，设置人数与规则"
+                            else "Choose cash or tournament, then set table size and rules",
                             color = Palette.TextDim, fontSize = 11.sp, maxLines = 2)
                     }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ActionButton(st.startGame, Palette.Gold, textColor = Palette.Ink,
-                        modifier = Modifier.weight(1f).height(48.dp)) { vm.screen = Screen.Setup }
-                    ActionButton(if (st.isZh) "专项训练" else "Training", Palette.CallBtn,
-                        modifier = Modifier.weight(1f).height(48.dp)) { vm.openTraining() }
-                }
+                ActionButton(st.startGame, Palette.Gold, textColor = Palette.Ink,
+                    modifier = Modifier.fillMaxWidth().height(48.dp)) { vm.screen = Screen.Setup }
                 val summary = st.setupSummary(
                     p.lastMode == GameMode.TOURNAMENT, p.lastSize, p.lastStackBB,
                     p.lastTableType == TableType.MIXED, p.lastHandsPerLevel, p.lastAnte,
                 )
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column(
-                        Modifier.weight(1f).pressable { vm.startGame(lastConfig(p)) }
-                            .clip(RoundedCornerShape(12.dp)).background(Color(0x66000000))
-                            .border(1.dp, Palette.Gold.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    ) {
-                        Text(st.quickStart + "  ▶", color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Text(summary.take(2).joinToString(if (st.isZh) "，" else ", "),
-                            color = Palette.Text.copy(alpha = 0.85f), fontSize = 11.sp,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    TextButton(onClick = { vm.startGame(lastConfig(p)) }) {
+                        Text(st.quickStart, color = Palette.Text, fontSize = 13.sp)
                     }
-                    TextButton(onClick = vm::openEditionSettings) {
-                        Text(if (st.isZh) "自定义" else "Customize",
-                            color = Palette.Gold, fontSize = 12.sp)
+                    Text(summary.take(2).joinToString(if (st.isZh) "，" else ", "),
+                        color = Palette.TextDim, fontSize = 11.sp, modifier = Modifier.weight(1f),
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x66000000))
+                        .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = vm::openTraining)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(if (st.isZh) "专项训练" else "Training",
+                            color = Palette.Text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text(if (st.isZh) "用自己的历史牌局练习河牌决策"
+                            else "Practise river decisions from your own hands",
+                            color = Palette.TextDim, fontSize = 11.sp)
                     }
+                    Text("›", color = Palette.Gold, fontSize = 24.sp, lineHeight = 24.sp)
                 }
             }
         }

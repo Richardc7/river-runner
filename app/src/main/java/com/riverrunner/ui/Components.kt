@@ -77,15 +77,6 @@ val Numeric = androidx.compose.ui.text.font.FontFamily(
     androidx.compose.ui.text.font.Font(com.riverrunner.R.font.barlow_condensed_bold, FontWeight.Bold),
 )
 
-fun actColor(k: ActKind?): Color = when (k) {
-    ActKind.FOLD -> Color(0xFF5A615D)
-    ActKind.CHECK -> Color(0xFF3F7FC4)
-    ActKind.CALL -> Color(0xFF2E8B5A)
-    ActKind.BET -> Color(0xFFC08A1E)
-    ActKind.ALLIN -> Color(0xFFC0392B)
-    ActKind.POST, null -> Color(0xFF3A4741)
-}
-
 private val SUIT_SYMBOL = charArrayOf('♣', '♦', '♥', '♠')
 
 fun rankText(card: Int): String = Cards.RANKS[Cards.rank(card)].let { if (it == 'T') "10" else it.toString() }
