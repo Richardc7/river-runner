@@ -10,42 +10,21 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.riverrunner.audio.Sound
 import com.riverrunner.audio.SoundPlayer
+import com.riverrunner.data.EditionPrefs
 import com.riverrunner.data.HistoryStore
+import com.riverrunner.data.Prefs
 import com.riverrunner.data.Profile
 import com.riverrunner.data.ProfileStore
-import com.riverrunner.data.Prefs
-import com.riverrunner.data.EditionPrefs
 import com.riverrunner.engine.*
 import com.riverrunner.engine.strategy.*
-import java.io.File
 import com.riverrunner.i18n.EN
 import com.riverrunner.i18n.ZH
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-sealed class Screen {
-    data object Home : Screen()
-    data object Table : Screen()
-    data class Result(val summary: SessionSummary) : Screen()
-    data object History : Screen()
-    data class Replay(val record: HandRecord, val blind: Boolean = false) : Screen()
-    data object Stats : Screen()
-    data object Settings : Screen()
-    data object Appearance : Screen()
-    data class EditionSettings(val showCashRules: Boolean = false) : Screen()
-    data object Training : Screen()
-    data object Guide : Screen()
-    data object Saves : Screen()
-    data object Achievements : Screen()
-    data object Setup : Screen()
-    data object TrainingSetup : Screen()
-}
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     val prefs = Prefs(app)
@@ -64,107 +43,53 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         highContrast = enabled
         Palette.highContrast = enabled
     }
-    private val analysisRoot: File = app.filesDir
-    private val practiceStorage = Dispatchers.IO.limitedParallelism(1)
-    private fun analysisStore(id: String = profile.id) = StrategyTraceStore(analysisRoot, id)
-    suspend fun analysisFor(record: HandRecord): HandAnalysis? {
-        val id = profile.id; val retained = history.all().map { it.id }.toSet()
-        return withContext(Dispatchers.IO) { analysisStore(id).also { it.retain(retained) }.load(record.id) }
-    }
-    /** V0.4 drills: derive only from saved, contemporaneously modelled river choices. */
-    suspend fun trainingItems(): List<TrainingItem> = withContext(Dispatchers.IO) {
-        val id = profile.id
-        val records = history.all().takeLast(300)
-        val store = analysisStore(id)
-        val out = ArrayList<TrainingItem>()
-        for (record in records) {
-            val analysis = runCatching { store.load(record.id) }.getOrNull() ?: continue
-            val replayer = Replayer(record)
-            for (trace in analysis.decisions) {
-                if (trace.actionValues.size < 2 || trace.seat != record.heroSeat) continue
-                val view = runCatching { ObservationFactory.forActor(
-                    replayer.engineBeforeAction(trace.actionIndex), record.mode
-                ) }.getOrNull() ?: continue
-                if (DecisionFingerprint.of(view) != trace.contextHash) continue
-                val exercise = TrainingCurriculum.fromHistory(listOf(analysis)).firstOrNull {
-                    it.id == "h" + record.id + "a" + trace.actionIndex
-                } ?: continue
-                out += TrainingItem(exercise, record, view, trace.baseline, trace.notes.toList(),
-                    "${analysis.algorithmVersion} / ${analysis.randomVersion}")
-            }
-        }
-        out
-    }
-    internal suspend fun hasBlindDecisions(record: HandRecord): Boolean {
-        val id = profile.id
-        return withContext(Dispatchers.IO) {
-            val analysis = analysisStore(id).load(record.id) ?: return@withContext false
-            blindDecisions(record, historicalDecisions(record, analysis, Replayer(record))).isNotEmpty()
-        }
-    }
 
-    /** Aggregates only fingerprint-matched historical hero decision-time records. */
-    suspend fun studyAssessments(): List<DecisionAssessment> = withContext(Dispatchers.IO) {
-        val store = analysisStore()
-        history.all().takeLast(300).flatMap { record ->
-            currentCoroutineContext().ensureActive()
-            assessmentsFor(record, store).toList()
-        }
-    }
+    private val studyRepo = StudyRepository(app.filesDir)
 
-    suspend fun handsWithModelDeviations(records: List<HandRecord>): Set<Long> = withContext(Dispatchers.IO) {
-        val store = analysisStore()
-        buildSet {
-            for (record in records) {
-                currentCoroutineContext().ensureActive()
-                if (assessmentsFor(record, store).any { it.needsStudy }) add(record.id)
-            }
-        }
-    }
+    suspend fun analysisFor(record: HandRecord): HandAnalysis? =
+        studyRepo.analysisFor(profile.id, history.all().map { it.id }.toSet(), record.id)
 
-    private fun assessmentsFor(record: HandRecord, store: StrategyTraceStore): Sequence<DecisionAssessment> = sequence {
-        val analysis = runCatching { store.load(record.id) }.getOrNull() ?: return@sequence
-        for ((view, trace, action) in historicalDecisions(record, analysis, Replayer(record))) {
-            val assessment = runCatching { StudyCoach.assess(record.id, view, trace, action) }.getOrNull() ?: continue
-            yield(assessment)
-        }
-    }
+    suspend fun trainingItems(): List<TrainingItem> =
+        studyRepo.trainingItems(profile.id, history.all())
 
-    suspend fun loadSpacedProgress(): ReviewProgress = withContext(practiceStorage) {
-        SpacedReviewStore(analysisRoot, profile.id).load()
-    }
+    internal suspend fun hasBlindDecisions(record: HandRecord): Boolean =
+        studyRepo.hasBlindDecisions(profile.id, record)
+
+    suspend fun studyAssessments(): List<DecisionAssessment> =
+        studyRepo.studyAssessments(profile.id, history.all())
+
+    suspend fun handsWithModelDeviations(records: List<HandRecord>): Set<Long> =
+        studyRepo.handsWithModelDeviations(profile.id, records)
+
+    suspend fun loadSpacedProgress(): ReviewProgress = studyRepo.loadSpacedProgress(profile.id)
+
     fun saveSpacedProgress(value: ReviewProgress) {
         val id = profile.id
-        viewModelScope.launch(practiceStorage) { SpacedReviewStore(analysisRoot, id).save(value) }
+        viewModelScope.launch { studyRepo.saveSpacedProgress(id, value) }
     }
+
     suspend fun getStudyRecord(id: Long): HandRecord? = withContext(Dispatchers.IO) {
         history.all().firstOrNull { it.id == id }
     }
-    suspend fun getStudyAnalysis(id: Long): HandAnalysis? = withContext(Dispatchers.IO) {
-        runCatching { analysisStore().load(id) }.getOrNull()
-    }
 
-    suspend fun loadTrainingProgress(): TrainingProgress = withContext(practiceStorage) {
-        TrainingProgressStore(analysisRoot, profile.id).load()
-    }
+    suspend fun getStudyAnalysis(id: Long): HandAnalysis? = studyRepo.loadAnalysis(profile.id, id)
+
+    suspend fun loadTrainingProgress(): TrainingProgress = studyRepo.loadTrainingProgress(profile.id)
+
     fun saveTrainingProgress(progress: TrainingProgress) {
         val id = profile.id
-        viewModelScope.launch(practiceStorage) { TrainingProgressStore(analysisRoot, id).save(progress) }
+        viewModelScope.launch { studyRepo.saveTrainingProgress(id, progress) }
     }
-    suspend fun resetPracticeProgress() {
-        val id = profile.id
-        withContext(practiceStorage) {
-            TrainingProgressStore(analysisRoot, id).save(TrainingProgress())
-            SpacedReviewStore(analysisRoot, id).save(ReviewProgress())
-        }
-    }
-    suspend fun referenceForTraining(): ReferenceBook? = withContext(Dispatchers.IO) {
-        TrainingReferenceStore(analysisRoot, profile.id).load()
-    }
-    suspend fun saveTrainingReference(book: ReferenceBook) {
-        val id = profile.id
-        withContext(Dispatchers.IO) { TrainingReferenceStore(analysisRoot, id).save(book) }
-    }
+
+    suspend fun resetPracticeProgress() = studyRepo.resetPracticeProgress(profile.id)
+
+    suspend fun referenceForTraining(): ReferenceBook? = studyRepo.loadReference(profile.id)
+
+    suspend fun saveTrainingReference(book: ReferenceBook) = studyRepo.saveReference(profile.id, book)
+
+    suspend fun exportableSolverSpots(limit: Int = 50): List<Pair<HandRecord, SolverSpot>> =
+        studyRepo.exportableSolverSpots(profile.id, history.all(), limit)
+
     private val editionPrefs = EditionPrefs(app)
     var editionConfig by mutableStateOf(editionPrefs.load()); private set
     fun saveEdition(config: EditionConfig) { editionPrefs.save(config); editionConfig = config }
@@ -186,6 +111,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             else -> error("Unknown study toggle")
         }
     }
+
     private var editionReturnScreen: Screen = Screen.Home
     private var trainingReturnScreen: Screen = Screen.Home
 
@@ -202,6 +128,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         screen = Screen.Training
     }
     fun closeTraining() { screen = trainingReturnScreen }
+
     var topUpAvailable by mutableStateOf(false); private set
     fun topUpHero() {
         val s = session ?: return
@@ -234,58 +161,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun deleteProfile(id: String) {
         if (screen == Screen.Table || reviewing) return
-        analysisStore(id).deleteAll(); TrainingProgressStore(analysisRoot, id).delete(); SpacedReviewStore(analysisRoot, id).delete(); TrainingReferenceStore(analysisRoot, id).delete(); profiles.delete(id); switchProfile(profiles.active().id)
+        studyRepo.deleteProfileArtifacts(id)
+        profiles.delete(id)
+        switchProfile(profiles.active().id)
     }
     fun nextProfileName(): String = profiles.nextDefaultName()
     val maxSlots: Int get() = ProfileStore.MAX_SLOTS
 
     internal suspend fun exportSave(uri: Uri) {
-        val selected = profile
-        val hands = history.all()
-        withContext(practiceStorage) {
-            val id = selected.id
-            val traces = analysisStore(id)
-            val backup = SaveBackup(selected, hands, hands.mapNotNull { traces.load(it.id) },
-                TrainingProgressStore(analysisRoot, id).load(), SpacedReviewStore(analysisRoot, id).load(),
-                TrainingReferenceStore(analysisRoot, id).load())
-            val resolver = getApplication<Application>().contentResolver
-            val output = resolver.openOutputStream(uri, "wt") ?: throw java.io.IOException("Cannot open backup")
-            SaveBackupCodec.write(backup, output)
-        }
+        studyRepo.exportSave(profile, history.all(), getApplication<Application>().contentResolver, uri)
     }
 
     internal suspend fun importSave(uri: Uri): Profile {
         check(profileList.size < maxSlots)
-        val restored = withContext(practiceStorage) {
-            val resolver = getApplication<Application>().contentResolver
-            val input = resolver.openInputStream(uri) ?: throw java.io.IOException("Cannot open backup")
-            val backup = SaveBackupCodec.read(input)
-            var importedId: String? = null
-            try {
-                profiles.restore(backup.profile) { id ->
-                    importedId = id
-                    profiles.historyFile(id).bufferedWriter().use { out ->
-                        for (hand in backup.hands) {
-                            out.write(hand.encode())
-                            out.newLine()
-                        }
-                    }
-                    val traces = analysisStore(id)
-                    backup.analyses.forEach(traces::save)
-                    TrainingProgressStore(analysisRoot, id).save(backup.training)
-                    SpacedReviewStore(analysisRoot, id).save(backup.review)
-                    backup.reference?.let { TrainingReferenceStore(analysisRoot, id).save(it) }
-                }
-            } catch (failure: Exception) {
-                importedId?.let { id ->
-                    analysisStore(id).deleteAll()
-                    TrainingProgressStore(analysisRoot, id).delete()
-                    SpacedReviewStore(analysisRoot, id).delete()
-                    TrainingReferenceStore(analysisRoot, id).delete()
-                }
-                throw failure
-            }
-        }
+        val restored = studyRepo.importSave(profiles, getApplication<Application>().contentResolver, uri)
         switchProfile(restored.id)
         return restored
     }
@@ -309,6 +198,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
     var guideTab = GuideTab.BASICS
         private set
     var guideReturnScreen: Screen = Screen.Home
@@ -350,6 +240,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun showChangelog() { whatsNew = changelog }
     fun dismissWhatsNew() { whatsNew = null; changelog.firstOrNull()?.let { prefs.seenChangelog = it.version } }
+
     var reviewing by mutableStateOf(false); private set
     var reviewEachHand by mutableStateOf(prefs.reviewEachHand); private set
     fun setReviewEach(v: Boolean) { prefs.reviewEachHand = v; reviewEachHand = v }
@@ -367,6 +258,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         prefs.saveAppearance(value.face.code, value.back.art.code, value.table.code)
         appearance = value
     }
+
     private val sound = SoundPlayer(app).also { it.enabled = prefs.sound }
     var soundOn by mutableStateOf(prefs.sound); private set
     fun setSound(v: Boolean) { prefs.sound = v; soundOn = v; sound.enabled = v }
@@ -471,9 +363,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         } else null
     }
     private suspend fun runGame(s: GameSession) {
-        val savedReference = if (prefs.realtimeGto) withContext(Dispatchers.IO) {
-            TrainingReferenceStore(analysisRoot, profile.id).load()
-        } else null
+        val savedReference = if (prefs.realtimeGto) studyRepo.loadReference(profile.id) else null
         while (!s.isOver && !quitRequested) {
             topUpAvailable = false; liveStrategyHint = null
             val buyInsBefore = s.buyIns.size
@@ -561,13 +451,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val lastHeroAction = built.actions.lastOrNull { it.seat == built.heroSeat && !it.type.isPost }
             val rec = built.copy(favorite = starHand,
                 autoFoldedOnExit = exitMoveIssued && lastHeroAction?.type == ActionType.FOLD)
-            val store = history; val traces = analysisStore(); val analysis = s.lastAnalysis
+            val store = history; val profileId = profile.id; val traces = studyRepo.analysisStore(profileId); val analysis = s.lastAnalysis
+            var retainedIds: Set<Long> = emptySet()
             val analysisSaved = withContext(Dispatchers.IO) {
                 store.add(rec)
+                retainedIds = store.all().map { it.id }.toSet()
                 try {
                     if (analysis != null) traces.save(analysis)
-                    traces.retain(store.all().map { it.id }.toSet()); true
+                    traces.retain(retainedIds); true
                 } catch (e: java.io.IOException) { false } catch (e: IllegalStateException) { false }
+            }
+            if (analysisSaved) {
+                viewModelScope.launch { studyRepo.indexHand(profileId, rec, analysis, retainedIds) }
             }
             if (!analysisSaved) notice = if (prefs.chinese) "\u724c\u8c31\u5df2\u4fdd\u5b58\uff0c\u7b56\u7565\u5206\u6790\u4fdd\u5b58\u5931\u8d25" else "Hand saved; strategy analysis could not be saved"
             lastRecordId = rec.id

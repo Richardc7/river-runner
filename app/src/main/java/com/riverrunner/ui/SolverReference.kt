@@ -6,13 +6,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -29,28 +31,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.riverrunner.engine.Cards
+import com.riverrunner.engine.HandRecord
 import com.riverrunner.engine.MoveType
 import com.riverrunner.engine.strategy.DecisionFingerprint
 import com.riverrunner.engine.strategy.DecisionView
 import com.riverrunner.engine.strategy.ReferenceBook
 import com.riverrunner.engine.strategy.ReferenceCodec
+import com.riverrunner.engine.strategy.ReferenceNode
 import com.riverrunner.engine.strategy.SolverSpot
 import com.riverrunner.i18n.LocalStrings
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.io.OutputStream
 import java.io.Reader
 import java.util.Locale
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 internal fun SolverSpot.toJson(): String {
     val legal = view.legal
@@ -71,6 +78,55 @@ internal fun SolverSpot.toJson(): String {
             .put("canRaise", legal.canRaise).put("minRaiseTo", legal.minRaiseTo)
             .put("maxRaiseTo", legal.maxRaiseTo).put("heroStreetBet", legal.myStreetBet))
     }.toString(2)
+}
+
+/** Writes multiple eligible solver spots plus a manifest into a single ZIP bundle. */
+internal fun writeSolverSpotBatchZip(spots: List<Pair<HandRecord, SolverSpot>>, output: OutputStream) {
+    require(spots.isNotEmpty()) { "No solver spots to export" }
+    val manifestEntries = JSONArray()
+    ZipOutputStream(output.buffered()).use { zip ->
+        for ((record, spot) in spots) {
+            val hash = DecisionFingerprint.of(spot.view)
+            val fileName = "hand-${record.handNumber}-${hash.take(10)}.json"
+            zip.putNextEntry(ZipEntry(fileName))
+            zip.write(spot.toJson().toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
+            manifestEntries.put(
+                JSONObject()
+                    .put("file", fileName)
+                    .put("handId", record.id)
+                    .put("handNumber", record.handNumber)
+                    .put("contextHash", hash)
+            )
+        }
+        val manifest = JSONObject()
+            .put("format", "RR-SOLVER-SPOT-BATCH-1")
+            .put("count", spots.size)
+            .put("spots", manifestEntries)
+            .toString(2)
+        zip.putNextEntry(ZipEntry("manifest.json"))
+        zip.write(manifest.toByteArray(Charsets.UTF_8))
+        zip.closeEntry()
+    }
+}
+
+/**
+ * Merges one or more newly decoded [ReferenceBook]s into an optional existing book,
+ * deduplicating by `contextHash` (later entries win) while respecting the 3000-node cap.
+ */
+internal fun mergeReferenceBooks(existing: ReferenceBook?, incoming: List<ReferenceBook>): ReferenceBook {
+    require(incoming.isNotEmpty()) { "No reference books to merge" }
+    val merged = linkedMapOf<String, ReferenceNode>()
+    existing?.nodes?.forEach { merged[it.contextHash] = it }
+    for (book in incoming) {
+        for (node in book.nodes) {
+            merged[node.contextHash] = node
+        }
+    }
+    val nodes = merged.values.toList().let { list ->
+        if (list.size > 3000) list.takeLast(3000) else list
+    }
+    return ReferenceBook(incoming.last().provenance, nodes)
 }
 
 @Composable
@@ -163,6 +219,7 @@ internal fun StrategyFrequencyBar(frequencies: List<Pair<MoveType, Double>>) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SolverReferenceLibrary(vm: AppViewModel, reference: ReferenceBook?, onImported: (ReferenceBook) -> Unit) {
     val zh = LocalStrings.current.isZh
@@ -171,13 +228,13 @@ internal fun SolverReferenceLibrary(vm: AppViewModel, reference: ReferenceBook?,
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     var raw by remember(vm.profile.id) { mutableStateOf("") }
-    var importing by remember(vm.profile.id) { mutableStateOf(false) }
+    var busy by remember(vm.profile.id) { mutableStateOf(false) }
     var status by remember(vm.profile.id) { mutableStateOf("") }
     var failed by remember(vm.profile.id) { mutableStateOf(false) }
 
     fun importReference(read: () -> String) {
-        if (importing) return
-        importing = true
+        if (busy) return
+        busy = true
         status = ""
         scope.launch {
             try {
@@ -194,14 +251,77 @@ internal fun SolverReferenceLibrary(vm: AppViewModel, reference: ReferenceBook?,
                     "Import failed. Check the file format, size and action frequencies.")
                 failed = true
             } finally {
-                importing = false
+                busy = false
             }
         }
     }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+
+    val singlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) importReference {
             val input = resolver.openInputStream(uri) ?: throw IOException("Cannot open file")
             input.bufferedReader().use { it.readReferenceText() }
+        }
+    }
+
+    val multiPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isEmpty() || busy) return@rememberLauncherForActivityResult
+        busy = true
+        status = ""
+        scope.launch {
+            try {
+                val merged = withContext(Dispatchers.IO) {
+                    val decoded = uris.map { uri ->
+                        val input = resolver.openInputStream(uri) ?: throw IOException("Cannot open file")
+                        ReferenceCodec.decode(input.bufferedReader().use { it.readReferenceText() }.removePrefix("\uFEFF"))
+                    }
+                    mergeReferenceBooks(reference, decoded)
+                }
+                vm.saveTrainingReference(merged)
+                onImported(merged)
+                status = t(
+                    "已合并导入 ${uris.size} 个文件，当前共 ${merged.nodes.size} 个场景。",
+                    "Merged ${uris.size} file(s); library now holds ${merged.nodes.size} spots.",
+                )
+                failed = false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                status = t("批量导入失败。请确认所选文件均为有效的 RR-REFERENCE-1 格式。",
+                    "Batch import failed. Ensure every selected file is a valid RR-REFERENCE-1 file.")
+                failed = true
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    val batchExportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri == null || busy) return@rememberLauncherForActivityResult
+        busy = true
+        status = ""
+        scope.launch {
+            try {
+                val spots = vm.exportableSolverSpots(limit = 50)
+                if (spots.isEmpty()) {
+                    status = t("暂无可导出的单挑无抽水河牌场景。", "No eligible heads-up unraked river spots to export.")
+                    failed = true
+                } else {
+                    withContext(Dispatchers.IO) {
+                        val output = resolver.openOutputStream(uri, "wt") ?: throw IOException("Cannot open destination")
+                        writeSolverSpotBatchZip(spots, output)
+                    }
+                    status = t("已批量导出 ${spots.size} 个待求解场景（优先含偏离手牌）。",
+                        "Exported ${spots.size} solver spots (deviation hands prioritized).")
+                    failed = false
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                status = t("批量导出失败，请重试。", "Batch export failed. Please try again.")
+                failed = true
+            } finally {
+                busy = false
+            }
         }
     }
 
@@ -212,8 +332,8 @@ internal fun SolverReferenceLibrary(vm: AppViewModel, reference: ReferenceBook?,
     ) {
         Text(t("离线求解器参考", "Offline solver reference"),
             color = Palette.Gold, style = MaterialTheme.typography.titleLarge)
-        Text(t("在双轨分析或答案解析中导出单挑河牌场景，使用电脑上的求解器求解，再导入 RR-REFERENCE-1 结果。",
-            "Export a heads-up river spot from Policy comparison or a quiz explanation. Solve it on a computer and import the RR-REFERENCE-1 result."),
+        Text(t("支持单手或一键批量导出单挑无抽水河牌场景（ZIP），在电脑端 TexasSolver 求解后，可多选导回并自动合并。",
+            "Export single or batch heads-up unraked river spots (ZIP), solve them on desktop TexasSolver, then multi-select RR-REFERENCE-1 files to merge back."),
             color = Palette.TextDim, fontSize = 12.sp)
         Text(t("结果按原始决策精确匹配，频率取决于求解时的范围和下注尺寸。",
             "Results match the original decision exactly. Frequencies depend on the ranges and sizes used for the solve."),
@@ -222,9 +342,18 @@ internal fun SolverReferenceLibrary(vm: AppViewModel, reference: ReferenceBook?,
             Text(t("已保存 ${reference.nodes.size} 个场景", "Saved spots: ${reference.nodes.size}") +
                 " · " + reference.provenance.source, color = Palette.Text, fontSize = 13.sp)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { picker.launch(arrayOf("*/*")) }, enabled = !importing) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { singlePicker.launch(arrayOf("*/*")) }, enabled = !busy) {
                 Text(if (reference == null) t("导入策略文件", "Import strategy file") else t("替换策略文件", "Replace strategy file"))
+            }
+            OutlinedButton(onClick = { multiPicker.launch(arrayOf("*/*")) }, enabled = !busy) {
+                Text(t("批量合并导入", "Batch merge import"))
+            }
+            OutlinedButton(
+                onClick = { batchExportPicker.launch("river-runner-spots-${vm.profile.id}.zip") },
+                enabled = !busy,
+            ) {
+                Text(t("批量导出场景 ZIP", "Batch export spots ZIP"))
             }
             if (reference != null) OutlinedButton(onClick = {
                 clipboard.setText(AnnotatedString(ReferenceCodec.encode(reference)))
@@ -234,9 +363,9 @@ internal fun SolverReferenceLibrary(vm: AppViewModel, reference: ReferenceBook?,
         OutlinedTextField(
             raw, { if (it.length <= ReferenceCodec.MAX_TEXT_LENGTH) raw = it },
             label = { Text(t("或粘贴参考策略文本", "Or paste reference text")) },
-            modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4, enabled = !importing,
+            modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4, enabled = !busy,
         )
-        OutlinedButton(onClick = { val input = raw; importReference { input } }, enabled = raw.isNotBlank() && !importing) {
+        OutlinedButton(onClick = { val input = raw; importReference { input } }, enabled = raw.isNotBlank() && !busy) {
             Text(if (reference == null) t("校验并导入", "Validate & import") else t("校验并替换", "Validate & replace"))
         }
     }
