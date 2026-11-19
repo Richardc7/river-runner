@@ -4,6 +4,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("io.github.takahirom.roborazzi")
 }
+val exploitVersion = rootProject.file("EXPLOIT_VERSION").readText().trim()
+val exploitVersionCode = rootProject.file("EXPLOIT_VERSION_CODE").readText().trim().toInt()
+val versionNameOverride = System.getenv("VERSION_NAME")
+
 android {
     namespace = "com.riverrunner"
     compileSdk = 35
@@ -11,8 +15,8 @@ android {
         applicationId = "com.riverrunner.exploit"
         minSdk = 26
         targetSdk = 35
-        versionCode = (System.getenv("VERSION_CODE") ?: System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
-        versionName = System.getenv("VERSION_NAME") ?: (rootProject.file("EXPLOIT_VERSION").readText().trim() + "-exploit-dev")
+        versionCode = System.getenv("VERSION_CODE")?.toInt() ?: exploitVersionCode
+        versionName = versionNameOverride ?: "v$exploitVersion"
     }
     signingConfigs {
         create("release") {
@@ -26,6 +30,9 @@ android {
         }
     }
     buildTypes {
+        debug {
+            if (versionNameOverride == null) versionNameSuffix = "-exploit-dev"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
