@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -278,9 +279,11 @@ private fun TableStatusBar(ui: TableScreenUi, fmt: (Int) -> String) {
         AlertDialog(
             onDismissRequest = { showDetails = false },
             title = { Text(if (st.isZh) "策略与数据" else "Strategy & odds") },
+            modifier = Modifier.widthIn(max = 500.dp).fillMaxWidth(.94f),
+            properties = DialogProperties(usePlatformDefaultWidth = false),
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (practice != null) PracticeHud(practice, fmt)
+                    if (practice != null && live?.view == null) PracticeHud(practice, fmt)
                     if (live != null) {
                         LiveStrategyDetails(live, ui.table?.bigBlind ?: 100, ui.legal?.isOpeningBet == true)
                     }
@@ -375,6 +378,7 @@ private fun LiveStrategyDetails(live: LiveStrategyHint, bb: Int, openingBet: Boo
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(title, color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         if (external) Text(live.source, color = Palette.TextDim, fontSize = 12.sp)
+        live.view?.let { DecisionContextDetails(it, modelEquity = live.modelEquity) }
         StrategyFrequencyBar(choices.groupBy { it.move.type }.map { (type, moves) ->
             type to moves.sumOf { it.probability }
         })

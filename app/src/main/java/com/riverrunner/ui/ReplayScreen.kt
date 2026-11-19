@@ -56,6 +56,8 @@ import com.riverrunner.engine.HandRecord
 import com.riverrunner.engine.MoveType
 import com.riverrunner.engine.ReplayFrame
 import com.riverrunner.engine.Replayer
+import com.riverrunner.engine.strategy.DecisionView
+import com.riverrunner.engine.strategy.ObservationFactory
 import com.riverrunner.engine.strategy.PolicySnapshot
 import com.riverrunner.engine.strategy.StudyCoach
 import com.riverrunner.i18n.LocalStrings
@@ -198,27 +200,35 @@ fun ReplayContent(
             StudyCoach.assess(record.id, savedDecision.view, savedDecision.trace, savedDecision.action).modelGapBB
         } else null
     }
-    val policyCache = remember(record.id) { mutableStateMapOf<Int, ReplayPolicy?>() }
-    LaunchedEffect(pane, record.id, decisionIndex, savedDecision) {
-        if (pane == ReplayPane.ANALYSIS && decisionIndex >= 0 && savedDecision == null &&
-            !policyCache.containsKey(decisionIndex)) {
-            policyCache[decisionIndex] = withContext(Dispatchers.Default) {
+    val contextCache = remember(record.id) { mutableStateMapOf<Int, ReplayDecision?>() }
+    val actionIndex = if (frame.action != null) actionsSoFar - 1 else -1
+    val opponentAction = frame.action?.takeIf { it.seat != record.heroSeat && !it.type.isPost }
+    val opponent = opponentAction?.let { action -> record.players.firstOrNull { it.seat == action.seat } }
+    LaunchedEffect(pane, record.id, decisionIndex, actionIndex, savedDecision) {
+        if (pane != ReplayPane.ANALYSIS) return@LaunchedEffect
+        val needed = listOfNotNull(actionIndex.takeIf { opponent != null },
+            decisionIndex.takeIf { it >= 0 && savedDecision == null }).distinct()
+        for (index in needed) {
+            if (contextCache.containsKey(index)) continue
+            contextCache[index] = withContext(Dispatchers.Default) {
                 runCatching {
-                    val e = replayer.engineBeforeAction(decisionIndex)
-                    ReplayPolicy(
-                        PolicySnapshot.from(Bot.decide(e, record.heroSeat, BotStyle.GTO, Random(record.id + decisionIndex))),
-                        e.legalActions().isOpeningBet,
-                    )
+                    val engine = replayer.engineBeforeAction(index)
+                    val view = ObservationFactory.forActor(engine, record.mode)
+                    val policy = if (view.actorSeat == record.heroSeat) ReplayPolicy(
+                        PolicySnapshot.from(Bot.decide(engine, record.heroSeat, BotStyle.GTO, Random(record.id + index))),
+                        view.legal.isOpeningBet,
+                    ) else null
+                    ReplayDecision(view, policy)
                 }.getOrNull()
             }
         }
     }
-    val reference = savedDecision?.let { ReplayPolicy(it.trace.baseline, it.view.legal.isOpeningBet) }
-        ?: policyCache[decisionIndex]
+    val rebuilt = contextCache[decisionIndex]?.takeIf { it.view.actorSeat == record.heroSeat }
+    val reference = savedDecision?.let { ReplayPolicy(it.trace.baseline, it.view.legal.isOpeningBet) } ?: rebuilt?.policy
+    val heroView = savedDecision?.view ?: rebuilt?.view
+    val opponentView = contextCache[actionIndex]?.view?.takeIf { it.actorSeat == opponent?.seat }
     val table = replayTable(st, record, frames, idx, equityCache[eqKey], fmt)
     val log = remember(record.id, st, fmt) { replayLog(st, record, frames, fmt) }
-    val opponentAction = frame.action?.takeIf { it.seat != record.heroSeat && !it.type.isPost }
-    val opponent = opponentAction?.let { action -> record.players.firstOrNull { it.seat == action.seat } }
     val timelineState = rememberLazyListState()
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Bg)) {
@@ -260,11 +270,12 @@ fun ReplayContent(
                     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll),
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (opponentAction != null && opponent != null) {
-                            OpponentInsightCard(opponentAction, opponent, frame.board, st, fmt)
+                            OpponentInsightCard(opponentAction, opponent, frame.board, opponentView,
+                                loading = !contextCache.containsKey(actionIndex), st, fmt)
                         }
                         if (decisionIndex >= 0) {
-                            AnalysisCard(heroAction.takeIf { wasHeroAction }, reference, modelGap,
-                                loading = savedDecision == null && !policyCache.containsKey(decisionIndex), fmt = fmt)
+                            AnalysisCard(heroAction.takeIf { wasHeroAction }, heroView, reference, modelGap,
+                                loading = savedDecision == null && !contextCache.containsKey(decisionIndex), fmt = fmt)
                         } else if (opponentAction == null) {
                             Text(if (st.isZh) "这一帧没有行动。可从行动记录选择要查看的决策。"
                                 else "There is no action in this frame. Select a decision in the action log.",
@@ -290,6 +301,7 @@ fun ReplayContent(
 private enum class ReplayPane { TIMELINE, ANALYSIS }
 
 private data class ReplayPolicy(val snapshot: PolicySnapshot, val openingBet: Boolean)
+private data class ReplayDecision(val view: DecisionView, val policy: ReplayPolicy?)
 
 @Composable
 private fun ReplayPaneTabs(pane: ReplayPane, st: Strings, select: (ReplayPane) -> Unit) {
@@ -370,7 +382,7 @@ private fun ReplayControls(index: Int, last: Int, onJump: (Int) -> Unit) {
 @Composable
 private fun OpponentInsightCard(
     action: Action, player: com.riverrunner.engine.RecordPlayer, board: List<Int>,
-    st: Strings, fmt: (Int) -> String,
+    view: DecisionView?, loading: Boolean, st: Strings, fmt: (Int) -> String,
 ) {
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
@@ -391,14 +403,19 @@ private fun OpponentInsightCard(
             Text((if (st.isZh) "本街牌型：" else "Hand on this street: ") +
                 HandEvaluator.categoryName(rank, st.isZh), color = Palette.TextDim, fontSize = 11.sp)
         }
-        Text(StudyPresentation.opponentReason(action, player.style, st.isZh),
-            color = Palette.Text, fontSize = 14.sp, lineHeight = 20.sp)
+        if (view != null) {
+            DecisionContextDetails(view, action)
+        } else {
+            Text(if (loading) st.computing else StudyPresentation.opponentReason(action, player.style, st.isZh),
+                color = Palette.Text, fontSize = 13.sp, lineHeight = 17.sp)
+        }
     }
 }
 
 @Composable
 private fun AnalysisCard(
-    heroAction: Action?, reference: ReplayPolicy?, modelGapBB: Double?, loading: Boolean, fmt: (Int) -> String,
+    heroAction: Action?, view: DecisionView?, reference: ReplayPolicy?, modelGapBB: Double?,
+    loading: Boolean, fmt: (Int) -> String,
 ) {
     val st = LocalStrings.current
     Column(
@@ -415,6 +432,7 @@ private fun AnalysisCard(
             Text((if (st.isZh) "相对模型最优 EV · " else "EV versus model best · ") + "%.2f BB".format(delta),
                 color = Palette.Gold, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
+        view?.let { DecisionContextDetails(it, heroAction, reference?.snapshot?.equity) }
         if (reference == null) {
             val unavailable = if (st.isZh) "这个决策没有可用的策略参考。" else "No strategy reference for this decision."
             Text(if (loading) st.computing else unavailable, color = Palette.Text, fontSize = 14.sp)
@@ -445,7 +463,9 @@ private fun AnalysisCard(
                 color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
             )
         }
-        policy.equity?.let { Text("${st.estEquity}: ${Format.pct(it)}", color = Palette.TextDim, fontSize = 13.sp) }
-        if (policy.potOdds > 0) Text("${st.needEquity}: ${Format.pct(policy.potOdds)}", color = Palette.TextDim, fontSize = 13.sp)
+        if (view == null) {
+            policy.equity?.let { Text("${st.estEquity}: ${Format.pct(it)}", color = Palette.TextDim, fontSize = 13.sp) }
+            if (policy.potOdds > 0) Text("${st.needEquity}: ${Format.pct(policy.potOdds)}", color = Palette.TextDim, fontSize = 13.sp)
+        }
     }
 }
