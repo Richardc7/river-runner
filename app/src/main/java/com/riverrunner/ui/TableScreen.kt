@@ -404,8 +404,8 @@ private fun PracticeMetrics(info: PracticeInfo, fmt: (Int) -> String) {
     if (showSpr) AlertDialog(
         onDismissRequest = { showSpr = false },
         title = { Text(if (st.isZh) "SPR · 筹码底池比" else "SPR · Stack-to-pot ratio") },
-        text = { Text(if (st.isZh) "有效筹码除以底池。比值越小，剩余筹码越容易在接下来的下注中投入底池。"
-            else "Effective stack divided by pot. A smaller ratio makes it easier to commit the remaining stack.") },
+        text = { Text(if (st.isZh) "常用算法是有效筹码除以底池。桌面读数用你的剩余筹码除以当前底池。如果单挑对手更短，用双方较小的剩余筹码手算。"
+            else "Effective SPR is the effective stack divided by the pot. This live readout uses your own remaining stack. In heads-up play, use the smaller stack if your opponent is shorter.") },
         confirmButton = { TextButton(onClick = { showSpr = false }) { Text(st.back) } },
     )
 }
