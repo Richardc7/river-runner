@@ -177,21 +177,12 @@ internal fun DecisionQuestion(
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.weight(.95f).fillMaxHeight().verticalScroll(rememberScrollState())
             .clip(RoundedCornerShape(14.dp)).background(Palette.Panel).padding(13.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Text(if (explanation) t("本题回顾", "Question review") else t("决策情景", "Decision scenario"),
-                color = Palette.Gold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                color = Palette.Gold, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold)
             Text(t("历史牌局", "Saved hand") + " #" + item.record.handNumber +
                 "  ·  " + StudyPresentation.street(view.street, zh),
-                color = Palette.TextDim, fontSize = 12.sp)
-            val scenario = if (toCall > 0) t("河牌面对下注", "facing a river bet")
-                else t("河牌可过牌或下注", "checking or betting the river")
-            val attempts = categoryProgress?.attempts ?: 0
-            Text(if (attempts == 0) t("选中这手：$scenario，你还没练过这类题。",
-                "Why this hand: $scenario, from a category you haven’t practised.")
-            else t(
-                "选中这手：$scenario，此类题的模型首选一致次数为 ${categoryProgress?.exact}/$attempts。",
-                "Why this hand: $scenario. You matched the model on ${categoryProgress?.exact}/$attempts attempts in this category.",
-            ), color = Palette.TextDim, fontSize = 12.sp)
+                color = Palette.TextDim, fontSize = 12.sp, lineHeight = 16.sp)
             HorizontalDivider(color = Palette.Line)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 QuestionMetric(t("底池", "Pot"), "%.1f BB".format(Locale.US, view.pot.toDouble() / bb), Modifier.weight(1f))
@@ -204,8 +195,17 @@ internal fun DecisionQuestion(
             val position = HandEngine.positionName(view.order.indexOf(view.actorSeat), view.order.size)
             Text(t("位置：", "Position: ") + position +
                 "  ·  " + t("有效人数：", "Players: ") + view.seats.size,
-                color = Palette.Text, fontSize = 12.sp)
+                color = Palette.Text, fontSize = 12.sp, lineHeight = 16.sp)
 
+            val scenario = if (toCall > 0) t("河牌面对下注", "facing a river bet")
+                else t("河牌可过牌或下注", "checking or betting the river")
+            val attempts = categoryProgress?.attempts ?: 0
+            Text(if (attempts == 0) t("选中这手：$scenario，你还没练过这类题。",
+                "Why this hand: $scenario, from a category you haven’t practised.")
+            else t(
+                "选中这手：$scenario，此类题的模型首选一致次数为 ${categoryProgress?.exact}/$attempts。",
+                "Why this hand: $scenario. You matched the model on ${categoryProgress?.exact}/$attempts attempts in this category.",
+            ), color = Palette.TextDim, fontSize = 12.sp, lineHeight = 16.sp)
         }
         val answerScroll = key(d.id, explanation) { rememberScrollState() }
         Column(Modifier.weight(1.05f).fillMaxHeight()
@@ -288,7 +288,7 @@ internal fun DecisionQuestion(
 @Composable
 private fun QuestionMetric(label: String, value: String, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, color = Palette.TextDim, fontSize = 11.sp)
+        Text(label, color = Palette.TextDim, fontSize = 11.sp, lineHeight = 14.sp)
         Text(value, color = Palette.Gold, fontFamily = Numeric, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
     }
 }

@@ -61,15 +61,15 @@ internal fun DecisionCards(view: DecisionView) {
     val zh = LocalStrings.current.isZh
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(if (zh) "你的底牌" else "Your cards", color = Palette.TextDim, fontSize = 12.sp)
+            Text(if (zh) "你的底牌" else "Your cards", color = Palette.TextDim, fontSize = 12.sp, lineHeight = 16.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                 view.ownHole.forEach { PlayingCard(it, 27.dp) }
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(if (zh) "当时可见的公共牌" else "Board at decision time", color = Palette.TextDim, fontSize = 12.sp)
+            Text(if (zh) "当时可见的公共牌" else "Board at decision time", color = Palette.TextDim, fontSize = 12.sp, lineHeight = 16.sp)
             if (view.board.isEmpty()) {
-                Text(if (zh) "翻牌前尚无公共牌" else "No public cards yet", color = Palette.Text)
+                Text(if (zh) "翻牌前尚无公共牌" else "No public cards yet", color = Palette.Text, fontSize = 12.sp, lineHeight = 16.sp)
             } else Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                 view.board.forEach { PlayingCard(it, 25.dp) }
             }
