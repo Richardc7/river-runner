@@ -50,9 +50,8 @@ fun ChangelogPanel(
     val zh = st.isZh
     Column(
         modifier.widthIn(max = 520.dp).fillMaxWidth().heightIn(max = 340.dp)
-            .clip(RoundedCornerShape(14.dp)).background(Palette.Panel)
-            .border(1.dp, Palette.GoldDim, RoundedCornerShape(14.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .studioCard(accent = Palette.Gold, radius = 16.dp, highlighted = true)
+            .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(st.whatsNew, color = Palette.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold)

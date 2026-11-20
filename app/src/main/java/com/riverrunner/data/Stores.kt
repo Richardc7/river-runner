@@ -73,6 +73,10 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("action_haptics", false)
         set(v) = sp.edit().putBoolean("action_haptics", v).apply()
 
+    var appTheme: String
+        get() = sp.getString("app_theme", "emerald") ?: "emerald"
+        set(v) = sp.edit().putString("app_theme", v).apply()
+
     val deckStyle: String
         get() = sp.getString("deck", "4") ?: "4"
     val cardBackStyle: String?

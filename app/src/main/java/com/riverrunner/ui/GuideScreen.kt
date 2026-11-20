@@ -84,24 +84,24 @@ fun GuideContent(onClose: () -> Unit, startTab: GuideTab = GuideTab.BASICS) {
                 verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 for (target in GuideTab.entries) {
                     val selected = target == tab
-                    val shape = RoundedCornerShape(8.dp)
+                    val shape = RoundedCornerShape(10.dp)
                     Box(Modifier.fillMaxWidth().clip(shape)
-                        .background(if (selected) Palette.AccentDim else Palette.Panel)
-                        .then(if (selected) Modifier.border(1.dp, Palette.Accent, shape) else Modifier)
+                        .background(if (selected) Brush.verticalGradient(listOf(Palette.FeltCenter, Palette.FeltMid)) else Brush.verticalGradient(listOf(Palette.PanelHi, Palette.Panel)))
+                        .border(1.dp, if (selected) Palette.Green.copy(alpha = 0.65f) else Palette.Line.copy(alpha = 0.45f), shape)
                         .selectable(selected, role = Role.Tab) {
                             focus.clearFocus()
                             tab = target
                         }
-                        .padding(horizontal = 10.dp, vertical = 7.dp)) {
-                        Text(tabTitle(target, zh), color = Palette.Text, fontSize = 13.sp, lineHeight = 17.sp,
+                        .padding(horizontal = 10.dp, vertical = 8.dp)) {
+                        Text(tabTitle(target, zh), color = if (selected) Color.White else Palette.TextDim, fontSize = 13.sp, lineHeight = 17.sp,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
                     }
                 }
             }
         }
         Column(
-            Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Palette.Panel)
-                .padding(14.dp).verticalScroll(scroll),
+            Modifier.weight(1f).fillMaxHeight().studioCard(radius = 16.dp)
+                .padding(16.dp).verticalScroll(scroll),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             when (tab) {
@@ -218,7 +218,7 @@ private fun Rankings(zh: Boolean) {
     H(if (zh) "从大到小" else "Strongest to weakest")
     for ((i, r) in GUIDE_RANKS.withIndex()) {
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Palette.PanelHi).padding(6.dp),
+            Modifier.fillMaxWidth().studioCard(radius = 10.dp).padding(horizontal = 10.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("${i + 1}", color = Palette.Accent, fontSize = 18.sp, fontFamily = Numeric, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))

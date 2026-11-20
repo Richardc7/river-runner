@@ -51,7 +51,7 @@ import com.riverrunner.i18n.LocalStrings
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-private enum class SettingsSection { GENERAL, APPEARANCE, AI_COACH, DATA_ABOUT }
+private enum class SettingsSection { AI_COACH, GENERAL, APPEARANCE, DATA_ABOUT }
 
 @Composable
 fun SettingsScreen(vm: AppViewModel) {
@@ -66,7 +66,7 @@ fun SettingsScreen(vm: AppViewModel) {
     var confirmReset by remember { mutableStateOf(false) }
     var resetting by remember { mutableStateOf(false) }
     var resetStatus by remember { mutableStateOf<String?>(null) }
-    var activeSection by remember { mutableStateOf(SettingsSection.GENERAL) }
+    var activeSection by remember { mutableStateOf(SettingsSection.AI_COACH) }
     val scrollState = rememberScrollState()
     val sectionOffsets = remember { mutableStateMapOf<SettingsSection, Int>() }
     val scope = rememberCoroutineScope()
@@ -136,80 +136,7 @@ fun SettingsScreen(vm: AppViewModel) {
             Modifier.weight(1f).fillMaxHeight().verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Section 1: General & Display
-            Column(
-                Modifier.fillMaxWidth()
-                    .onGloballyPositioned { sectionOffsets[SettingsSection.GENERAL] = it.positionInParent().y.roundToInt() }
-                    .studioCard(radius = 16.dp)
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                SectionTitle(if (st.isZh) "常规与显示" else "GENERAL & DISPLAY")
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(st.language, color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                        StudioSegmentedBar(
-                            options = listOf(true to "中文", false to "English"),
-                            selected = st.isZh,
-                            onSelect = { vm.setChinese(it) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(if (st.isZh) "字号" else "Text size", color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                        StudioSegmentedBar(
-                            options = listOf(100 to "100%", 110 to "110%", 120 to "120%"),
-                            selected = vm.textSizePercent,
-                            onSelect = { vm.setTextSize(it) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(st.speed, color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    StudioSegmentedBar(
-                        options = listOf(0 to st.slow, 1 to st.normal, 2 to st.fast),
-                        selected = speed,
-                        onSelect = { speed = it; vm.prefs.speed = it },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                HorizontalDivider(color = Palette.Line.copy(alpha = 0.45f))
-                ToggleRow(if (st.isZh) "高对比度" else "High contrast", vm.highContrast, vm::updateHighContrast)
-                ToggleRow(st.practiceDefault, practice) { practice = it; vm.prefs.practiceDefault = it }
-                ToggleRow(st.showInBB, vm.showInBB) { vm.setShowBB(it) }
-            }
-
-            // Section 2: Appearance & Audio
-            Column(
-                Modifier.fillMaxWidth()
-                    .onGloballyPositioned { sectionOffsets[SettingsSection.APPEARANCE] = it.positionInParent().y.roundToInt() }
-                    .studioCard(radius = 16.dp)
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                SectionTitle(if (st.isZh) "外观与反馈" else "APPEARANCE & AUDIO")
-                ActionButton(
-                    if (st.isZh) "牌桌与扑克牌外观  ›" else "Table and card appearance  ›",
-                    Palette.PanelHi,
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
-                ) { vm.screen = Screen.Appearance }
-                SettingsSwitch(
-                    if (st.isZh) "对手姓名随打法风格" else "Match opponent names to play style",
-                    if (st.isZh) "关闭时随机取名。更改从下一局生效。" else "Off uses random names. Changes apply to the next game.",
-                    namesFollowStyle,
-                ) {
-                    namesFollowStyle = it
-                    vm.prefs.opponentNamesFollowStyle = it
-                }
-                ToggleRow(st.sound, vm.soundOn) { vm.setSound(it) }
-                ToggleRow(if (st.isZh) "行动时震动反馈" else "Haptic feedback on actions", haptics) {
-                    haptics = it
-                    vm.prefs.actionHaptics = it
-                }
-            }
-
-            // Section 3: AI & Coaching
+            // Section 1: AI & Coaching (placed first so custom AI entry is immediately reachable above the fold)
             Column(
                 Modifier.fillMaxWidth()
                     .onGloballyPositioned { sectionOffsets[SettingsSection.AI_COACH] = it.positionInParent().y.roundToInt() }
@@ -265,6 +192,87 @@ fun SettingsScreen(vm: AppViewModel) {
                     ) { vm.openTraining() }
                 }
             }
+
+            // Section 2: General & Display
+            Column(
+                Modifier.fillMaxWidth()
+                    .onGloballyPositioned { sectionOffsets[SettingsSection.GENERAL] = it.positionInParent().y.roundToInt() }
+                    .studioCard(radius = 16.dp)
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SectionTitle(if (st.isZh) "常规与显示" else "GENERAL & DISPLAY")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(st.language, color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        StudioSegmentedBar(
+                            options = listOf(true to "中文", false to "English"),
+                            selected = st.isZh,
+                            onSelect = { vm.setChinese(it) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(if (st.isZh) "字号" else "Text size", color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        StudioSegmentedBar(
+                            options = listOf(100 to "100%", 110 to "110%", 120 to "120%"),
+                            selected = vm.textSizePercent,
+                            onSelect = { vm.setTextSize(it) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(st.speed, color = Palette.Text, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    StudioSegmentedBar(
+                        options = listOf(0 to st.slow, 1 to st.normal, 2 to st.fast),
+                        selected = speed,
+                        onSelect = { speed = it; vm.prefs.speed = it },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                HorizontalDivider(color = Palette.Line.copy(alpha = 0.45f))
+                ToggleRow(if (st.isZh) "高对比度" else "High contrast", vm.highContrast, vm::updateHighContrast)
+                ToggleRow(st.practiceDefault, practice) { practice = it; vm.prefs.practiceDefault = it }
+                ToggleRow(st.showInBB, vm.showInBB) { vm.setShowBB(it) }
+            }
+
+            // Section 2: Appearance & Audio
+            Column(
+                Modifier.fillMaxWidth()
+                    .onGloballyPositioned { sectionOffsets[SettingsSection.APPEARANCE] = it.positionInParent().y.roundToInt() }
+                    .studioCard(radius = 16.dp)
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SectionTitle(if (st.isZh) "外观与反馈" else "APPEARANCE & AUDIO")
+                ConfigurationChoices(
+                    if (st.isZh) "全局主题（同步切换牌桌与牌面牌背）" else "Global theme (syncs table & cards)",
+                    AppTheme.entries,
+                    vm.appTheme,
+                    { it.title(st.isZh) },
+                ) { vm.updateAppTheme(it, syncAppearance = true) }
+                ActionButton(
+                    if (st.isZh) "牌桌与扑克牌外观  ›" else "Table and card appearance  ›",
+                    Palette.PanelHi,
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                ) { vm.screen = Screen.Appearance }
+                SettingsSwitch(
+                    if (st.isZh) "对手姓名随打法风格" else "Match opponent names to play style",
+                    if (st.isZh) "关闭时随机取名。更改从下一局生效。" else "Off uses random names. Changes apply to the next game.",
+                    namesFollowStyle,
+                ) {
+                    namesFollowStyle = it
+                    vm.prefs.opponentNamesFollowStyle = it
+                }
+                ToggleRow(st.sound, vm.soundOn) { vm.setSound(it) }
+                ToggleRow(if (st.isZh) "行动时震动反馈" else "Haptic feedback on actions", haptics) {
+                    haptics = it
+                    vm.prefs.actionHaptics = it
+                }
+            }
+
+
 
             // Section 4: Backup & About
             Column(

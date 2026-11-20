@@ -95,8 +95,7 @@ fun TrainingScreen(vm: AppViewModel, onBack: () -> Unit) {
                     })
                 }
                 1 -> if (vm.spacedDrillsEnabled) {
-                    Column(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
-                        .background(Palette.Panel).padding(10.dp)) {
+                    Column(Modifier.fillMaxSize().studioCard(radius = 16.dp).padding(12.dp)) {
                         SpacedErrorCoach(vm)
                     }
                 } else TrainingEmpty(t("请在设置中开启「错题与间隔复习」。",
@@ -127,8 +126,8 @@ private fun RiverTrainingEmpty(vm: AppViewModel) {
         ) to t("配置单挑筹码局", "Set up heads-up cash")
     }
     Column(
-        Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(Palette.Panel)
-            .verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().studioCard(radius = 16.dp)
+            .verticalScroll(rememberScrollState()).padding(22.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -147,7 +146,7 @@ private fun RiverTrainingEmpty(vm: AppViewModel) {
 
 @Composable
 private fun TrainingEmpty(message: String) {
-    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(Palette.Panel)
+    Box(Modifier.fillMaxSize().studioCard(radius = 16.dp)
         .padding(22.dp), contentAlignment = Alignment.Center) {
         Text(message, color = Palette.TextDim, fontSize = 14.sp)
     }
@@ -173,9 +172,9 @@ internal fun DecisionQuestion(
     val potOdds = if (toCall > 0) toCall.toDouble() / (view.pot + toCall) else null
     var showDetails by remember(d.id) { mutableStateOf(false) }
 
-    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(.95f).fillMaxHeight().verticalScroll(rememberScrollState())
-            .clip(RoundedCornerShape(14.dp)).background(Palette.Panel).padding(13.dp),
+            .studioCard(accent = Palette.Gold, radius = 16.dp).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Text(if (explanation) t("本题回顾", "Question review") else t("决策情景", "Decision scenario"),
                 color = Palette.Gold, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold)
@@ -212,7 +211,7 @@ internal fun DecisionQuestion(
         }
         val answerScroll = key(d.id, explanation) { rememberScrollState() }
         Column(Modifier.weight(1.05f).fillMaxHeight()
-            .clip(RoundedCornerShape(14.dp)).background(Palette.Panel).padding(12.dp),
+            .studioCard(radius = 16.dp).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Column(Modifier.weight(1f).verticalScroll(answerScroll),
                 verticalArrangement = Arrangement.spacedBy(7.dp)) {

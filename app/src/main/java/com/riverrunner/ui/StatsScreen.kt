@@ -114,8 +114,8 @@ fun StatsScreen(vm: AppViewModel) {
 
 @Composable
 private fun StatsPanel(modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Palette.Panel)
-        .verticalScroll(rememberScrollState()).padding(12.dp), content = content)
+    Column(modifier.fillMaxHeight().studioCard(radius = 16.dp)
+        .verticalScroll(rememberScrollState()).padding(14.dp), content = content)
 }
 
 private data class SampleMetric(

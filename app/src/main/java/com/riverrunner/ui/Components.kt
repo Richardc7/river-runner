@@ -64,31 +64,32 @@ import com.riverrunner.engine.Cards
  */
 object Palette {
     internal var highContrast by mutableStateOf(false)
+    internal var theme by mutableStateOf(AppTheme.EMERALD)
 
-    val Bg: Color get() = Color(if (highContrast) 0xFF000000 else 0xFF0B0F14)
-    val Panel: Color get() = Color(if (highContrast) 0xFF0E1110 else 0xFF121820)
-    val PanelHi: Color get() = Color(if (highContrast) 0xFF191E1B else 0xFF1A222C)
-    val PanelHi2: Color get() = Color(if (highContrast) 0xFF323C37 else 0xFF26313F)
-    val Line: Color get() = Color(if (highContrast) 0xFF89968E else 0xFF2D3B49)
-    val FeltCenter = Color(0xFF1F6E49) // studio-lit deep emerald
-    val FeltMid = Color(0xFF134E34)
-    val FeltEdge = Color(0xFF0A2C1D)
-    val Rail = Color(0xFF221A14)      // dark smoked walnut
-    val RailHi = Color(0xFF4B3829)
-    val Gold: Color get() = Color(if (highContrast) 0xFFFFD76D else 0xFFE5BC66)
-    val GoldDim = Color(0xFF665126)
-    val Accent get() = Gold                 // selection, your turn, primary action
-    val AccentDim = GoldDim
-    val Text: Color get() = Color(if (highContrast) 0xFFFFFFFF else 0xFFF0F4F8)
-    val TextDim: Color get() = Color(if (highContrast) 0xFFD9E1DC else 0xFF93A3B3)
-    val Red: Color get() = Color(if (highContrast) 0xFFFF837D else 0xFFEC6B64)
-    val Green: Color get() = Color(if (highContrast) 0xFF70E5AA else 0xFF42C78A)
-    val Blue: Color get() = Color(if (highContrast) 0xFF90C6FF else 0xFF60A5FA)
+    val Bg: Color get() = if (highContrast) Color(0xFF000000) else theme.bg
+    val Panel: Color get() = if (highContrast) Color(0xFF0E1110) else theme.panel
+    val PanelHi: Color get() = if (highContrast) Color(0xFF191E1B) else theme.panelHi
+    val PanelHi2: Color get() = if (highContrast) Color(0xFF323C37) else theme.panelHi2
+    val Line: Color get() = if (highContrast) Color(0xFF89968E) else theme.line
+    val FeltCenter: Color get() = theme.feltCenter
+    val FeltMid: Color get() = theme.feltMid
+    val FeltEdge: Color get() = theme.feltEdge
+    val Rail: Color get() = theme.rail
+    val RailHi: Color get() = theme.railHi
+    val Gold: Color get() = if (highContrast) Color(0xFFFFD76D) else theme.gold
+    val GoldDim: Color get() = theme.goldDim
+    val Accent: Color get() = Gold          // selection, your turn, primary action
+    val AccentDim: Color get() = GoldDim
+    val Text: Color get() = if (highContrast) Color(0xFFFFFFFF) else theme.text
+    val TextDim: Color get() = if (highContrast) Color(0xFFD9E1DC) else theme.textDim
+    val Red: Color get() = if (highContrast) Color(0xFFFF837D) else theme.red
+    val Green: Color get() = if (highContrast) Color(0xFF70E5AA) else theme.green
+    val Blue: Color get() = if (highContrast) Color(0xFF90C6FF) else theme.blue
     val FoldBtn = Color(0xFFA83A33)
     val CallBtn = Color(0xFF1F7A50)
-    val RaiseBtn get() = Gold
+    val RaiseBtn: Color get() = Gold
     val AllInBtn = Color(0xFFA82C22)
-    val Ink = Color(0xFF0B0F14)
+    val Ink: Color get() = theme.ink
 }
 
 /** Condensed numerals for chip amounts and scores (Barlow Condensed, SIL OFL). */
@@ -197,12 +198,33 @@ fun PlayingCard(card: Int?, width: Dp, dim: Boolean = false, modifier: Modifier 
             2 -> Color(0xFF9A2D4B)
             else -> Color(0xFF292346)
         }
+        DeckStyle.CHINESE -> when (suit) {
+            0 -> Color(0xFF1D6B53) // celadon jade
+            1 -> Color(0xFF9E7022) // antique bronze gold
+            2 -> Color(0xFFB83227) // vermilion seal red
+            else -> Color(0xFF171A1E) // sumi ink
+        }
+        DeckStyle.MODERN -> when (suit) {
+            0 -> Color(0xFF4ADE80)
+            1 -> Color(0xFF38BDF8)
+            2 -> Color(0xFFFB7185)
+            else -> Color(0xFFF8FAFC)
+        }
+        DeckStyle.KYOTO -> when (suit) {
+            0 -> Color(0xFF236B5E) // bamboo teal
+            1 -> Color(0xFF365C94) // aizome slate blue
+            2 -> Color(0xFFB83B35) // sakura vermilion
+            else -> Color(0xFF16243B) // deep indigo ink
+        }
     }
     val face = when (style) {
         DeckStyle.FOUR_COLOR_FILLED -> if (suit == 3) Color(0xFF2A2D31) else fourColor(suit)
         DeckStyle.CYBERPUNK -> Color(0xFF151629)
         DeckStyle.WESTERN -> Color(0xFFFFE6BB)
         DeckStyle.TAROT -> Color(0xFFF7EBCA)
+        DeckStyle.CHINESE -> Color(0xFFF7F1E1)
+        DeckStyle.MODERN -> Color(0xFF141B29)
+        DeckStyle.KYOTO -> Color(0xFFF5F0E6)
         else -> Color(0xFFFBF9F3)
     }
     val border = when (style) {
@@ -210,11 +232,14 @@ fun PlayingCard(card: Int?, width: Dp, dim: Boolean = false, modifier: Modifier 
         DeckStyle.CYBERPUNK -> ink.copy(alpha = 0.66f)
         DeckStyle.WESTERN -> Color(0xFFAE7946)
         DeckStyle.TAROT -> Color(0xFFA37A3D)
+        DeckStyle.CHINESE -> Color(0xFFC9A458)
+        DeckStyle.MODERN -> Color(0xFF475569)
+        DeckStyle.KYOTO -> Color(0xFFC7A65E)
         else -> Color(0x45000000)
     }
     val font = when (style) {
         DeckStyle.CYBERPUNK -> FontFamily.Monospace
-        DeckStyle.TAROT, DeckStyle.WESTERN -> FontFamily.Serif
+        DeckStyle.TAROT, DeckStyle.WESTERN, DeckStyle.CHINESE, DeckStyle.KYOTO -> FontFamily.Serif
         else -> FontFamily.Default
     }
     // Compensate fontScale inside fixed-dp cards so 110%/120% text settings never clip ranks.
@@ -228,6 +253,15 @@ fun PlayingCard(card: Int?, width: Dp, dim: Boolean = false, modifier: Modifier 
             .background(face)
             .border(if (filled) 1.5.dp else 1.dp, border, shape)
     ) {
+        if (style == DeckStyle.CHINESE || style == DeckStyle.KYOTO) {
+            Canvas(Modifier.fillMaxSize().padding(width * 0.06f)) {
+                drawRoundRect(
+                    border.copy(alpha = 0.45f),
+                    style = Stroke(0.8.dp.toPx()),
+                    cornerRadius = CornerRadius(width.toPx() * 0.08f, width.toPx() * 0.08f),
+                )
+            }
+        }
         Column(Modifier.padding(start = width * 0.09f, top = width * 0.04f)) {
             Text(
                 rankText(card), color = ink, fontWeight = FontWeight.Bold, fontFamily = font,
@@ -258,21 +292,93 @@ fun CardBack(width: Dp, modifier: Modifier = Modifier) {
         )
         return
     }
+    val bgColors = when (style) {
+        CardBackStyle.CHINESE -> listOf(Color(0xFF6B1C16), Color(0xFF280A08))
+        CardBackStyle.MODERN -> listOf(Color(0xFF1D3054), Color(0xFF0A1120))
+        CardBackStyle.KYOTO -> listOf(Color(0xFF1A365C), Color(0xFF0B172A))
+        else -> listOf(Color(0xFF962537), Color(0xFF4B0F1A))
+    }
+    val rimColor = when (style) {
+        CardBackStyle.CHINESE -> Color(0xFFD9B464)
+        CardBackStyle.MODERN -> Color(0xFF38BDF8)
+        CardBackStyle.KYOTO -> Color(0xFFD8B468)
+        else -> Color(0xFFE8D9B0)
+    }
     Box(
         modifier.size(width, width * 1.4f)
             .shadow(2.dp, shape, ambientColor = Color.Black.copy(alpha = 0.45f))
             .clip(shape)
-            .background(Brush.linearGradient(listOf(Color(0xFF962537), Color(0xFF4B0F1A))))
-            .border(1.dp, Color(0xFFE8D9B0).copy(alpha = 0.8f), shape)
+            .background(Brush.linearGradient(bgColors))
+            .border(1.dp, rimColor.copy(alpha = 0.82f), shape)
     ) {
         Canvas(Modifier.fillMaxSize().padding(width * 0.1f)) {
-            val step = size.width / 3.5f
-            var x = -size.height
-            while (x < size.width) {
-                drawLine(Color(0x30FFFFFF), Offset(x, size.height), Offset(x + size.height, 0f), 1.2f)
-                x += step
+            val w = size.width
+            val h = size.height
+            when (style) {
+                CardBackStyle.CHINESE -> {
+                    drawRoundRect(rimColor.copy(alpha = 0.65f), style = Stroke(1.1f), cornerRadius = CornerRadius(3f, 3f))
+                    val inset = w * 0.16f
+                    drawRoundRect(
+                        rimColor.copy(alpha = 0.38f),
+                        topLeft = Offset(inset, inset),
+                        size = Size(w - inset * 2, h - inset * 2),
+                        style = Stroke(0.9f),
+                        cornerRadius = CornerRadius(2f, 2f),
+                    )
+                    val cx = w / 2f
+                    val cy = h / 2f
+                    val rx = w * 0.24f
+                    val ry = h * 0.18f
+                    val diamond = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(cx, cy - ry); lineTo(cx + rx, cy); lineTo(cx, cy + ry); lineTo(cx - rx, cy); close()
+                    }
+                    drawPath(diamond, Color(0xFF1F5B4F).copy(alpha = 0.85f))
+                    drawPath(diamond, rimColor.copy(alpha = 0.85f), style = Stroke(1.1f))
+                }
+                CardBackStyle.MODERN -> {
+                    val step = w / 3.2f
+                    var x = -h
+                    while (x < w) {
+                        drawLine(rimColor.copy(alpha = 0.22f), Offset(x, h), Offset(x + h, 0f), 1f)
+                        x += step
+                    }
+                    drawRoundRect(rimColor.copy(alpha = 0.55f), style = Stroke(1f), cornerRadius = CornerRadius(3f, 3f))
+                    val cx = w / 2f
+                    val cy = h / 2f
+                    val r = w * 0.22f
+                    drawCircle(rimColor.copy(alpha = 0.18f), r * 1.4f, Offset(cx, cy))
+                    drawCircle(rimColor.copy(alpha = 0.75f), r, Offset(cx, cy), style = Stroke(1.2f))
+                }
+                CardBackStyle.KYOTO -> {
+                    val cols = 2
+                    val rows = 3
+                    val cw = w / cols
+                    val ch = h / rows
+                    for (ix in 0..cols) {
+                        drawLine(rimColor.copy(alpha = 0.22f), Offset(ix * cw, 0f), Offset(ix * cw, h), 0.8f)
+                    }
+                    for (iy in 0..rows) {
+                        drawLine(rimColor.copy(alpha = 0.22f), Offset(0f, iy * ch), Offset(w, iy * ch), 0.8f)
+                    }
+                    for (ix in 0 until cols) for (iy in 0 until rows) {
+                        val x0 = ix * cw; val y0 = iy * ch
+                        drawLine(rimColor.copy(alpha = 0.26f), Offset(x0, y0), Offset(x0 + cw, y0 + ch), 0.8f)
+                        drawLine(rimColor.copy(alpha = 0.26f), Offset(x0 + cw, y0), Offset(x0, y0 + ch), 0.8f)
+                    }
+                    drawRoundRect(rimColor.copy(alpha = 0.6f), style = Stroke(1f), cornerRadius = CornerRadius(3f, 3f))
+                    drawCircle(Color(0xFFC6422C), w * 0.13f, Offset(w / 2f, h / 2f))
+                    drawCircle(rimColor.copy(alpha = 0.85f), w * 0.13f, Offset(w / 2f, h / 2f), style = Stroke(0.9f))
+                }
+                else -> {
+                    val step = w / 3.5f
+                    var x = -h
+                    while (x < w) {
+                        drawLine(Color(0x30FFFFFF), Offset(x, h), Offset(x + h, 0f), 1.2f)
+                        x += step
+                    }
+                    drawRoundRect(Color(0x66E8D9B0), style = Stroke(1f), size = Size(w, h), cornerRadius = CornerRadius(3f, 3f))
+                }
             }
-            drawRoundRect(Color(0x66E8D9B0), style = Stroke(1f), size = Size(size.width, size.height), cornerRadius = CornerRadius(3f, 3f))
         }
     }
 }

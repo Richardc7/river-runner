@@ -87,8 +87,8 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                             ObservationFactory.forActor(replayer.engineBeforeAction(trace.actionIndex), record.mode)
                         }.getOrNull() }
                         val matches = view != null && DecisionFingerprint.of(view) == trace.contextHash
-                        Card(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(Modifier.fillMaxWidth().studioCard(accent = Palette.Gold, radius = 14.dp)) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(StudyPresentation.street(trace.street, zh) + " · " +
                                     (if (zh) "决策 #" else "Decision #") + trace.actionIndex,
                                     color = Palette.Gold, style = MaterialTheme.typography.titleMedium)

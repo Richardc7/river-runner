@@ -30,8 +30,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val prefs = Prefs(app)
     var textSizePercent by mutableStateOf(prefs.textSizePercent); private set
     var highContrast by mutableStateOf(prefs.highContrast); private set
+    var appTheme by mutableStateOf(AppTheme.fromCode(prefs.appTheme)); private set
 
-    init { Palette.highContrast = highContrast }
+    init {
+        Palette.highContrast = highContrast
+        Palette.theme = appTheme
+    }
 
     fun setTextSize(percent: Int) {
         prefs.textSizePercent = percent
@@ -42,6 +46,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         prefs.highContrast = enabled
         highContrast = enabled
         Palette.highContrast = enabled
+    }
+
+    fun updateAppTheme(value: AppTheme, syncAppearance: Boolean = true) {
+        prefs.appTheme = value.code
+        appTheme = value
+        Palette.theme = value
+        if (syncAppearance) {
+            updateAppearance(value.defaultAppearance)
+        }
     }
 
     private val studyRepo = StudyRepository(app.filesDir)

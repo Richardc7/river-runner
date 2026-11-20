@@ -239,11 +239,10 @@ fun ReplayContent(
                     showTotalPot = !frame.isEnd)
                 ReplayControls(idx, frames.lastIndex, jumpTo)
             }
-            val shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
             Column(
-                Modifier.width(railWidth).fillMaxHeight().clip(shape).background(Palette.Panel)
-                    .border(1.dp, Palette.Line, shape).padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
+                Modifier.width(railWidth).fillMaxHeight().padding(top = 4.dp, bottom = 4.dp, end = 4.dp)
+                    .studioCard(accent = Palette.Green, radius = 14.dp).padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     if (onBack != null) SmallButton("←", onBack)
@@ -305,8 +304,9 @@ private data class ReplayDecision(val view: DecisionView, val policy: ReplayPoli
 
 @Composable
 private fun ReplayPaneTabs(pane: ReplayPane, st: Strings, select: (ReplayPane) -> Unit) {
-    val shape = RoundedCornerShape(8.dp)
-    Row(Modifier.fillMaxWidth().clip(shape).background(Palette.Bg).selectableGroup().padding(3.dp),
+    val shape = RoundedCornerShape(10.dp)
+    Row(Modifier.fillMaxWidth().clip(shape).background(Palette.Bg.copy(alpha = 0.8f))
+        .border(1.dp, Palette.Line.copy(alpha = 0.55f), shape).selectableGroup().padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         for (option in ReplayPane.entries) {
             val active = pane == option
@@ -314,11 +314,13 @@ private fun ReplayPaneTabs(pane: ReplayPane, st: Strings, select: (ReplayPane) -
                 ReplayPane.TIMELINE -> if (st.isZh) "行动记录" else "Action log"
                 ReplayPane.ANALYSIS -> if (st.isZh) "本步分析" else "Step analysis"
             }
-            Box(Modifier.weight(1f).heightIn(min = 38.dp).clip(shape)
-                .background(if (active) Palette.Gold else Palette.PanelHi)
+            val tabShape = RoundedCornerShape(7.dp)
+            Box(Modifier.weight(1f).heightIn(min = 36.dp).clip(tabShape)
+                .background(if (active) Palette.FeltCenter else Palette.Panel.copy(alpha = 0.25f))
+                .then(if (active) Modifier.border(1.dp, Palette.Green.copy(alpha = 0.6f), tabShape) else Modifier)
                 .selectable(active, role = Role.Tab) { select(option) },
                 contentAlignment = Alignment.Center) {
-                Text(label, color = if (active) Palette.Ink else Palette.Text, fontSize = 13.sp,
+                Text(label, color = if (active) androidx.compose.ui.graphics.Color.White else Palette.TextDim, fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold)
             }
         }
@@ -385,8 +387,7 @@ private fun OpponentInsightCard(
     view: DecisionView?, loading: Boolean, st: Strings, fmt: (Int) -> String,
 ) {
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-            .background(Palette.PanelHi).padding(9.dp),
+        Modifier.fillMaxWidth().studioCard(accent = Palette.Gold, radius = 12.dp).padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Text((if (st.isZh) "对手行动解读 · " else "Opponent decision · ") + player.name,
@@ -419,7 +420,7 @@ private fun AnalysisCard(
 ) {
     val st = LocalStrings.current
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Palette.PanelHi).padding(8.dp),
+        Modifier.fillMaxWidth().studioCard(accent = Palette.Green, radius = 12.dp).padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(

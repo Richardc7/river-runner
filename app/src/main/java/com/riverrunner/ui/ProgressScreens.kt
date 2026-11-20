@@ -136,9 +136,8 @@ fun UnlockToast(def: AchievementDef?, modifier: Modifier = Modifier) {
     ) {
         val d = last ?: return@AnimatedVisibility
         Row(
-            Modifier.padding(top = 10.dp).clip(RoundedCornerShape(14.dp)).background(Palette.PanelHi)
-                .border(1.5.dp, categoryColor(d.category), RoundedCornerShape(14.dp))
-                .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+            Modifier.padding(top = 10.dp).studioCard(accent = categoryColor(d.category), radius = 16.dp, highlighted = true)
+                .padding(start = 10.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
                 .semantics { contentDescription = "${st.achievementUnlocked}: ${if (st.isZh) d.nameZh else d.nameEn}" },
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -255,7 +254,7 @@ private fun AchievementTile(d: AchievementDef, profile: Profile, df: SimpleDateF
     val done = at != null
     val value = profile.counter(d.counter).coerceAtMost(d.target)
     Row(
-        modifier.height(96.dp).clip(RoundedCornerShape(12.dp)).background(if (done) Palette.PanelHi else Palette.Panel)
+        modifier.height(96.dp).studioCard(accent = if (done) categoryColor(d.category) else Palette.Line, radius = 14.dp, highlighted = done)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -367,9 +366,8 @@ private fun SaveCard(p: Profile, active: Boolean, modifier: Modifier, onUse: () 
     val df = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
     val cashBB = p.counter(Progress.CASH_PROFIT_CENTI_BB) / 100.0
     Column(
-        modifier.clip(RoundedCornerShape(14.dp)).background(Palette.Panel)
-            .border(if (active) 2.dp else 1.dp, if (active) Palette.Accent else Palette.PanelHi2, RoundedCornerShape(14.dp))
-            .padding(12.dp),
+        modifier.studioCard(accent = if (active) Palette.Gold else Palette.Line, radius = 16.dp, highlighted = active)
+            .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -49,8 +49,8 @@ fun EditionScreen(initial: EditionConfig, chinese: Boolean, onSave: (EditionConf
             }
         }
 
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Palette.Panel).padding(11.dp),
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.weight(1f).fillMaxHeight().studioCard(radius = 16.dp).padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     SettingsChip(t("AI 策略", "AI strategy"), !cashSelected, { cashSelected = false })
@@ -87,9 +87,9 @@ fun EditionScreen(initial: EditionConfig, chinese: Boolean, onSave: (EditionConf
                 }
             }
 
-            Column(Modifier.weight(1.06f).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Palette.Panel)
-                .verticalScroll(rememberScrollState()).padding(11.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Column(Modifier.weight(1.06f).fillMaxHeight().studioCard(radius = 16.dp)
+                .verticalScroll(rememberScrollState()).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(t("座位配置", "Seat settings"), color = Palette.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 Text(t("点选座位设置对手风格或筹码。超出开局人数的座位会忽略。",
                     "Select a seat to set its opponent style or stack. Seats outside the table size are ignored."),
@@ -129,9 +129,8 @@ fun EditionScreen(initial: EditionConfig, chinese: Boolean, onSave: (EditionConf
 @Composable
 private fun SeatSettingsCard(modifier: Modifier, title: String, preset: String?, stack: String,
     customized: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(8.dp)
-    Column(modifier.clip(shape).background(Palette.PanelHi).border(1.dp, if (customized) Palette.Gold else Palette.Line, shape)
-        .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp),
+    Column(modifier.studioCard(accent = if (customized) Palette.Gold else Palette.Line, radius = 10.dp, highlighted = customized)
+        .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 9.dp, vertical = 7.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, Modifier.weight(1f), color = Palette.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,

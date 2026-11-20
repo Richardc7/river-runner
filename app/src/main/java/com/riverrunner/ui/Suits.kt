@@ -20,7 +20,10 @@ enum class DeckStyle(val code: String) {
     CLASSIC("2"),
     CYBERPUNK("cyberpunk"),
     WESTERN("western"),
-    TAROT("tarot");
+    TAROT("tarot"),
+    CHINESE("chinese"),
+    MODERN("modern"),
+    KYOTO("kyoto");
 
     companion object { fun fromCode(c: String?) = entries.firstOrNull { it.code == c } ?: FOUR_COLOR }
 }

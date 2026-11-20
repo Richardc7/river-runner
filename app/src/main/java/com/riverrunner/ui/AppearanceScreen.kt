@@ -41,12 +41,12 @@ fun AppearanceScreen(vm: AppViewModel) {
             Text(t("牌桌与扑克牌外观", "Table and card appearance"),
                 fontSize = 20.sp, color = Palette.Text, fontWeight = FontWeight.Bold)
         }
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(Palette.Panel)
-                .padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(t("实时预览", "Preview"), color = Palette.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f).fillMaxHeight().studioCard(accent = Palette.Green, radius = 16.dp)
+                .padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(t("实时预览", "Preview"), color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
                 Box(Modifier.weight(1f).fillMaxWidth().heightIn(min = 80.dp)
-                    .clip(RoundedCornerShape(10.dp)).background(Palette.Bg), contentAlignment = Alignment.Center) {
+                    .clip(RoundedCornerShape(12.dp)).background(Palette.Bg), contentAlignment = Alignment.Center) {
                     TableSurface(appearance.table, Modifier.fillMaxSize(), centerY = .5f)
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                         for (card in previewCards) PlayingCard(card, 33.dp)
@@ -56,9 +56,13 @@ fun AppearanceScreen(vm: AppViewModel) {
                 ConfigurationChoices(t("整套风格", "Presets"), PokerAppearance.presets, appearance,
                     { it.table.title(st.isZh) }, vm::updateAppearance)
             }
-            Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(Palette.Panel)
-                .verticalScroll(rememberScrollState()).padding(12.dp),
+            Column(Modifier.weight(1f).fillMaxHeight().studioCard(radius = 16.dp)
+                .verticalScroll(rememberScrollState()).padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                ConfigurationChoices(t("全局主题（联动牌桌与牌面牌背）", "Global theme (syncs table & cards)"),
+                    AppTheme.entries, vm.appTheme, { it.title(st.isZh) }) {
+                    vm.updateAppTheme(it, syncAppearance = true)
+                }
                 ConfigurationChoices(t("牌桌", "Table"), TableStyle.entries, appearance.table, { it.title(st.isZh) }) {
                     vm.updateAppearance(appearance.copy(table = it))
                 }
@@ -73,6 +77,9 @@ fun AppearanceScreen(vm: AppViewModel) {
                         DeckStyle.CYBERPUNK -> TableStyle.CYBERPUNK.title(st.isZh)
                         DeckStyle.WESTERN -> TableStyle.WESTERN.title(st.isZh)
                         DeckStyle.TAROT -> TableStyle.TAROT.title(st.isZh)
+                        DeckStyle.CHINESE -> TableStyle.CHINESE.title(st.isZh)
+                        DeckStyle.MODERN -> TableStyle.MODERN.title(st.isZh)
+                        DeckStyle.KYOTO -> TableStyle.KYOTO.title(st.isZh)
                     }
                 }) { vm.updateAppearance(appearance.copy(face = it)) }
             }

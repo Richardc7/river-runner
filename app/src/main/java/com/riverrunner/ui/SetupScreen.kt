@@ -91,8 +91,8 @@ fun SetupContent(
     val stackOptions = if (mode == GameMode.CASH) cashStacks else tourneyStacks
 
     Column(
-        Modifier.fillMaxSize().background(Palette.Bg).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        Modifier.fillMaxSize().background(Palette.Bg).padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // Clean studio top bar
         Row(
@@ -101,7 +101,7 @@ fun SetupContent(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             SmallButton("←", onBack)
-            Text(st.newGame, color = Palette.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text(st.newGame, color = Palette.Text, fontSize = 19.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             if (onCustomize != null) {
                 SmallButton(
                     if (st.isZh) "⚙ 自定义对手及规则" else "⚙ Customize opponents & rules",
@@ -111,54 +111,48 @@ fun SetupContent(
             }
         }
 
-        Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             // Left frosted-glass configuration card
             Column(
                 Modifier.weight(1f).fillMaxHeight()
                     .studioCard(radius = 16.dp)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 OptionRow(st.mode) {
                     Pill(st.cash, mode == GameMode.CASH, { mode = GameMode.CASH; if (stackBB !in cashStacks) stackBB = 100 })
                     Pill(st.tournament, mode == GameMode.TOURNAMENT, { mode = GameMode.TOURNAMENT; if (stackBB !in tourneyStacks) stackBB = 50 })
                 }
-                HorizontalDivider(color = Palette.Line.copy(alpha = 0.45f))
                 OptionRow(st.players) {
-                    for (n in listOf(2, 5, 6, 7, 8, 9)) Pill("$n", size == n, { size = n }, Modifier.width(50.dp))
+                    for (n in listOf(2, 5, 6, 7, 8, 9)) Pill("$n", size == n, { size = n }, Modifier.width(48.dp))
                 }
-                HorizontalDivider(color = Palette.Line.copy(alpha = 0.45f))
                 OptionRow(st.stackLabelBB) {
-                    for (b in stackOptions) Pill("$b", stackBB == b, { stackBB = b }, Modifier.width(58.dp))
+                    for (b in stackOptions) Pill("$b", stackBB == b, { stackBB = b }, Modifier.width(56.dp))
                 }
-                HorizontalDivider(color = Palette.Line.copy(alpha = 0.45f))
                 OptionRow(st.tableType) {
                     Pill(st.gtoTable, table == TableType.GTO, { table = TableType.GTO })
                     Pill(st.mixedTable, table == TableType.MIXED, { table = TableType.MIXED })
                 }
                 if (mode == GameMode.TOURNAMENT) {
-                    HorizontalDivider(color = Palette.Line.copy(alpha = 0.45f))
                     OptionRow(st.handsPerLevel) {
-                        for (h in listOf(5, 8, 10, 15, 20)) Pill("$h", hpl == h, { hpl = h }, Modifier.width(50.dp))
+                        for (h in listOf(5, 8, 10, 15, 20)) Pill("$h", hpl == h, { hpl = h }, Modifier.width(48.dp))
                     }
                 } else {
-                    HorizontalDivider(color = Palette.Line.copy(alpha = 0.45f))
                     OptionRow(st.ante) {
                         Pill(st.none, !ante, { ante = false })
                         Pill("12.5%", ante, { ante = true })
                     }
                 }
                 if (onLiveStrategyChange != null) {
-                    HorizontalDivider(color = Palette.Line.copy(alpha = 0.45f))
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
                             .background(Palette.Bg.copy(alpha = 0.55f))
                             .border(1.dp, Palette.Line.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text(
                                 if (st.isZh) "本局显示实时策略参考" else "Show live strategy during this game",
                                 color = Palette.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,

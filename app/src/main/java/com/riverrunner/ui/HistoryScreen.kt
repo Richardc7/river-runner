@@ -275,9 +275,10 @@ private fun HistoryRow(entry: HistoryEntry, showResults: Boolean, deviated: Bool
     )
     val net = hand.heroNet.toDouble() / hand.bigBlind
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Palette.Panel)
+        Modifier.fillMaxWidth()
+            .studioCard(accent = if (showResults && deviated) Palette.Gold else Palette.Line, radius = 12.dp, highlighted = showResults && deviated)
             .clickable(role = Role.Button, onClickLabel = t("回放", "Replay"), onClick = onReplay)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
