@@ -114,9 +114,17 @@ fun EditionReplayScreen(vm: AppViewModel, initial: HandRecord, startBlind: Boole
                                         }
                                     }
                                     actual?.let {
-                                        StudyCoach.assess(record.id, view, trace, it).modelGapBB?.let { gap ->
-                                            Text((if (zh) "相对模型最优 EV · " else "EV versus model best · ") +
-                                                "%.2f BB".format(if (gap < .005) 0.0 else -gap), color = Palette.Gold)
+                                        val gap = StudyCoach.assess(record.id, view, trace, it).modelGapBB
+                                        if (gap != null) {
+                                            val title = if (trace.isMultiwayEv) {
+                                                if (zh) "采样区间支持的 EV 差下限 · " else "EV gap lower bound from sampling bands · "
+                                            } else if (zh) "相对模型最优 EV · " else "EV versus model best · "
+                                            val shown = if (gap < .005) 0.0 else if (trace.isMultiwayEv) gap else -gap
+                                            Text(title + "%.2f BB".format(shown), color = Palette.Gold)
+                                        } else if (trace.isMultiwayEv && trace.actionValues.size >= 2) {
+                                            Text(if (zh) "该行动没有可判分的多人模型 EV 比较。"
+                                                else "No gradable multiway model EV comparison for this action.",
+                                                color = Palette.TextDim)
                                         }
                                     }
                                     Text(statusText(trace.status, zh))

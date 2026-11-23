@@ -188,65 +188,29 @@ class HandEngine(val setup: HandSetup, private val cards: CardSource) {
     private fun finishHand() {
         toAct = -1
         val live = ps.filter { !it.folded }
-        var returned: Pair<Int, Int>? = null
-        val byCommit = ps.sortedByDescending { it.committed }
-        if (byCommit.size >= 2 && byCommit[0].committed > byCommit[1].committed) {
-            val extra = byCommit[0].committed - byCommit[1].committed
-            byCommit[0].committed -= extra; byCommit[0].stack += extra
-            returned = byCommit[0].seat to extra
+        val plan = PotSettlement.plan(ps.associate { it.seat to it.committed }, live.map { it.seat })
+        val returned = plan.returned
+        if (returned != null) {
+            val player = p(returned.first)
+            player.committed -= returned.second
+            player.stack += returned.second
         }
-        val won = HashMap<Int, Int>(); val pots = ArrayList<Pot>(); val scores = HashMap<Int, Int>()
-        val showdown: List<Int>
-        if (live.size == 1) {
-            val w = live[0]; val total = ps.sumOf { it.committed }
-            pots += Pot(total, listOf(w.seat), listOf(w.seat)); won[w.seat] = total; showdown = emptyList()
-        } else {
+        val scores = HashMap<Int, Int>()
+        val showdown = if (live.size == 1) emptyList() else {
             while (_board.size < 5) _board += cards.board(_board.size)
             val boardMask = Cards.mask(_board.toIntArray())
             for (p in live) scores[p.seat] = HandEvaluator.evaluate(boardMask or Cards.mask(p.hole))
-            showdown = order.filter { s -> live.any { it.seat == s } }
-            val contrib = HashMap<Int, Int>()
-            for (p in ps) contrib[p.seat] = p.committed
-            while (contrib.values.any { it > 0 }) {
-                val liveWithChips = live.filter { contrib.getValue(it.seat) > 0 }
-                if (liveWithChips.isEmpty()) {
-                    val rest = contrib.values.sum()
-                    if (pots.isNotEmpty()) {
-                        val last = pots.removeAt(pots.size - 1)
-                        pots += last.copy(amount = last.amount + rest)
-                        val share = rest / last.winners.size
-                        last.winners.forEach { won[it] = (won[it] ?: 0) + share }
-                        won[last.winners[0]] = won.getValue(last.winners[0]) + rest - share * last.winners.size
-                    }
-                    break
-                }
-                val level = liveWithChips.minOf { contrib.getValue(it.seat) }; var amount = 0
-                for (s in contrib.keys.toList()) {
-                    val c = contrib.getValue(s); val take = minOf(c, level)
-                    amount += take; contrib[s] = c - take
-                }
-                val eligible = liveWithChips.map { it.seat }
-                val best = eligible.maxOf { scores.getValue(it) }
-                val winners = order.filter { it in eligible && scores.getValue(it) == best }
-                val share = amount / winners.size; var odd = amount - share * winners.size
-                for (wSeat in winners) {
-                    var get = share
-                    if (odd > 0) { get++; odd-- }
-                    won[wSeat] = (won[wSeat] ?: 0) + get
-                }
-                pots += Pot(amount, eligible, winners)
-            }
+            live.map { it.seat }
         }
-        val afterRake = RakeSettlement.apply(pots, setup.cashRules, setup.bigBlind, _board.size >= 3)
-        val rake = afterRake.sumOf { it.rake }
-        if (rake > 0) {
-            pots.clear(); pots.addAll(afterRake); won.clear()
-            for (pot in pots) {
-                val share = pot.amount / pot.winners.size
-                var odd = pot.amount % pot.winners.size
-                for (winner in pot.winners) {
-                    won[winner] = (won[winner] ?: 0) + share + if (odd-- > 0) 1 else 0
-                }
+        val pots = RakeSettlement.apply(plan.pots, setup.cashRules, setup.bigBlind, _board.size >= 3)
+            .map { it.copy(winners = PotSettlement.winners(it, scores)) }
+        val rake = pots.sumOf { it.rake }
+        val won = HashMap<Int, Int>()
+        for ((index, pot) in pots.withIndex()) {
+            val tail = if (rake == 0 && index == pots.lastIndex) plan.foldedTail else 0
+            for ((winnerIndex, winner) in pot.winners.withIndex()) {
+                val award = PotSettlement.award(pot.amount, pot.winners.size, winnerIndex, tail)
+                won[winner] = (won[winner] ?: 0) + award
             }
         }
         for ((s, amt) in won) p(s).stack += amt

@@ -17,7 +17,9 @@ multi-street AI or full multiway GTO evaluator.
 - The `low` / `high` fields for this calculator are approximate
   two-standard-error **sampling** bands, **not** confidence intervals for
   the range model, future opponents' responses, or Solver/GTO correctness.
-  StudyCoach uses non-overlapping sampling bands for multiway model gaps.
+  The v2 calculator uses squared-weight residuals for the self-normalized
+  estimate. Review and scored drills require a clear measured difference;
+  overlapping estimates and saved v1 estimates are not graded as EV errors.
 - `StrategySession.capture` saves model values for eligible 3-9-way terminal
   river decisions. Unsupported cases explicitly say that further action
   modelling is required, rather than pretending a closing call has a
@@ -34,5 +36,7 @@ model remains unchanged.
 
 New tests include a biased-sequential-sampling counterexample, eight
 non-overlapping opponent hands, 3- and 9-way terminal calls, side pots,
-rake and invalid nonterminal contexts. GitHub Actions runs on the
+rake and invalid nonterminal contexts. The terminal evaluator also matches
+actual 3-, 5-, 6- and 9-seat payouts on a tied board, including folded blinds
+and rake. GitHub Actions runs on the
 `exploit/**` branch before opening the PR.

@@ -17,7 +17,8 @@ data class DecisionAssessment(
     val preferredFrequency: Double, val modelGapBB: Double?,
     val needsStudy: Boolean,
     val ownHole: List<Int>, val board: List<Int>, val potBB: Double, val toCallBB: Double,
-    val legalTypes: List<MoveType>
+    val legalTypes: List<MoveType>,
+    val sampledEvBest: MoveType? = null,
 )
 data class StudyCategory(val key: String, val hands: Int, val marked: Int, val measuredEv: Int, val meanModelGapBB: Double) {
     val reviewRate: Double get() = if (hands == 0) 0.0 else marked.toDouble() / hands
@@ -58,16 +59,13 @@ object StudyCoach {
                 "Preflop facing raise" else "Preflop opening"
             else -> if (view.legal.canCall) view.street.name + " facing bet" else view.street.name + " initiative"
         }
-        val exact = answer?.let { move -> trace.actionValues.firstOrNull { it.move == move } }
-        val modelGap = if (exact != null && trace.actionValues.size >= 2) {
-            // Sampling-only bounds must not turn an uncertain multiway edge into a scored error.
-            val gap = if (trace.notes.any { it.contains(MultiwayRiverEv.VERSION) })
-                trace.actionValues.maxOf { it.low } - exact.high
-            else trace.actionValues.maxOf { it.chips } - exact.chips
-            max(0.0, gap) / view.bigBlind
-        } else null
+        val modelGap = answer?.let(trace::gradableEvGapChips)?.div(view.bigBlind)
+        val sampledEvBest = if (trace.isMultiwayEv && modelGap != null)
+            trace.gradableBestEv()?.move?.type else null
         val mismatch = actualFreq != null && actualFreq < .2 && byType.getValue(preferred) >= .45
-        val marked = mismatch || modelGap != null && modelGap >= 1.0
+        // Do not overwrite an uncertain or unsupported sampled EV verdict with a policy guess.
+        val marked = if (trace.isMultiwayEv) modelGap != null && modelGap >= 1.0
+            else mismatch || modelGap != null && modelGap >= 1.0
         val legalTypes = buildList {
             if (view.legal.canCheck) add(MoveType.CHECK) else add(MoveType.FOLD)
             if (view.legal.canCall) add(MoveType.CALL)
@@ -77,7 +75,7 @@ object StudyCoach {
             "h" + handId + "a" + trace.actionIndex, topic, pos, view.street,
             depth, size, odds, answer, preferred, actualFreq, byType.getValue(preferred), modelGap, marked,
             view.ownHole.toList(), view.board.toList(),
-            view.pot.toDouble() / view.bigBlind, view.legal.toCall.toDouble() / view.bigBlind, legalTypes
+            view.pot.toDouble() / view.bigBlind, view.legal.toCall.toDouble() / view.bigBlind, legalTypes, sampledEvBest
         )
     }
     fun categories(assessments: List<DecisionAssessment>): List<StudyCategory> {

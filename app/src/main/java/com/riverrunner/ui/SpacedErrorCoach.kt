@@ -94,7 +94,10 @@ fun SpacedErrorCoach(vm: AppViewModel) {
                             color = Palette.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Text(t("答完后显示模型偏好。", "See the model preference after answering."),
                             color = Palette.TextDim, fontSize = 11.sp)
-                        for ((index, type) in a.legalTypes.take(6).withIndex()) {
+                        val choices = if (a.sampledEvBest != null) a.legalTypes.filter {
+                            it == MoveType.FOLD || it == MoveType.CALL
+                        } else a.legalTypes
+                        for ((index, type) in choices.take(6).withIndex()) {
                             OutlinedButton(onClick = { choice = type }, modifier = Modifier.fillMaxWidth()
                                 .heightIn(min = 39.dp), shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(1.dp, Palette.Line),
@@ -105,7 +108,7 @@ fun SpacedErrorCoach(vm: AppViewModel) {
                         }
                     } else {
                         val selected = requireNotNull(choice)
-                        val correct = selected == a.preferred
+                        val correct = selected == (a.sampledEvBest ?: a.preferred)
                         Text(t("答案解析", "Answer explanation"), color = Palette.Gold,
                             fontSize = 17.sp, fontWeight = FontWeight.Bold)
                         Text(if (correct) t("✓ 与模型偏好相同", "✓ Same as model favourite")
@@ -114,14 +117,22 @@ fun SpacedErrorCoach(vm: AppViewModel) {
                             fontWeight = FontWeight.Bold)
                         Text(t("你选择：", "Your choice: ") + StudyPresentation.moveType(selected, zh),
                             color = Palette.Text)
-                        Text(t("模型首选：", "Model favourite: ") +
-                            StudyPresentation.moveType(a.preferred, zh) +
-                            t("（频率约 ", " (~") +
-                            "%.1f%%".format(Locale.US, 100 * a.preferredFrequency) + ")",
-                            color = Palette.Text)
+                        val sampledBest = a.sampledEvBest
+                        if (sampledBest != null) {
+                            Text(t("多人 EV 模型首选：", "Multiway EV model favourite: ") +
+                                StudyPresentation.moveType(sampledBest, zh), color = Palette.Text)
+                        } else {
+                            Text(t("模型首选：", "Model favourite: ") +
+                                StudyPresentation.moveType(a.preferred, zh) +
+                                t("（频率约 ", " (~") +
+                                "%.1f%%".format(Locale.US, 100 * a.preferredFrequency) + ")",
+                                color = Palette.Text)
+                        }
                         a.modelGapBB?.let {
-                            Text(t("该历史行动的条件模型 EV 差距：", "Historical conditional model EV gap: ") +
-                                "%.2f".format(Locale.US, it) + " BB",
+                            val label = if (sampledBest != null)
+                                t("历史行动的 EV 差下限：", "Historical EV gap lower bound: ")
+                            else t("该历史行动的条件模型 EV 差距：", "Historical conditional model EV gap: ")
+                            Text(label + "%.2f".format(Locale.US, it) + " BB",
                                 color = Palette.Gold, fontSize = 12.sp)
                         }
                         Text(t("模型偏好不等于真实正确答案。下次遇到类似筹码、位置及赔率时，应重新判断具体范围。",

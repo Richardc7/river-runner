@@ -14,7 +14,7 @@ import kotlin.random.Random
  * multiple side pots, all-in opponents, and cash rake via the game's pot rules.
  */
 object MultiwayRiverEv {
-    const val VERSION = "multiway-river-closure-v1"
+    const val VERSION = "multiway-river-closure-v2"
 
     fun isTerminal(view: DecisionView): Boolean {
         if (view.street != Street.RIVER || view.opponents.size !in 2..8) return false
@@ -48,19 +48,26 @@ object MultiwayRiverEv {
             return unsupported("Pot does not match public commitments")
 
         val cost = if (view.legal.canCheck) 0 else view.legal.toCall
-        val settlement = buildSettlement(view, cost)
-            ?: return unsupported("Inconsistent contribution or side-pot eligibility")
+        val committed = view.seats.associate {
+            it.seat to it.committed.toLong() + if (it.seat == view.actorSeat) cost else 0
+        }
+        if (committed.size != view.seats.size || committed.values.any { it !in 0L..Int.MAX_VALUE.toLong() } ||
+            committed.values.sum() > Int.MAX_VALUE
+        ) return unsupported("Invalid public commitments")
+        val live = view.seats.filterNot { it.folded }.map { it.seat }.toSet()
+        val liveInOrder = view.order.filter { it in live }
+        if (view.actorSeat !in live || liveInOrder.size != live.size || liveInOrder.toSet() != live)
+            return unsupported("Inconsistent seat order or pot eligibility")
+        val plan = PotSettlement.plan(committed.mapValues { it.value.toInt() }, liveInOrder)
+        if (plan.pots.isEmpty()) return unsupported("No contested pot")
+        val pots = RakeSettlement.apply(plan.pots, view.cashRules, view.bigBlind, true)
+        val foldedTail = if (pots.none { it.rake > 0 }) plan.foldedTail else 0
+        val heroRefund = plan.returned?.takeIf { it.first == view.actorSeat }?.second ?: 0
         val dead = Cards.mask((view.ownHole + view.board).toIntArray())
         val sampler = JointRangeSampler(ranges)
         val boardMask = Cards.mask(view.board.toIntArray())
         val heroScore = HandEvaluator.evaluate(boardMask or Cards.mask(view.ownHole.toIntArray()))
-        val rankInOrder = view.order.withIndex().associate { it.value to it.index }
-
-        var accepted = 0
-        var weightSum = 0.0
-        var weightSquaredSum = 0.0
-        var weightedNet = 0.0
-        var weightedNetSquared = 0.0
+        val moments = ImportanceSampleMoments()
         repeat(iterations) {
             val draw = sampler.sample(dead, random) ?: return@repeat
             val weight = draw.importanceWeight
@@ -70,33 +77,21 @@ object MultiwayRiverEv {
             for ((seat, cards) in draw.holes) {
                 scores[seat] = HandEvaluator.evaluate(boardMask or cards)
             }
-            var heroAward = settlement.heroRefund.toDouble()
-            for (pot in settlement.pots) {
-                val best = pot.eligible.maxOf { scores.getValue(it) }
-                val winners = pot.eligible.filter { scores.getValue(it) == best }
-                    .sortedBy { rankInOrder.getValue(it) }
-                val heroIndex = winners.indexOf(view.actorSeat)
-                if (heroIndex >= 0) {
-                    heroAward += pot.amount / winners.size
-                    if (heroIndex < pot.amount % winners.size) heroAward += 1.0
-                }
+            var heroAward = heroRefund
+            for ((index, pot) in pots.withIndex()) {
+                val winners = PotSettlement.winners(pot, scores)
+                val tail = if (index == pots.lastIndex) foldedTail else 0
+                heroAward += PotSettlement.award(pot.amount, winners.size, winners.indexOf(view.actorSeat), tail)
             }
-            val net = heroAward - cost
-            accepted++
-            weightSum += weight
-            weightSquaredSum += weight * weight
-            weightedNet += weight * net
-            weightedNetSquared += weight * net * net
+            moments.add(weight, (heroAward - cost).toDouble())
         }
-        if (weightSum <= 0 || weightSquaredSum <= 0)
+        if (moments.count == 0)
             return unsupported("No legal joint hands were sampled")
-        val effectiveSamples = weightSum * weightSum / weightSquaredSum
+        val effectiveSamples = moments.effectiveSamples
         if (effectiveSamples < max(25.0, iterations * 0.10))
             return unsupported("Joint range sampling produced insufficient effective samples")
-        val mean = weightedNet / weightSum
-        val variance = max(0.0, weightedNetSquared / weightSum - mean * mean)
-        val samplingError = sqrt(variance / effectiveSamples)
-        val delta = 2.0 * samplingError
+        val mean = moments.mean
+        val delta = 2.0 * moments.standardError
         val outcome = ActionValue(
             if (view.legal.canCheck) Move.CHECK else Move.CALL,
             mean, mean - delta, mean + delta,
@@ -104,7 +99,7 @@ object MultiwayRiverEv {
         val values = if (view.legal.canCheck) listOf(outcome)
             else listOf(ActionValue(Move.FOLD, 0.0, 0.0, 0.0), outcome)
         return RiverAnalysis(true, values, null, emptyMap(), listOf(
-            "$VERSION: terminal cash river; ${view.opponents.size} live opponents, $accepted/$iterations legal joint samples, effective sample size ${"%.0f".format(java.util.Locale.US, effectiveSamples)}.",
+            "$VERSION: terminal cash river; ${view.opponents.size} live opponents, ${moments.count}/$iterations legal joint samples, effective sample size ${"%.0f".format(java.util.Locale.US, effectiveSamples)}.",
             "Opponent hands come from an importance-weighted product of inferred marginal ranges; this is not a calibrated joint strategy or solver GTO.",
             "Low/high show approximate +/-2 Monte Carlo standard errors ONLY. They exclude range-model and continuation-policy uncertainty and are not validated confidence intervals.",
             "Only closing check/call versus fold is evaluated. Bet/raise and nonterminal river decisions need a full multiway continuation model.",
@@ -112,34 +107,38 @@ object MultiwayRiverEv {
         ))
     }
 
-    private data class Settlement(val pots: List<Pot>, val heroRefund: Int)
+}
 
-    /** Reproduces the wager-refund and tiered-pot arithmetic from HandEngine.finishHand. */
-    private fun buildSettlement(view: DecisionView, additional: Int): Settlement? {
-        val committed = view.seats.associate { seat ->
-            seat.seat to seat.committed.toLong() + if (seat.seat == view.actorSeat) additional else 0
-        }.toMutableMap()
-        val highest = committed.entries.sortedByDescending { it.value }
-        var heroRefund = 0L
-        if (highest.size >= 2 && highest[0].value > highest[1].value) {
-            val excess = highest[0].value - highest[1].value
-            committed[highest[0].key] = highest[1].value
-            if (highest[0].key == view.actorSeat) heroRefund = excess
-        }
-        val tiers = committed.values.filter { it > 0L }.distinct().sorted()
-        val pots = ArrayList<Pot>()
-        var previous = 0L
-        for (level in tiers) {
-            val contributors = committed.count { it.value >= level }
-            val chips = (level - previous) * contributors
-            if (chips <= 0L || chips > Int.MAX_VALUE) return null
-            val eligible = view.seats.filter { !it.folded && committed.getValue(it.seat) >= level }
-                .map { it.seat }
-            if (eligible.isEmpty()) return null
-            pots += Pot(chips.toInt(), eligible, emptyList())
-            previous = level
-        }
-        if (pots.isEmpty() || heroRefund > Int.MAX_VALUE) return null
-        return Settlement(RakeSettlement.apply(pots, view.cashRules, view.bigBlind, true), heroRefund.toInt())
+/** Self-normalized importance sampling; squared weights also weight the residuals. */
+internal class ImportanceSampleMoments {
+    var count = 0
+        private set
+    var mean = 0.0
+        private set
+    private var weightSum = 0.0
+    private var squaredWeightSum = 0.0
+    private var squaredWeightMean = 0.0
+    private var squaredWeightM2 = 0.0
+
+    fun add(weight: Double, outcome: Double) {
+        count++
+        weightSum += weight
+        mean += (outcome - mean) * (weight / weightSum)
+        val squared = weight * weight
+        if (squared == 0.0) return
+        squaredWeightSum += squared
+        val delta = outcome - squaredWeightMean
+        squaredWeightMean += delta * (squared / squaredWeightSum)
+        squaredWeightM2 += squared * delta * (outcome - squaredWeightMean)
     }
+
+    val effectiveSamples: Double
+        get() = if (squaredWeightSum > 0) (weightSum / sqrt(squaredWeightSum)).let { it * it } else 0.0
+
+    // Shift the squared-weight variance to the ordinary weighted mean (the ratio estimate).
+    val standardError: Double
+        get() {
+            val shift = squaredWeightMean - mean
+            return sqrt(max(0.0, squaredWeightM2 + squaredWeightSum * shift * shift)) / weightSum
+        }
 }

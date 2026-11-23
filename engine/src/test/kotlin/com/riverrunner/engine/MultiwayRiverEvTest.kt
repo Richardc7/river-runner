@@ -123,4 +123,53 @@ class MultiwayRiverEvTest {
         assertEquals(1500.0, result.values.single { it.move == Move.CHECK }.chips, 1e-8)
         assertFalse(MultiwayRiverEv.isTerminal(v.copy(actions = actions.take(1))))
     }
+    @Test fun terminalEvMatchesEngineSettlementAcrossTableSizesAndFoldedBlindTiers() {
+        val boardCards = Cards.parseMany("AsKsQsJsTs")
+        for (tableSize in listOf(3, 5, 6, 9)) {
+            for (rules in listOf(CashRules(), CashRules(rakeBasisPoints = 1000, rakeCapBB = 20))) {
+                val holes = (0..51).filterNot { it in boardCards.toSet() }.chunked(2)
+                    .take(tableSize).mapIndexed { seat, cards -> seat to cards.toIntArray() }.toMap()
+                val setup = HandSetup(1, 2, 0, tableSize - 1,
+                    (0 until tableSize).map { SeatSetup(it, "Seat $it", 100) }, rules)
+                val engine = HandEngine(setup, PresetCardSource(holes, boardCards))
+                engine.apply(Move.raiseTo(4))
+                while (engine.phase == Phase.BETTING) {
+                    engine.apply(if (tableSize == 5 && engine.toAct in 0..1) Move.FOLD else Move.CALL)
+                }
+                repeat(2) {
+                    engine.dealNextStreet()
+                    while (engine.phase == Phase.BETTING) engine.apply(Move.CHECK)
+                }
+                engine.dealNextStreet()
+                while (engine.toAct != setup.buttonSeat) engine.apply(Move.CHECK)
+                val view = ObservationFactory.forActor(engine, GameMode.CASH)
+                val ranges = view.opponents.associate { seat ->
+                    val hand = holes.getValue(seat.seat)
+                    seat.seat to WeightedRange.of(listOf(WeightedCombo(hand[0], hand[1], 1.0)))
+                }
+                val analysis = MultiwayRiverEv.analyze(view, ranges, Random(1), 80)
+                engine.apply(Move.CHECK)
+                val result = assertNotNull(engine.result)
+                assertEquals(1, result.pots.size)
+                if (tableSize == 5 && !rules.hasRake) assertEquals(5, result.won.getValue(view.actorSeat))
+                assertEquals(result.won.getValue(view.actorSeat).toDouble(),
+                    analysis.values.single().chips, 1e-10, "table size $tableSize, rules $rules")
+            }
+        }
+    }
+
+    @Test fun weightedStandardErrorUsesSquaredWeightResiduals() {
+        val samples = listOf(0.05 to 30.0, 0.10 to -50.0, 0.40 to 120.0, 0.90 to -10.0)
+        val moments = ImportanceSampleMoments()
+        samples.forEach { (w, x) -> moments.add(w, x) }
+        val total = samples.sumOf { it.first }
+        val mean = samples.sumOf { (w, x) -> w * x } / total
+        val expected = kotlin.math.sqrt(samples.sumOf { (w, x) ->
+            val residual = w * (x - mean)
+            residual * residual
+        }) / total
+        assertEquals(mean, moments.mean, 1e-12)
+        assertEquals(expected, moments.standardError, 1e-12)
+    }
+
 }

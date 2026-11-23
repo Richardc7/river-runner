@@ -51,6 +51,8 @@ class StrategySession(private val seed: Long, private val mode: GameMode, val co
         val notes = buildList {
             if (advice.note.isNotBlank()) add(advice.note)
             if (river != null) {
+                if (!river.supported && view.opponents.size >= 2)
+                    add("${MultiwayRiverEv.VERSION}: no gradable action EV")
                 addAll(river.assumptions)
                 if (river.supported) {
                     if (river.rangeClasses.isNotEmpty()) add("Top model range classes: " + river.rangeClasses.entries.take(12).joinToString(", ") { "${it.key}: ${"%.1f".format(java.util.Locale.US, it.value * 100)}%" })

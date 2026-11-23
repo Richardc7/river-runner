@@ -60,6 +60,7 @@ import com.riverrunner.engine.strategy.DecisionView
 import com.riverrunner.engine.strategy.ObservationFactory
 import com.riverrunner.engine.strategy.PolicySnapshot
 import com.riverrunner.engine.strategy.StudyCoach
+import com.riverrunner.engine.strategy.isMultiwayEv
 import com.riverrunner.i18n.LocalStrings
 import com.riverrunner.i18n.Strings
 import kotlinx.coroutines.Dispatchers
@@ -275,6 +276,7 @@ fun ReplayContent(
                         }
                         if (decisionIndex >= 0) {
                             AnalysisCard(heroAction.takeIf { wasHeroAction }, heroView, reference, modelGap,
+                                sampledGap = savedDecision?.trace?.isMultiwayEv == true,
                                 loading = savedDecision == null && !contextCache.containsKey(decisionIndex), fmt = fmt)
                         } else if (opponentAction == null) {
                             Text(if (st.isZh) "这一帧没有行动。可从行动记录选择要查看的决策。"
@@ -415,7 +417,7 @@ private fun OpponentInsightCard(
 @Composable
 private fun AnalysisCard(
     heroAction: Action?, view: DecisionView?, reference: ReplayPolicy?, modelGapBB: Double?,
-    loading: Boolean, fmt: (Int) -> String,
+    sampledGap: Boolean, loading: Boolean, fmt: (Int) -> String,
 ) {
     val st = LocalStrings.current
     Column(
@@ -428,8 +430,11 @@ private fun AnalysisCard(
             color = Palette.Text, fontSize = 17.sp, fontWeight = FontWeight.Bold,
         )
         if (modelGapBB != null) {
-            val delta = if (modelGapBB < .005) 0.0 else -modelGapBB
-            Text((if (st.isZh) "相对模型最优 EV · " else "EV versus model best · ") + "%.2f BB".format(delta),
+            val delta = if (modelGapBB < .005) 0.0 else if (sampledGap) modelGapBB else -modelGapBB
+            val title = if (sampledGap) {
+                if (st.isZh) "采样区间支持的 EV 差下限 · " else "EV gap lower bound from sampling bands · "
+            } else if (st.isZh) "相对模型最优 EV · " else "EV versus model best · "
+            Text(title + "%.2f BB".format(delta),
                 color = Palette.Gold, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
         view?.let { DecisionContextDetails(it, heroAction, reference?.snapshot?.equity) }
