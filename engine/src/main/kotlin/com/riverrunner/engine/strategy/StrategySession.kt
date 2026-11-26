@@ -34,9 +34,20 @@ class StrategySession(private val seed: Long, private val mode: GameMode, val co
         val snapshot = opponents.snapshots()
         val candidateMoves = (advice.baseline.options + advice.policy.options).map { it.first }
 
-        val river = if (view.street == Street.RIVER && view.mode == GameMode.CASH && view.opponents.size == 1) {
-            val seat = view.opponents.single().seat
-            RiverEv.analyze(view, RangeModel.infer(view, seat, snapshot[seat]), snapshot[seat], candidateMoves)
+        val river = if (view.street == Street.RIVER && view.mode == GameMode.CASH) {
+            when (view.opponents.size) {
+                1 -> {
+                    val seat = view.opponents.single().seat
+                    RiverEv.analyze(view, RangeModel.infer(view, seat, snapshot[seat]), snapshot[seat], candidateMoves)
+                }
+                in 2..8 -> if (MultiwayRiverEv.isTerminal(view)) {
+                    val ranges = view.opponents.associate { it.seat to RangeModel.infer(view, it.seat, snapshot[it.seat]) }
+                    MultiwayRiverEv.analyze(view, ranges,
+                        StrategyRandom.forDecision(seed, handNumber, view.actionIndex, view.actorSeat, 3))
+                } else RiverAnalysis(false, emptyList(), null, emptyMap(),
+                    listOf("Multiway river continuation is not yet evaluated: a later opponent can still act."))
+                else -> null
+            }
         } else null
 
         val turnOrFlop = if (view.mode == GameMode.CASH && view.opponents.size == 1 && !view.cashRules.hasRake) {
@@ -58,9 +69,11 @@ class StrategySession(private val seed: Long, private val mode: GameMode, val co
         val notes = buildList {
             if (advice.note.isNotBlank()) add(advice.note)
             if (river != null) {
+                if (!river.supported && view.opponents.size >= 2)
+                    add("${MultiwayRiverEv.VERSION}: no gradable action EV")
                 addAll(river.assumptions)
                 if (river.supported) {
-                    add("Top model range classes: " + rangeClasses.entries.take(12).joinToString(", ") { "${it.key}: ${"%.1f".format(java.util.Locale.US, it.value * 100)}%" })
+                    if (rangeClasses.isNotEmpty()) add("Top model range classes: " + rangeClasses.entries.take(12).joinToString(", ") { "${it.key}: ${"%.1f".format(java.util.Locale.US, it.value * 100)}%" })
                     add("River EV is coaching-only in this version; it does not override the bounded live policy.")
                 }
             } else if (turnOrFlop != null) {

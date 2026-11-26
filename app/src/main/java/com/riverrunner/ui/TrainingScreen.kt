@@ -252,7 +252,10 @@ internal fun DecisionQuestion(
                         color = Palette.Text, fontSize = 12.sp)
                     Text(t("模型首选：", "Model-favoured: ") + StudyPresentation.move(best.move, bb, zh, view.legal.isOpeningBet),
                         color = Palette.Text, fontSize = 12.sp)
-                    Text(t("条件模型 EV 差距：", "Conditional model EV gap: ") +
+                    val lossLabel = if (d.usesSamplingBands)
+                        t("采样区间支持的 EV 差下限：", "EV gap lower bound from sampling bands: ")
+                    else t("条件模型 EV 差距：", "Conditional model EV gap: ")
+                    Text(lossLabel +
                         "%.2f".format(Locale.US, score.modelLossChips / bb) + " BB",
                         color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     SolverReferencePanel(view, reference)

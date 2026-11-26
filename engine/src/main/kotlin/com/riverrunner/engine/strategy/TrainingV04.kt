@@ -4,16 +4,21 @@ import com.riverrunner.engine.*
 import java.util.Base64
 import kotlin.math.abs
 
-data class TrainingDrill(val id: String, val category: String, val options: List<ActionValue>) {
+data class TrainingDrill(
+    val id: String, val category: String, val options: List<ActionValue>,
+    val usesSamplingBands: Boolean = false,
+) {
     init {
         require(id.matches(Regex("[a-zA-Z0-9_-]{1,80}")))
         require(category.length in 1..80)
         require(options.size in 2..64 && options.map { it.move }.distinct().size == options.size)
+        require(!usesSamplingBands || separatedBest(options) != null)
     }
-    val best: ActionValue get() = options.maxBy { it.chips }
+    val best: ActionValue get() = if (usesSamplingBands) requireNotNull(separatedBest(options)) else options.maxBy { it.chips }
     fun grade(move: Move): DrillGrade {
         val chosen = options.singleOrNull { it.move == move } ?: error("Illegal drill answer")
-        return DrillGrade(id, category, best.move == move, (best.chips - chosen.chips).coerceAtLeast(0.0))
+        val winner = best
+        return DrillGrade(id, category, winner.move == move, actionValueGap(winner, chosen, usesSamplingBands))
     }
 }
 data class DrillGrade(val id: String, val category: String, val exact: Boolean, val modelLossChips: Double)
@@ -29,7 +34,7 @@ object TrainingCurriculum {
     fun fromHistory(hands: Iterable<HandAnalysis>): List<TrainingDrill> =
         hands.flatMap { hand ->
             hand.decisions.mapNotNull { decision ->
-                if (decision.actionValues.size < 2) null else {
+                if (decision.gradableBestEv() == null) null else {
                     val category = when {
                         decision.evidence.isNotEmpty() -> "exploit-" + decision.evidence.first().code.name
                         decision.street == Street.FLOP ->
@@ -41,6 +46,7 @@ object TrainingCurriculum {
                         "h" + hand.handId + "a" + decision.actionIndex,
                         category,
                         decision.actionValues.toList(),
+                        usesSamplingBands = decision.isMultiwayEv,
                     )
                 }
             }

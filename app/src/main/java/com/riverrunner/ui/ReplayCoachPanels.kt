@@ -125,8 +125,14 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
                 val policy = if (trace.status == AdviceStatus.ADJUSTED) trace.exploit else trace.baseline
                 val best = policy.choices.groupBy { it.move.type }.mapValues { (_, options) -> options.sumOf { it.probability } }
                     .maxBy { it.value }.key
-                val score = if (chosen.type == best) 1.0 else 0.0
-                Text(t("模型偏好的行动：", "Model-favoured move: ") +
+                val gap = trace.gradableEvGapChips(chosen)?.div(view.bigBlind)
+                val score = if (trace.isMultiwayEv) {
+                    if (gap == null) null else if (trace.gradableBestEv()?.move == chosen) 1.0 else 0.0
+                } else if (chosen.type == best) 1.0 else 0.0
+                val policyLabel = if (trace.isMultiwayEv)
+                    t("启发式策略偏好：", "Heuristic policy favours: ")
+                else t("模型偏好的行动：", "Model-favoured move: ")
+                Text(policyLabel +
                     StudyPresentation.moveType(best, zh, view.legal.isOpeningBet) +
                     t("；你选：", "; your pick: ") + StudyPresentation.moveType(chosen.type, zh, view.legal.isOpeningBet),
                     color = Palette.Text)
@@ -138,20 +144,33 @@ fun BlindReplayCoach(vm: AppViewModel, record: HandRecord, nodes: List<Historica
                         StudyPresentation.move(StudyCoach.moveOf(it) ?: Move.FOLD, view.bigBlind, zh, view.legal.isOpeningBet),
                         color = Palette.TextDim)
                 }
-                val modeled = trace.actionValues.firstOrNull { it.move == chosen }
-                if (modeled != null && trace.actionValues.size >= 2) {
-                    val gap = (trace.actionValues.maxOf { it.chips } - modeled.chips).coerceAtLeast(0.0) / view.bigBlind
-                    Text(t("条件模型 EV 差：", "Conditional model EV gap: ") + number(gap) + " BB",
-                        color = Palette.Gold)
-                } else Text(t("本节点没有可靠的行动 EV 比较，不计算虚构的损失。",
+                if (gap != null) {
+                    if (trace.isMultiwayEv) trace.gradableBestEv()?.let { winner ->
+                        Text(t("采样 EV 模型首选：", "Sampled EV model favours: ") +
+                            StudyPresentation.move(winner.move, view.bigBlind, zh, view.legal.isOpeningBet),
+                            color = Palette.Text)
+                    }
+                    val label = if (trace.isMultiwayEv)
+                        t("采样区间支持的 EV 差下限：", "EV gap lower bound from sampling bands: ")
+                    else t("条件模型 EV 差：", "Conditional model EV gap: ")
+                    Text(label + number(gap) + " BB", color = Palette.Gold)
+                } else if (trace.isMultiwayEv) Text(
+                    t("没有可判分的多人 EV 比较，不计入成绩。",
+                        "No gradable multiway EV comparison; this answer is not scored."), color = Palette.TextDim)
+                else Text(t("本节点没有可靠的行动 EV 比较，不计算虚构的损失。",
                     "No supported action EV comparison; no fabricated loss estimate."), color = Palette.TextDim)
                 Button(onClick = {
-                    val today = System.currentTimeMillis() / 86_400_000L
-                    progress = progress.record("h" + record.id + "a" + trace.actionIndex, score, today)
-                    vm.saveSpacedProgress(progress)
+                    if (score != null) {
+                        val today = System.currentTimeMillis() / 86_400_000L
+                        progress = progress.record("h" + record.id + "a" + trace.actionIndex, score, today)
+                        vm.saveSpacedProgress(progress)
+                    }
                     answer = null
                     index = (index + 1) % nodes.size
-                }) { Text(t("记录并复习下一题", "Save and review next")) }
+                }) {
+                    Text(if (score == null) t("下一题", "Next question")
+                        else t("记录并复习下一题", "Save and review next"))
+                }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { index = (index - 1 + nodes.size) % nodes.size }) { Text(t("上一题", "Previous")) }
